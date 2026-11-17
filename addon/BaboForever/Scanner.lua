@@ -254,6 +254,9 @@ function BF:FinishScan()
       BF:SaveExport()
     end)
   end)
+  pcall(function()
+    BF:ScheduleExportRetry()
+  end)
 
   db.lastScan = timestamp
   db.lastScanMarket = marketKey

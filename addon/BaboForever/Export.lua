@@ -57,6 +57,25 @@ function BF:RecordExport(marketKey, timestamp, accumulator)
   self:SaveExport()
 end
 
+-- The Forever client throttles/defers SavedVariables writes. Retry the flush
+-- for several minutes so a completed scan reaches the companion as soon as the
+-- client permits a write, without any manual /bf export save.
+function BF:ScheduleExportRetry()
+  if self.exportRetry then
+    self.exportRetry:Cancel()
+    self.exportRetry = nil
+  end
+  local attempts = 0
+  self.exportRetry = C_Timer.NewTicker(60, function()
+    attempts = attempts + 1
+    self:SaveExport()
+    if attempts >= 6 then
+      self.exportRetry:Cancel()
+      self.exportRetry = nil
+    end
+  end)
+end
+
 function BF:ClearExport()
   local db = self:ExportDB()
   db.scans = {}
