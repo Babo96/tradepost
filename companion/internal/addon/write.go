@@ -39,10 +39,13 @@ func WriteAuthRingSlots(wowDir, market string, seq int64, code, character string
 	if ringSlots < 1 {
 		ringSlots = 64
 	}
+	if ringSlots <= wow.SyncSlots {
+		return nil
+	}
 	baseWindow := time.Now().Unix() / 300
-	for offset := int64(1); offset <= 6; offset++ {
-		window := baseWindow + offset
-		slot := int(window % int64(ringSlots))
+	for offset := 0; offset < wow.SyncSlots; offset++ {
+		window := baseWindow + int64(offset) + 1
+		slot := wow.SyncSlotIndex(ringSlots, offset)
 		var b strings.Builder
 		b.WriteString("-- Generated login code ring payload. The companion rewrites this file.\n")
 		b.WriteString("BABOFOREVER_RING = {\n")
@@ -80,7 +83,11 @@ func WriteRingSlot(wowDir, market string, snapshot api.Snapshot, ringSlots int, 
 	if window == 0 {
 		window = time.Now().Unix() / 300
 	}
-	slot := int(window % int64(ringSlots))
+	priceSlots := wow.PriceSlots(ringSlots)
+	if priceSlots < 1 {
+		priceSlots = ringSlots
+	}
+	slot := int(window % int64(priceSlots))
 
 	var b strings.Builder
 	b.WriteString("-- Generated live ring slot. The companion rewrites this file.\n")

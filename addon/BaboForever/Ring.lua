@@ -2,6 +2,7 @@ local ADDON, BF = ...
 
 local WINDOW = 300
 local DEFAULT_SLOTS = 64
+local SYNC_SLOTS = 8
 
 local function slotName(index)
   return string.format("BaboForever_Data_%02d", index)
@@ -123,7 +124,11 @@ function BF:LoadRingWindow(window, force)
     return false
   end
 
-  local index = window % count
+  local priceSlots = count - SYNC_SLOTS
+  if priceSlots < 1 then
+    priceSlots = count
+  end
+  local index = window % priceSlots
   local name = slotName(index)
 
   if isAddOnLoaded(name) then
@@ -173,6 +178,28 @@ function BF:LoadRingWindow(window, force)
     self.ring.lastSeq = data.seq
   end
   return applied
+end
+
+-- Load one reserved sync slot. These slots are never used by the 5-minute
+-- price ring, so they can carry login codes (and future sync payloads) even
+-- when the normal ring has wrapped.
+function BF:LoadSyncSlot(index)
+  local name = slotName(index)
+  if isAddOnLoaded(name) then
+    return nil
+  end
+  local loader = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
+  if not loader then
+    return nil
+  end
+  BABOFOREVER_RING = nil
+  local ok, loaded = pcall(loader, name)
+  local data = BABOFOREVER_RING
+  BABOFOREVER_RING = nil
+  if not ok or not loaded or type(data) ~= "table" then
+    return nil
+  end
+  return data
 end
 
 function BF:RingWarnWrap()

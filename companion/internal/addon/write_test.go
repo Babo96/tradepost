@@ -72,3 +72,35 @@ func TestWriteRingSlot(t *testing.T) {
 		t.Fatalf("unexpected pins in ring slot:\n%s", data)
 	}
 }
+
+func TestWriteAuthRingSlots(t *testing.T) {
+	wowDir := setupWow(t)
+	if err := WriteAuthRingSlots(wowDir, "eu:pve:horde", 5, "ABCD2345", "Schmoo-Boo", 1794949000, 64); err != nil {
+		t.Fatal(err)
+	}
+	for offset := 0; offset < wow.SyncSlots; offset++ {
+		index := wow.SyncSlotIndex(64, offset)
+		data, err := os.ReadFile(wow.SlotPath(wowDir, index))
+		if err != nil {
+			t.Fatalf("slot %d: %v", index, err)
+		}
+		if !strings.Contains(string(data), `code = "ABCD2345"`) || !strings.Contains(string(data), `seq = 5`) {
+			t.Fatalf("slot %d missing auth payload:\n%s", index, data)
+		}
+	}
+}
+
+func TestPriceRingSkipsSyncSlots(t *testing.T) {
+	wowDir := setupWow(t)
+	snapshot := api.Snapshot{
+		Market: "eu:pve:horde", Version: 7, Generated: 1794947776,
+		Items: []api.SnapshotItem{{Key: "i:1", Price: 1, Quantity: 1, Listings: 1, Scanned: 1794947776}},
+	}
+	path, err := WriteRingSlot(wowDir, "eu:pve:horde", snapshot, 64, 60, nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(path, "BaboForever_Data_04/Data.lua") {
+		t.Fatalf("price ring used a reserved sync slot: %s", path)
+	}
+}

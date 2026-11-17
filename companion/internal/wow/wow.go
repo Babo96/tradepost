@@ -123,6 +123,21 @@ func WriteAtomic(path string, data []byte) error {
 }
 
 const AuthSlots = 16
+const SyncSlots = 8
+
+func PriceSlots(ringSlots int) int {
+	if ringSlots <= SyncSlots {
+		return ringSlots
+	}
+	return ringSlots - SyncSlots
+}
+
+func SyncSlotIndex(ringSlots, index int) int {
+	if ringSlots <= SyncSlots {
+		return index % ringSlots
+	}
+	return PriceSlots(ringSlots) + (index % SyncSlots)
+}
 
 func AuthSlotName(index int) string {
 	return fmt.Sprintf("BaboForever_Auth_%02d", index)

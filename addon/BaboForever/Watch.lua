@@ -4,7 +4,7 @@ local AUTH_SLOTS = 16
 local AUTH_FIRST_DELAY = 8
 local AUTH_POLL_SECONDS = 2
 local AUTH_POLL_TRIES = 10
-local AUTH_RING_TRIES = 6
+local AUTH_RING_TRIES = 8
 
 function BF:CharacterKey()
   local name = UnitName("player") or "Unknown"
@@ -231,12 +231,15 @@ function BF:ReadAuthReplyFromRing(seq, attempt)
   if (attempt or 0) >= AUTH_RING_TRIES then
     return false
   end
-  local window = tonumber(self.config.ringWindow) or 300
-  local base = math.floor((time() - 1) / window)
-  local target = base + 1 + (attempt or 0)
-  self:LoadRingWindow(target, true)
-  local live = self.live and self.live[self:MarketKey()]
-  local auth = live and live.auth
+  local count = tonumber(self.config.ringSlots) or 64
+  if count <= 8 then
+    return false
+  end
+  local priceSlots = count - 8
+  local syncCount = 8
+  local index = priceSlots + ((attempt or 0) % syncCount)
+  local data = self:LoadSyncSlot(index)
+  local auth = data and data.auth
   if auth and auth.seq == seq and auth.code then
     self:PrintLoginCode(auth)
     return true
