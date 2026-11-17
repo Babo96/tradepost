@@ -242,6 +242,9 @@ function BF:FinishScan()
   end
 
   self:RecordExport(marketKey, timestamp, self.scan.acc)
+  pcall(function()
+    BF:SyncAuctionatorWatchList(false)
+  end)
 
   db.lastScan = timestamp
   db.lastScanMarket = marketKey
