@@ -13,7 +13,7 @@ globals = {
   "BABOFOREVER_EXPORT",
   "BABOFOREVER_ITEMS",
   "ChatEdit_InsertLink",
-  "GetItemQualityColor",
+  "ITEM_QUALITY_COLORS",
   "IsShiftKeyDown",
   "Minimap",
   "UISpecialFrames",

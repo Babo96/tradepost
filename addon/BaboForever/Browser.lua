@@ -225,6 +225,14 @@ function BF:FilterBrowser()
   self:RefreshBrowser()
 end
 
+local function qualityColor(quality)
+  local color = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality or 1]
+  if color and color.r then
+    return color.r, color.g, color.b
+  end
+  return 1, 1, 1
+end
+
 local function sortLabel(mode)
   if mode == "price" then
     return "Sort: price"
@@ -268,7 +276,7 @@ function BF:RefreshBrowser()
       local age = math.max(0, time() - (entry.t or 0))
       row.icon:SetTexture(item.icon or DEFAULT_ICON)
       row.name:SetText(item.name or ("Item #" .. tostring(item.itemID)))
-      row.name:SetTextColor(GetItemQualityColor(item.quality or 1))
+      row.name:SetTextColor(qualityColor(item.quality or 1))
       row.price:SetText(self:MoneyText(entry.p))
       row.meta:SetText(string.format(
         "%s  |cff9ca3af%d|r%s",
