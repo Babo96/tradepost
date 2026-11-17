@@ -218,11 +218,20 @@ function BF:RingNow(window)
   if not window then
     window = math.floor(time() / (tonumber(self.config.ringWindow) or WINDOW))
   end
+
+  local live = self.live and self.live[self:MarketKey()]
+  if live and live.window == window then
+    self:Print("ring window " .. window .. " already applied (seq " .. tostring(live.seq) .. ")")
+    return
+  end
+
   local applied = self:LoadRingWindow(window, true)
   if applied then
     self:Print("ring loaded window " .. window)
+  elseif self.ring and self.ring.lastWindow == window then
+    self:Print("ring window " .. window .. " already loaded")
   else
-    self:Print("ring window " .. window .. " not applied (missing, stale, or already loaded)")
+    self:Print("ring window " .. window .. " not applied (missing, stale, or disabled)")
   end
 end
 

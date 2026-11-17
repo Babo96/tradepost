@@ -110,24 +110,52 @@ function BF:AddPriceLines(tooltip, link)
     left = left .. "  |cff60a5faR|r"
   end
 
+  if type(tooltip.AddDoubleLine) ~= "function" then
+    return
+  end
   tooltip:AddDoubleLine(left, price)
 end
 
-local function safeTooltip(tooltip)
+local function linkFromTooltip(tooltip, data)
+  if data then
+    local link = data.hyperlink or data.itemLink
+    if link then
+      return link
+    end
+  end
+  if tooltip and type(tooltip.GetItem) == "function" then
+    local ok, _, link = pcall(tooltip.GetItem, tooltip)
+    if ok and link then
+      return link
+    end
+  end
+  return nil
+end
+
+local function safeTooltip(tooltip, data)
+  if not BF.config or not BF.config.tooltips then
+    return
+  end
+
   local ok, err = pcall(function()
-    local _, link = tooltip:GetItem()
-    BF:AddPriceLines(tooltip, link)
+    local link = linkFromTooltip(tooltip, data)
+    if link then
+      BF:AddPriceLines(tooltip, link)
+    end
   end)
   if not ok then
     BF:ReportError("tooltip", err)
     BF:SetConfig("tooltips", false)
-    BF:Print("tooltips disabled after an error; /bf tooltips on to retry")
+    if not BF.tooltipErrorShown then
+      BF.tooltipErrorShown = true
+      BF:Print("tooltips disabled after an error; /bf tooltips on to retry")
+    end
   end
 end
 
 if TooltipDataProcessor and Enum and Enum.TooltipDataType then
-  TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip)
-    safeTooltip(tooltip)
+  TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
+    safeTooltip(tooltip, data)
   end)
 else
   local function hook(tooltip)
