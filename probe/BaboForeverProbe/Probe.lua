@@ -268,6 +268,47 @@ local function cmdGetKey(key)
   record("getkey", { key = key, action = action })
 end
 
+local function cmdKeyVariants()
+  local variants = {
+    "CTRL-ALT-SHIFT-F1",
+    "ALT-CTRL-SHIFT-F1",
+    "CTRL-SHIFT-ALT-F1",
+    "SHIFT-CTRL-ALT-F1",
+    "SHIFT-ALT-CTRL-F1",
+    "ALT-SHIFT-CTRL-F1",
+  }
+  for _, key in ipairs(variants) do
+    out("variant " .. key .. " = " .. tostring(GetBindingAction(key)))
+  end
+  record("keyvariants", {})
+end
+
+local function cmdFindBind(needle)
+  needle = string.lower(needle or "")
+  local total = GetNumBindings and GetNumBindings() or 0
+  out("findbind needle=" .. needle .. " total=" .. total)
+  local found = 0
+  for index = 1, total do
+    local parts = { GetBinding(index) }
+    local command = parts[1]
+    local keys = {}
+    for i = 3, #parts do
+      keys[#keys + 1] = tostring(parts[i])
+    end
+    local haystack = string.lower(tostring(command) .. " " .. table.concat(keys, " "))
+    if needle == "" or string.find(haystack, needle, 1, true) then
+      found = found + 1
+      out("  [" .. index .. "] " .. tostring(command) .. " keys=" .. table.concat(keys, ","))
+      if found >= 50 then
+        out("  ... truncated")
+        break
+      end
+    end
+  end
+  out("found=" .. found)
+  record("findbind", { needle = needle, found = found })
+end
+
 local function cmdReset()
   local removed = 0
   for _, key in ipairs(KEYS) do
@@ -529,6 +570,8 @@ local function cmdHelp()
   out("  /bfprobe count                -- current replicate count")
   out("  /bfprobe bench [limit]        -- iterate the list, measure time/memory")
   out("  /bfprobe getkey [key]         -- read any binding key")
+  out("  /bfprobe keyvariants          -- try key-order variants")
+  out("  /bfprobe findbind [needle]    -- search all bindings")
   out("  /bfprobe item [id]            -- commodity status for an item")
   out("  /bfprobe market               -- parsed region / ruleset / house")
   out("  /bfprobe bindwrite [mode] [payload] -- click|raw|macro|spell")
@@ -561,6 +604,8 @@ SlashCmdList["BABOFOREVERPROBE"] = function(msg)
     count = function() cmdCount() end,
     bench = function() cmdBench(args[1]) end,
     getkey = function() cmdGetKey(args[1]) end,
+    keyvariants = function() cmdKeyVariants() end,
+    findbind = function() cmdFindBind(args[1]) end,
     item = function() cmdItem(args[1]) end,
     market = function() cmdMarket() end,
     bindwrite = function() cmdBindWrite(args[1], args[2]) end,
