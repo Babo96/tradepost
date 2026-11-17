@@ -246,8 +246,8 @@ end
 
 function BF:PollAuth(seq, tries)
   if tries >= AUTH_POLL_TRIES then
-    self:Print("no login code yet. Is the companion running? If this is the first")
-    self:Print("run after an update, restart the game once and try /bf login again.")
+    self:Print("no login code in game. Open http://127.0.0.1:8787 to read it,")
+    self:Print("or restart the game once and try /bf login again.")
     return
   end
   local delay = tries == 0 and AUTH_FIRST_DELAY or AUTH_POLL_SECONDS
@@ -273,5 +273,6 @@ function BF:RequestLogin()
   self:MarkActive()
   self:SaveExport()
   self:Print("requesting a login code from the companion...")
+  self:Print("the code also appears at http://127.0.0.1:8787")
   self:PollAuth(auth.seq, 0)
 end

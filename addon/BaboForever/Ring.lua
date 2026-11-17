@@ -59,6 +59,15 @@ function BF:ApplyRing(data, targetWindow)
   if data.auth then
     live.auth = data.auth
   end
+  -- Watch pins must apply even when the price snapshot did not change. A new
+  -- 5-minute slot normally carries the same seq, which used to reject the
+  -- whole payload before pins were read.
+  if data.pins then
+    live.pins = data.pins
+    if data.pins_updated then
+      self:ApplyRemoteWatch(data.pins, data.pins_updated)
+    end
+  end
   if data.seq <= live.seq then
     return false
   end
@@ -90,12 +99,6 @@ function BF:ApplyRing(data, targetWindow)
     live.lookup[key] = nil
   end
 
-  if data.pins then
-    live.pins = data.pins
-    if data.pins_updated then
-      self:ApplyRemoteWatch(data.pins, data.pins_updated)
-    end
-  end
 
   self:Debug(string.format(
     "ring applied window=%s seq=%s items=%d",
