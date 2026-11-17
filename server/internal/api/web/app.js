@@ -247,7 +247,9 @@ function renderDetail(item) {
     api("/v1/item/markets", { key: item.key }),
   ]).then(([history, comparison]) => {
     if (!state.selected || state.selected.key !== requested) return;
-    chart.innerHTML = renderChart(history.points || []);
+    const points = history.points || [];
+    chart.innerHTML = renderChart(points);
+    wireChart(chart, points);
     const marketView = renderMarkets(comparison.markets || []);
     markets.textContent = "";
     if (typeof marketView === "string") {
@@ -288,6 +290,14 @@ function renderChart(points) {
   const dots = points.map((point, index) => `
       <circle cx="${x(index)}" cy="${y(point.max)}" r="2.5" fill="#f0c040" />
       <circle cx="${x(index)}" cy="${y(point.min)}" r="2.5" fill="#4ade80" />`).join("");
+  const step = points.length > 1 ? (width - 2 * pad) / (points.length - 1) : (width - 2 * pad);
+  const hits = points.map((_, index) => {
+    const left = points.length === 1 ? pad : Math.max(pad, x(index) - step / 2);
+    const right = points.length === 1 ? width - pad : Math.min(width - pad, x(index) + step / 2);
+    return `<rect class="chart-hit" data-index="${index}" data-x="${x(index)}"
+      data-max-y="${y(points[index].max)}" data-min-y="${y(points[index].min)}"
+      x="${left}" y="${pad}" width="${Math.max(1, right - left)}" height="${height - 2 * pad}" />`;
+  }).join("");
   const first = new Date(points[0].t * 1000);
   const last = new Date(points[points.length - 1].t * 1000);
   const label = (date) => date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit" });
@@ -296,15 +306,89 @@ function renderChart(points) {
     <div class="legend">
       <span><i style="background:#f0c040"></i>max ${money(max)}</span>
       <span><i style="background:#4ade80"></i>min ${money(min)}</span>
+      <span class="chart-hint">hover for values</span>
     </div>
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Price history">
+    <svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Price history">
       <line x1="${pad}" y1="${height - pad}" x2="${width - pad}" y2="${height - pad}" stroke="#2a3441" />
       <polyline fill="none" stroke="#f0c040" stroke-width="2" points="${maxLine}" />
       <polyline fill="none" stroke="#4ade80" stroke-width="2" points="${minLine}" />
       ${dots}
+      <line class="chart-guide" x1="0" y1="${pad}" x2="0" y2="${height - pad}" />
+      <circle class="chart-cursor-max" cx="0" cy="0" r="4" />
+      <circle class="chart-cursor-min" cx="0" cy="0" r="4" />
+      ${hits}
       <text x="${pad}" y="${height - 2}" fill="#8b98a8" font-size="11">${label(first)}</text>
       <text x="${width - pad}" y="${height - 2}" fill="#8b98a8" font-size="11" text-anchor="end">${label(last)}</text>
-    </svg>`;
+    </svg>
+    <div class="chart-tip" hidden></div>`;
+}
+
+function wireChart(container, points) {
+  const svg = container.querySelector("svg.chart");
+  const tip = container.querySelector(".chart-tip");
+  const guide = container.querySelector(".chart-guide");
+  const maxDot = container.querySelector(".chart-cursor-max");
+  const minDot = container.querySelector(".chart-cursor-min");
+  if (!svg || !tip || !guide) return;
+
+  const hide = () => {
+    tip.hidden = true;
+    guide.style.opacity = "0";
+    maxDot.style.opacity = "0";
+    minDot.style.opacity = "0";
+  };
+
+  svg.querySelectorAll(".chart-hit").forEach((hit) => {
+    hit.addEventListener("mouseenter", (event) => {
+      const index = Number(hit.getAttribute("data-index"));
+      const point = points[index];
+      if (!point) return;
+      const time = new Date(point.t * 1000).toLocaleString([], {
+        weekday: "short", month: "short", day: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+      const samples = point.samples || 0;
+      tip.innerHTML = `
+        <div class="tip-time">${escapeHTML(time)}</div>
+        <div class="tip-row"><span>Max</span><strong>${money(point.max)}</strong></div>
+        <div class="tip-row"><span>Min</span><strong>${money(point.min)}</strong></div>
+        <div class="tip-row"><span>Qty</span><strong>${(point.quantity || 0).toLocaleString()}</strong></div>
+        <div class="tip-samples">${samples} sample${samples === 1 ? "" : "s"}</div>`;
+      tip.hidden = false;
+      const x = hit.getAttribute("data-x");
+      guide.setAttribute("x1", x);
+      guide.setAttribute("x2", x);
+      guide.style.opacity = "1";
+      maxDot.setAttribute("cx", x);
+      maxDot.setAttribute("cy", hit.getAttribute("data-max-y"));
+      maxDot.style.opacity = "1";
+      minDot.setAttribute("cx", x);
+      minDot.setAttribute("cy", hit.getAttribute("data-min-y"));
+      minDot.style.opacity = "1";
+      positionChartTip(container, tip, event);
+    });
+    hit.addEventListener("mousemove", (event) => positionChartTip(container, tip, event));
+  });
+  svg.addEventListener("mouseleave", hide);
+}
+
+function positionChartTip(container, tip, event) {
+  if (tip.hidden) return;
+  const rect = container.getBoundingClientRect();
+  const width = tip.offsetWidth;
+  const height = tip.offsetHeight;
+  let left = event.clientX - rect.left + 14;
+  if (left + width > rect.width - 8) {
+    left = event.clientX - rect.left - width - 14;
+  }
+  left = Math.max(8, Math.min(left, rect.width - width - 8));
+  let top = event.clientY - rect.top - height - 14;
+  if (top < 8) {
+    top = event.clientY - rect.top + 18;
+  }
+  top = Math.max(8, Math.min(top, rect.height - height - 8));
+  tip.style.left = `${left}px`;
+  tip.style.top = `${top}px`;
 }
 
 function renderMarkets(markets) {
