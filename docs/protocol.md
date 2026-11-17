@@ -110,8 +110,9 @@ BABOFOREVER_RING = {
 
 ## Open items
 
-- `/bfprobe bench` on the 280k auction list: scan time and memory, unique item
-  keys, missing item info. This sets the aggregation pass and the snapshot size.
+- Scan benchmark done: 254,976 auctions in 4,817 ms, 6,593 unique item IDs,
+  -568 KB memory after GC. The real pass adds equipment-link/item-level work;
+  measure that in the addon prototype.
 - Choose 48 vs 64 vs 96 slots after measuring typical session length and slot
   size.
 - Delta vs full snapshot per window; cumulative deltas are the current default.

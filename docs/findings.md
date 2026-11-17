@@ -24,16 +24,37 @@ next design decision depends on it.
 | Field | Value |
 |---|---|
 | `GetNumReplicateItems()` when opened | 0 outside AH |
-| Same after `/bfprobe scan` | 105,472 then 280,707 |
-| `IsThrottledMessageSystemReady()` | true |
+| Same after `/bfprobe scan` | 105,472 → 280,707 → 285,012 |
+| `IsThrottledMessageSystemReady()` | true, later false during Auctionator scan |
 | `GetItemCommodityStatus(2589)` | not captured yet |
 | `GetItemCommodityStatus(4496)` | not captured yet |
-| Scan wall-clock time (if measured) | pending `/bfprobe bench` |
-| Memory before/after (`collectgarbage("count")`) | pending `/bfprobe bench` |
+| Scan wall-clock time | **4,817 ms** for 254,976 auctions (info-only pass) |
+| Memory before/after (`collectgarbage("count")`) | **-568 KB** after GC |
 
-The live list reached **280,707** auctions after a full replicate. That is much
-larger than the ~80k example in the API docs, so the addon must aggregate in a
-streaming pass and must not keep the raw list or per-auction tables.
+`/bfprobe bench` on the full list:
+
+```
+total        = 254,976   (list later grew to 285,012)
+uniqueItemIDs= 6,593     (Auctionator processed 6,671 items)
+usable       = 254,963
+missingInfo  = 69,857    (~27%)
+elapsedMs    = 4,817
+memoryDeltaKB= -568
+minUnitPrice = 1 copper
+maxUnitPrice = 420,690,074 copper (~42k gold, needs outlier filtering)
+```
+
+Conclusions:
+
+- A full replicate pass is feasible: ~5 s for the info-only loop, ~6.6k unique
+  item keys, no memory growth after GC.
+- The 280k number is **auctions**, not items. The snapshot will be small.
+- `missingInfo` is high (~27%). Do not bulk-load item data. Key non-equipment
+  by itemID; for equipment use the replicate link / item level when available
+  and fall back to itemID when it is not.
+- The replicate list keeps growing after the first event (105k → 285k). Wait
+  for a quiet period before finalising a scan.
+- Outlier filtering is required (1 copper to 42k gold).
 
 Notes on market structure observed in game:
 

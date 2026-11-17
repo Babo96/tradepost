@@ -14,9 +14,10 @@ preceded by a timestamped backup of `bindings-cache.wtf`.
 - LoadOnDemand ring: **confirmed** (`RINGA123` loaded mid-session).
 - New addon folders at runtime: **not discovered** (`MISSING`).
 - TOC metadata: **cached** at load/startup.
-- Remaining: `/bfprobe bench` on the 280k auction list.
+- Full replicate benchmark: **4,817 ms** for 254,976 auctions, 6,593 unique
+  item IDs, no memory growth after GC.
 
-Sections 2–4 are kept for re-testing; section 5 is the confirmed channel.
+Phase 0 is complete. Sections 2–4 are kept for re-testing.
 
 If anything looks wrong:
 
