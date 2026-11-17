@@ -69,6 +69,7 @@ function BF:SetWatched(key, watched)
   entry.updated = time()
   self:MarkActive()
   self:SaveExport()
+  self:SyncBlizzardFavorites(false)
   self:SyncAuctionatorWatchList(false)
   if self.browser and self.browser.frame and self.browser.frame:IsShown() then
     self:RefreshBrowser()
@@ -83,6 +84,166 @@ end
 
 -- Called from Ring.lua with the server watch list. The timestamp prevents an
 -- older ring slot from overwriting a newer local change.
+function BF:MakeAuctionItemKey(key)
+  if not C_AuctionHouse or type(C_AuctionHouse.MakeItemKey) ~= "function" then
+    return nil
+  end
+  local prefix, itemID, itemLevel = key:match("^([igp]):(%d+):?(%d*)")
+  itemID = tonumber(itemID)
+  if not itemID then
+    return nil
+  end
+  if prefix == "g" then
+    return C_AuctionHouse.MakeItemKey(itemID, tonumber(itemLevel) or 0)
+  end
+  if prefix == "i" then
+    return C_AuctionHouse.MakeItemKey(itemID)
+  end
+  return nil
+end
+
+function BF:KeyFromAuctionItemKey(itemKey)
+  if type(itemKey) ~= "table" or not itemKey.itemID then
+    return nil
+  end
+  local itemID = itemKey.itemID
+  local classID = self:ClassIDFor(itemID)
+  if classID == 2 or classID == 4 then
+    local itemLevel = tonumber(itemKey.itemLevel) or 0
+    return "g:" .. itemID .. ":" .. itemLevel
+  end
+  return "i:" .. itemID
+end
+
+function BF:InitBlizzardFavorites()
+  if self.blizzardFavoritesHooked then
+    return
+  end
+  if not C_AuctionHouse or type(C_AuctionHouse.SetFavoriteItem) ~= "function" then
+    return
+  end
+  self.blizzardFavoritesHooked = true
+  hooksecurefunc(C_AuctionHouse, "SetFavoriteItem", function(itemKey, setFavorite)
+    if BF.blizzardFavoriteBusy then
+      return
+    end
+    BF:OnBlizzardFavorite(itemKey, setFavorite)
+  end)
+end
+
+function BF:OnBlizzardFavorite(itemKey, setFavorite)
+  local key = self:KeyFromAuctionItemKey(itemKey)
+  if not key then
+    return
+  end
+  self.blizzardFavoriteBusy = true
+  local entry = self:CurrentWatch()
+  entry.blizzardFavorites = entry.blizzardFavorites or {}
+  if setFavorite then
+    entry.blizzardFavorites[key] = true
+    pcall(self.SetWatched, self, key, true)
+  else
+    entry.blizzardFavorites[key] = nil
+    pcall(self.SetWatched, self, key, false)
+  end
+  self.blizzardFavoriteBusy = false
+end
+
+-- Push watchlist entries into the default Auction House favorites. Run only
+-- while at the AH; outside it the next AH open performs the sync.
+function BF:SyncBlizzardFavorites(announce)
+  if self.blizzardFavoriteBusy or not self.atAuctionHouse then
+    return false
+  end
+  if not C_AuctionHouse or type(C_AuctionHouse.SetFavoriteItem) ~= "function" then
+    return false
+  end
+  if type(C_AuctionHouse.MakeItemKey) ~= "function" then
+    return false
+  end
+  if type(C_AuctionHouse.FavoritesAreAvailable) == "function" and not C_AuctionHouse.FavoritesAreAvailable() then
+    return false
+  end
+
+  local entry = self:CurrentWatch()
+  local previous = entry.blizzardFavorites or {}
+  local current = {}
+  local changed = false
+  self.blizzardFavoriteBusy = true
+  for _, key in ipairs(self:WatchKeys()) do
+    local itemKey = self:MakeAuctionItemKey(key)
+    if itemKey then
+      current[key] = true
+      if not previous[key] then
+        pcall(C_AuctionHouse.SetFavoriteItem, itemKey, true)
+        changed = true
+      end
+    end
+  end
+  for key in pairs(previous) do
+    if not current[key] then
+      local itemKey = self:MakeAuctionItemKey(key)
+      if itemKey then
+        pcall(C_AuctionHouse.SetFavoriteItem, itemKey, false)
+        changed = true
+      end
+    end
+  end
+  entry.blizzardFavorites = current
+  self.blizzardFavoriteBusy = false
+  if changed then
+    self:SaveExport()
+  end
+  if announce then
+    self:Print("Auction House favorites synced: " .. #self:WatchKeys() .. " item(s)")
+  end
+  return true
+end
+
+-- Discover favorites that existed before this session. Only keys present in
+-- the scan can be checked; the SetFavoriteItem hook handles later changes.
+function BF:DiscoverBlizzardFavorites(keys)
+  if self.favoritesScanned or not self.atAuctionHouse then
+    return false
+  end
+  if not C_AuctionHouse or type(C_AuctionHouse.IsFavoriteItem) ~= "function" then
+    return false
+  end
+  self.favoritesScanned = true
+  local entry = self:CurrentWatch()
+  entry.blizzardFavorites = entry.blizzardFavorites or {}
+  local changed = false
+  for key in pairs(keys or {}) do
+    local itemKey = self:MakeAuctionItemKey(key)
+    if itemKey then
+      local ok, favorite = pcall(C_AuctionHouse.IsFavoriteItem, itemKey)
+      if ok then
+        if favorite then
+          if not entry.items[key] then
+            entry.items[key] = true
+            changed = true
+          end
+          entry.blizzardFavorites[key] = true
+        elseif entry.blizzardFavorites[key] then
+          entry.items[key] = nil
+          entry.blizzardFavorites[key] = nil
+          changed = true
+        end
+      end
+    end
+  end
+  if changed then
+    entry.updated = time()
+    self:MarkActive()
+    self:SaveExport()
+    if self.browser and self.browser.frame and self.browser.frame:IsShown() then
+      self:RefreshBrowser()
+    end
+  end
+  self:SyncBlizzardFavorites(false)
+  return true
+end
+
 function BF:AuctionatorFavourites()
   if not Auctionator or type(Auctionator.Groups) ~= "table" then
     return nil
@@ -101,7 +262,7 @@ end
 -- additive/differential: items removed from Favourites are removed only if
 -- they were added by this sync, so website/browser watches are not lost.
 function BF:SyncAuctionatorFavourites(announce)
-  if self.config and self.config.auctionatorFavourites == false then
+  if self.config and (self.config.auctionatorBridge == false or self.config.auctionatorFavourites == false) then
     return false
   end
   local list = self:AuctionatorFavourites()
@@ -151,6 +312,9 @@ function BF:SyncAuctionatorFavourites(announce)
 end
 
 function BF:SyncAuctionatorWatchList(announce)
+  if self.config and self.config.auctionatorBridge == false then
+    return false
+  end
   if not Auctionator or type(Auctionator.API) ~= "table" or type(Auctionator.API.v1) ~= "table" then
     if announce then
       self:Print("Auctionator API is not available")
@@ -240,6 +404,7 @@ function BF:ApplyRemoteWatch(items, updated)
   entry.updated = updated
   self:MarkActive()
   self:SaveExport()
+  self:SyncBlizzardFavorites(false)
   self:SyncAuctionatorWatchList(false)
   if self.browser and self.browser.frame and self.browser.frame:IsShown() then
     self:RefreshBrowser()

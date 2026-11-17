@@ -62,6 +62,7 @@ function BF:PrintHelp()
   self:Print("  /bf watch [id/key]   toggle a watched item / list the watchlist")
   self:Print("  /bf watch sync       rebuild the Auctionator watchlist")
   self:Print("  /bf favourites on/off mirror Auctionator favourites into the watchlist")
+  self:Print("  /bf favorites sync   push the watchlist into the default AH stars")
   self:Print("  /bf login            get a short web login code")
   self:Print("  /bf bridge [on/off]  Auctionator display bridge")
   self:Print("  /bf bridgetest [id]  original vs current Auctionator price")
@@ -165,7 +166,9 @@ SlashCmdList["BABOFOREVER"] = function(msg)
       BF:Print((watched and "watching " or "unwatched ") .. key)
     end
   elseif command == "favourites" or command == "favorites" then
-    if rest == "on" then
+    if rest == "sync" then
+      BF:SyncBlizzardFavorites(true)
+    elseif rest == "on" then
       BF:SetConfig("auctionatorFavourites", true)
       BF:SyncAuctionatorFavourites(true)
     elseif rest == "off" then

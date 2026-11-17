@@ -48,6 +48,7 @@ function BF:OnLogin()
   self:PruneLocal()
   self:InitRing()
   self:InitBridge()
+  self:InitBlizzardFavorites()
   C_Timer.After(3, function()
     pcall(function()
       BF:SaveExport()
@@ -72,7 +73,13 @@ end
 function BF:OnAuctionHouseShow()
   self.atAuctionHouse = true
   self:UpdateMarket()
+  self:InitBlizzardFavorites()
   self:Debug("AH opened. Market: " .. self:MarketKey())
+  C_Timer.After(2, function()
+    pcall(function()
+      BF:SyncBlizzardFavorites(false)
+    end)
+  end)
   self:TryScan(false)
 end
 

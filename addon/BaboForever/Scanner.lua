@@ -241,6 +241,9 @@ function BF:FinishScan()
     unique = unique + 1
   end
 
+  pcall(function()
+    BF:DiscoverBlizzardFavorites(self.scan.acc)
+  end)
   self:RecordExport(marketKey, timestamp, self.scan.acc)
   pcall(function()
     BF:SyncAuctionatorFavourites(false)
