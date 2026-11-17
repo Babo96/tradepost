@@ -26,7 +26,8 @@ GET  /v1/meta                        -> markets, versions, counts, freshness
 GET  /v1/snapshot/{market}           -> gzip JSON snapshot + ETag
 GET  /v1/snapshot/{market}/data-addon.zip
 GET  /v1/items?market=..&q=..        -> item search with latest prices
-GET  /v1/item/history?market=..&key= -> hourly min/max history
+GET  /v1/item/history?market=..&key=..&range=12h|7d|all
+                                      -> raw / 15m / hourly history
 GET  /v1/item/markets?key=..         -> latest price per market
 POST /v1/auth/code                   -> one-time web login code (bearer)
 POST /v1/auth/redeem                 -> exchange code for a session cookie
@@ -74,11 +75,13 @@ uses the client item cache; metadata is uploaded only when it changes.
 
 ## Schema
 
-`clients`, `markets`, `scans`, `prices_latest`, `prices_hourly`, `items`.
+`clients`, `markets`, `scans`, `prices_latest`, `prices_raw`, `prices_15m`,
+`prices_hourly`, `items`.
 Migrations are embedded and run at startup.
 
-History is kept as hourly min/max buckets per market/key, which feeds the web
-chart. The web watchlist is stored in browser `localStorage`; server-side pins
+History is kept at three resolutions: raw scans for 12 hours, 15-minute
+min/max buckets for 7 days, and hourly min/max buckets indefinitely. A
+background cleanup runs every 10 minutes. The web watchlist is stored in browser `localStorage`; server-side pins
 shared with the addon are a later step.
 
 ## Deployment

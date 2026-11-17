@@ -352,12 +352,35 @@ func (s *Server) handleItemHistory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid item key")
 		return
 	}
-	limit := parseLimit(query.Get("limit"), 168, 1000)
-	history, err := s.store.ItemHistory(r.Context(), market, key, limit)
+	rangeKey := query.Get("range")
+	if rangeKey == "" {
+		rangeKey = "all"
+	}
+	var resolution string
+	var since time.Time
+	var limit int
+	switch rangeKey {
+	case "12h":
+		resolution = "raw"
+		since = time.Now().Add(-12 * time.Hour)
+		limit = parseLimit(query.Get("limit"), 1000, 5000)
+	case "7d":
+		resolution = "15m"
+		since = time.Now().Add(-7 * 24 * time.Hour)
+		limit = parseLimit(query.Get("limit"), 2000, 10000)
+	case "all":
+		resolution = "hour"
+		limit = parseLimit(query.Get("limit"), 5000, 20000)
+	default:
+		writeError(w, http.StatusBadRequest, "invalid range")
+		return
+	}
+	history, err := s.store.HistoryPoints(r.Context(), market, key, resolution, since, limit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "history failed")
 		return
 	}
+	history.Range = rangeKey
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, http.StatusOK, history)
 }

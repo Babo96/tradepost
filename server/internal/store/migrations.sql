@@ -97,3 +97,33 @@ CREATE TABLE IF NOT EXISTS watch_lists (
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (client_id, character)
 );
+
+CREATE TABLE IF NOT EXISTS prices_15m (
+  market text NOT NULL,
+  item_key text NOT NULL,
+  bucket timestamptz NOT NULL,
+  min_price bigint NOT NULL,
+  max_price bigint NOT NULL,
+  quantity bigint NOT NULL,
+  samples integer NOT NULL DEFAULT 1,
+  PRIMARY KEY (market, item_key, bucket)
+);
+
+CREATE INDEX IF NOT EXISTS prices_15m_bucket
+  ON prices_15m (bucket);
+
+CREATE TABLE IF NOT EXISTS prices_raw (
+  id bigserial PRIMARY KEY,
+  market text NOT NULL,
+  item_key text NOT NULL,
+  price bigint NOT NULL,
+  quantity bigint NOT NULL,
+  listings integer NOT NULL,
+  scanned_at timestamptz NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS prices_raw_lookup
+  ON prices_raw (market, item_key, scanned_at);
+
+CREATE INDEX IF NOT EXISTS prices_raw_scanned
+  ON prices_raw (scanned_at);

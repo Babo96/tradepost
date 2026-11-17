@@ -12,6 +12,7 @@ const state = {
   results: [],
   selected: null,
   session: null,
+  range: localStorage.getItem("bf-range") || "all",
   watch: new Set(JSON.parse(localStorage.getItem("bf-watch") || "[]")),
 };
 
@@ -222,7 +223,24 @@ function renderDetail(item) {
   detail.append(heading, key, current, watch);
 
   const chartTitle = document.createElement("h3");
-  chartTitle.textContent = "Price history";
+  const rangeLabel = state.range === "12h" ? "12h · raw scans"
+    : state.range === "7d" ? "7d · 15-minute buckets"
+    : "all · hourly buckets";
+  chartTitle.textContent = "Price history · " + rangeLabel;
+  const ranges = document.createElement("div");
+  ranges.className = "range-tabs";
+  for (const [value, label] of [["12h", "12h"], ["7d", "7d"], ["all", "All"]]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    if (state.range === value) button.classList.add("active");
+    button.addEventListener("click", () => {
+      state.range = value;
+      localStorage.setItem("bf-range", value);
+      if (state.selected) renderDetail(state.selected);
+    });
+    ranges.append(button);
+  }
   const chart = document.createElement("div");
   chart.className = "chart-wrap";
   chart.textContent = "Loading history…";
@@ -230,16 +248,16 @@ function renderDetail(item) {
   marketsTitle.textContent = "Markets";
   const markets = document.createElement("div");
   markets.textContent = "Loading markets…";
-  detail.append(chartTitle, chart, marketsTitle, markets);
+  detail.append(chartTitle, ranges, chart, marketsTitle, markets);
 
   const requested = item.key;
   Promise.all([
-    api("/v1/item/history", { market: state.market, key: item.key, limit: 168 }),
+    api("/v1/item/history", { market: state.market, key: item.key, range: state.range }),
     api("/v1/item/markets", { key: item.key }),
   ]).then(([history, comparison]) => {
     if (!state.selected || state.selected.key !== requested) return;
     const points = history.points || [];
-    chart.innerHTML = renderChart(points);
+    chart.innerHTML = renderChart(points, history);
     wireChart(chart, points);
     const marketView = renderMarkets(comparison.markets || []);
     markets.textContent = "";
@@ -260,7 +278,7 @@ function escapeHTML(value) {
   }[char]));
 }
 
-function renderChart(points) {
+function renderChart(points, meta) {
   if (!points.length) {
     return `<p class="empty">No hourly history yet. New scans will build this chart.</p>`;
   }
@@ -278,9 +296,9 @@ function renderChart(points) {
 
   const maxLine = points.map((point, index) => `${x(index)},${y(point.max)}`).join(" ");
   const minLine = points.map((point, index) => `${x(index)},${y(point.min)}`).join(" ");
-  const dots = points.map((point, index) => `
+  const dots = points.length <= 300 ? points.map((point, index) => `
       <circle cx="${x(index)}" cy="${y(point.max)}" r="2.5" fill="#f0c040" />
-      <circle cx="${x(index)}" cy="${y(point.min)}" r="2.5" fill="#4ade80" />`).join("");
+      <circle cx="${x(index)}" cy="${y(point.min)}" r="2.5" fill="#4ade80" />`).join("") : "";
   const step = points.length > 1 ? (width - 2 * pad) / (points.length - 1) : (width - 2 * pad);
   const hits = points.map((_, index) => {
     const left = points.length === 1 ? pad : Math.max(pad, x(index) - step / 2);
@@ -291,7 +309,10 @@ function renderChart(points) {
   }).join("");
   const first = new Date(points[0].t * 1000);
   const last = new Date(points[points.length - 1].t * 1000);
-  const label = (date) => date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit" });
+  const range = meta && meta.range;
+  const label = (date) => range === "12h"
+    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString([], { month: "short", day: "numeric" });
 
   return `
     <div class="legend">

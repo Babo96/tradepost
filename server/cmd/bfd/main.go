@@ -31,6 +31,22 @@ func main() {
 	}
 	defer st.Close()
 
+	go func() {
+		_ = st.CleanupHistory(ctx)
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := st.CleanupHistory(ctx); err != nil {
+					log.Printf("history cleanup: %v", err)
+				}
+			}
+		}
+	}()
+
 	addr := env("BFD_ADDR", ":8080")
 	server := &http.Server{
 		Addr:              addr,

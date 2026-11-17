@@ -21,6 +21,8 @@ type MemStore struct {
 	versions map[string]int64
 	items    map[int64]store.ItemMeta
 	history  map[string]map[string]map[int64]store.HistoryPoint
+	quarter  map[string]map[string]map[int64]store.HistoryPoint
+	raw      map[string]map[string][]store.HistoryPoint
 	codes    map[string]store.LoginGrant
 	used     map[string]bool
 	sessions map[string]store.WebSession
@@ -36,6 +38,8 @@ func NewMemStore() *MemStore {
 		versions: map[string]int64{},
 		items:    map[int64]store.ItemMeta{},
 		history:  map[string]map[string]map[int64]store.HistoryPoint{},
+		quarter:  map[string]map[string]map[int64]store.HistoryPoint{},
+		raw:      map[string]map[string][]store.HistoryPoint{},
 		codes:    map[string]store.LoginGrant{},
 		used:     map[string]bool{},
 		sessions: map[string]store.WebSession{},
@@ -118,6 +122,41 @@ func (m *MemStore) Ingest(_ context.Context, clientID string, scan store.Scan) (
 		}
 		point.Samples++
 		byKey[bucket] = point
+	}
+
+	if m.quarter[scan.Market] == nil {
+		m.quarter[scan.Market] = map[string]map[int64]store.HistoryPoint{}
+	}
+	quarterBucket := scan.ScannedAt.Truncate(15 * time.Minute).Unix()
+	if m.raw[scan.Market] == nil {
+		m.raw[scan.Market] = map[string][]store.HistoryPoint{}
+	}
+	for _, item := range scan.Items {
+		byKey := m.quarter[scan.Market][item.Key]
+		if byKey == nil {
+			byKey = map[int64]store.HistoryPoint{}
+			m.quarter[scan.Market][item.Key] = byKey
+		}
+		point, ok := byKey[quarterBucket]
+		if !ok {
+			point = store.HistoryPoint{Bucket: quarterBucket, Min: item.Price, Max: item.Price}
+		}
+		if item.Price < point.Min {
+			point.Min = item.Price
+		}
+		if item.Price > point.Max {
+			point.Max = item.Price
+		}
+		if item.Quantity > point.Quantity {
+			point.Quantity = item.Quantity
+		}
+		point.Samples++
+		byKey[quarterBucket] = point
+
+		m.raw[scan.Market][item.Key] = append(m.raw[scan.Market][item.Key], store.HistoryPoint{
+			Bucket: scan.ScannedAt.Unix(), Min: item.Price, Max: item.Price,
+			Quantity: item.Quantity, Listings: item.Listings, Samples: 1,
+		})
 	}
 
 	m.versions[scan.Market]++
@@ -220,15 +259,42 @@ func (m *MemStore) SearchItems(_ context.Context, market, query string, limit in
 	return result, nil
 }
 
-func (m *MemStore) ItemHistory(_ context.Context, market, key string, limit int) (store.History, error) {
+func (m *MemStore) ItemHistory(ctx context.Context, market, key string, limit int) (store.History, error) {
+	return m.HistoryPoints(ctx, market, key, "hour", time.Unix(0, 0), limit)
+}
+
+func (m *MemStore) HistoryPoints(_ context.Context, market, key, resolution string, since time.Time, limit int) (store.History, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	history := store.History{Market: market, Key: key, Points: []store.HistoryPoint{}}
+	history := store.History{Market: market, Key: key, Resolution: resolution, Points: []store.HistoryPoint{}}
 	history.Name = m.items[store.ItemID(key)].Name
-	for bucket, point := range m.history[market][key] {
-		point.Bucket = bucket
-		history.Points = append(history.Points, point)
+	if since.IsZero() {
+		since = time.Unix(0, 0)
 	}
+
+	switch resolution {
+	case "raw":
+		for _, point := range m.raw[market][key] {
+			if point.Bucket >= since.Unix() {
+				history.Points = append(history.Points, point)
+			}
+		}
+	case "15m":
+		for bucket, point := range m.quarter[market][key] {
+			if bucket >= since.Unix() {
+				point.Bucket = bucket
+				history.Points = append(history.Points, point)
+			}
+		}
+	default:
+		for bucket, point := range m.history[market][key] {
+			if bucket >= since.Unix() {
+				point.Bucket = bucket
+				history.Points = append(history.Points, point)
+			}
+		}
+	}
+
 	sort.Slice(history.Points, func(i, j int) bool {
 		return history.Points[i].Bucket < history.Points[j].Bucket
 	})
@@ -236,6 +302,47 @@ func (m *MemStore) ItemHistory(_ context.Context, market, key string, limit int)
 		history.Points = history.Points[len(history.Points)-limit:]
 	}
 	return history, nil
+}
+
+func (m *MemStore) CleanupHistory(context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	rawCutoff := time.Now().Add(-12 * time.Hour).Unix()
+	quarterCutoff := time.Now().Add(-7 * 24 * time.Hour).Unix()
+	for market, byKey := range m.raw {
+		for key, points := range byKey {
+			kept := points[:0]
+			for _, point := range points {
+				if point.Bucket >= rawCutoff {
+					kept = append(kept, point)
+				}
+			}
+			if len(kept) == 0 {
+				delete(byKey, key)
+			} else {
+				byKey[key] = kept
+			}
+		}
+		if len(byKey) == 0 {
+			delete(m.raw, market)
+		}
+	}
+	for market, byKey := range m.quarter {
+		for key, points := range byKey {
+			for bucket := range points {
+				if bucket < quarterCutoff {
+					delete(points, bucket)
+				}
+			}
+			if len(points) == 0 {
+				delete(byKey, key)
+			}
+		}
+		if len(byKey) == 0 {
+			delete(m.quarter, market)
+		}
+	}
+	return nil
 }
 
 func (m *MemStore) ItemMarkets(_ context.Context, key string) ([]store.MarketPrice, error) {

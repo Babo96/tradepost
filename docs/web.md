@@ -15,8 +15,11 @@ Node build or separate static host.
 - search by item name or item ID over `prices_latest`
 - cheapest-first results with quality-colored names, item level, price,
   quantity, listings, and scan age
-- item detail: hourly min/max chart (`prices_hourly`), market comparison across
-  alliance/horde/neutral and rulesets
+- item detail: selectable history range:
+  - `12h` raw scan points (`prices_raw`, retained 12 hours)
+  - `7d` 15-minute min/max buckets (`prices_15m`, retained 7 days)
+  - `All` hourly min/max buckets (`prices_hourly`, retained indefinitely)
+- market comparison across alliance/horde/neutral and rulesets
 - watchlist stored in `localStorage` when logged out, or per character on the
   server after `/bf login`; see [`watch.md`](watch.md)
 - money formatting in gold/silver/copper
@@ -34,12 +37,16 @@ Node build or separate static host.
 
 ```
 GET /v1/items?market=eu:pve:horde&q=linen&limit=50
-GET /v1/item/history?market=eu:pve:horde&key=i:2589&limit=168
+GET /v1/item/history?market=eu:pve:horde&key=i:2589&range=12h
+GET /v1/item/history?market=eu:pve:horde&key=i:2589&range=7d
+GET /v1/item/history?market=eu:pve:horde&key=i:2589&range=all
 GET /v1/item/markets?key=i:2589
 ```
 
 Search `q` matches a name substring, an exact key (`i:2589`), or an item ID.
-History returns oldest-to-newest hourly buckets with min/max/quantity/samples.
+History returns oldest-to-newest points with min/max/quantity/samples. The
+response includes `resolution` (`raw`, `15m`, `hour`) and `range`. Old raw and
+15-minute rows are deleted by the server cleanup loop; hourly rows are kept.
 
 ## Ingest additions
 

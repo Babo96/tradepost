@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -88,7 +89,17 @@ func (p *Postgres) SearchItems(ctx context.Context, market, query string, limit 
 }
 
 func (p *Postgres) ItemHistory(ctx context.Context, market, key string, limit int) (History, error) {
-	history := History{Market: market, Key: key, Points: []HistoryPoint{}}
+	return p.HistoryPoints(ctx, market, key, "hour", time.Unix(0, 0), limit)
+}
+
+func (p *Postgres) HistoryPoints(ctx context.Context, market, key, resolution string, since time.Time, limit int) (History, error) {
+	history := History{Market: market, Key: key, Resolution: resolution, Points: []HistoryPoint{}}
+	if since.IsZero() {
+		since = time.Unix(0, 0)
+	}
+	if limit < 1 {
+		limit = 1000
+	}
 
 	itemID := ItemID(key)
 	if itemID > 0 {
@@ -97,14 +108,29 @@ func (p *Postgres) ItemHistory(ctx context.Context, market, key string, limit in
 		).Scan(&history.Name)
 	}
 
-	rows, err := p.pool.Query(ctx,
-		`SELECT extract(epoch FROM bucket)::bigint, min_price, max_price, quantity, samples
-		 FROM prices_hourly
-		 WHERE market = $1 AND item_key = $2
-		 ORDER BY bucket DESC
-		 LIMIT $3`,
-		market, key, limit,
-	)
+	var query string
+	switch resolution {
+	case "raw":
+		query = `SELECT extract(epoch FROM scanned_at)::bigint, price, price, quantity, listings, 1
+		         FROM prices_raw
+		         WHERE market = $1 AND item_key = $2 AND scanned_at >= $3
+		         ORDER BY scanned_at DESC
+		         LIMIT $4`
+	case "15m":
+		query = `SELECT extract(epoch FROM bucket)::bigint, min_price, max_price, quantity, 0, samples
+		         FROM prices_15m
+		         WHERE market = $1 AND item_key = $2 AND bucket >= $3
+		         ORDER BY bucket DESC
+		         LIMIT $4`
+	default:
+		query = `SELECT extract(epoch FROM bucket)::bigint, min_price, max_price, quantity, 0, samples
+		         FROM prices_hourly
+		         WHERE market = $1 AND item_key = $2 AND bucket >= $3
+		         ORDER BY bucket DESC
+		         LIMIT $4`
+	}
+
+	rows, err := p.pool.Query(ctx, query, market, key, since, limit)
 	if err != nil {
 		return History{}, err
 	}
@@ -112,7 +138,7 @@ func (p *Postgres) ItemHistory(ctx context.Context, market, key string, limit in
 
 	for rows.Next() {
 		var point HistoryPoint
-		if err := rows.Scan(&point.Bucket, &point.Min, &point.Max, &point.Quantity, &point.Samples); err != nil {
+		if err := rows.Scan(&point.Bucket, &point.Min, &point.Max, &point.Quantity, &point.Listings, &point.Samples); err != nil {
 			return History{}, err
 		}
 		history.Points = append(history.Points, point)
@@ -124,6 +150,18 @@ func (p *Postgres) ItemHistory(ctx context.Context, market, key string, limit in
 		history.Points[i], history.Points[j] = history.Points[j], history.Points[i]
 	}
 	return history, nil
+}
+
+func (p *Postgres) CleanupHistory(ctx context.Context) error {
+	if _, err := p.pool.Exec(ctx,
+		`DELETE FROM prices_raw WHERE scanned_at < now() - interval '12 hours'`,
+	); err != nil {
+		return err
+	}
+	_, err := p.pool.Exec(ctx,
+		`DELETE FROM prices_15m WHERE bucket < now() - interval '7 days'`,
+	)
+	return err
 }
 
 func (p *Postgres) ItemMarkets(ctx context.Context, key string) ([]MarketPrice, error) {

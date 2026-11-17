@@ -444,3 +444,50 @@ func TestLoginCodeAndWatchSync(t *testing.T) {
 		t.Fatalf("me after logout status %d", meRec2.Code)
 	}
 }
+
+func TestHistoryRanges(t *testing.T) {
+	srv, _ := newTestServer(t)
+	client := enroll(t, srv)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(ingestBody()))
+	req.Header.Set("Authorization", "Bearer "+client.Token)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ingest status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	cases := []struct {
+		query      string
+		resolution string
+	}{
+		{"12h", "raw"},
+		{"7d", "15m"},
+		{"all", "hour"},
+	}
+	for _, tc := range cases {
+		request := httptest.NewRequest(http.MethodGet,
+			"/v1/item/history?market=eu:pve:horde&key=i:2589&range="+tc.query, nil)
+		response := httptest.NewRecorder()
+		srv.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s status %d: %s", tc.query, response.Code, response.Body.String())
+		}
+		var history struct {
+			Resolution string `json:"resolution"`
+			Range      string `json:"range"`
+			Points     []struct {
+				Min int64 `json:"min"`
+			} `json:"points"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &history); err != nil {
+			t.Fatal(err)
+		}
+		if history.Resolution != tc.resolution || history.Range != tc.query {
+			t.Fatalf("%s: unexpected history header: %+v", tc.query, history)
+		}
+		if len(history.Points) != 1 || history.Points[0].Min != 1234 {
+			t.Fatalf("%s: unexpected points: %+v", tc.query, history.Points)
+		}
+	}
+}

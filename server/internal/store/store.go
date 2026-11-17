@@ -93,14 +93,17 @@ type HistoryPoint struct {
 	Min      int64 `json:"min"`
 	Max      int64 `json:"max"`
 	Quantity int64 `json:"quantity"`
+	Listings int32 `json:"listings,omitempty"`
 	Samples  int64 `json:"samples"`
 }
 
 type History struct {
-	Market string         `json:"market"`
-	Key    string         `json:"key"`
-	Name   string         `json:"name"`
-	Points []HistoryPoint `json:"points"`
+	Market     string         `json:"market"`
+	Key        string         `json:"key"`
+	Name       string         `json:"name"`
+	Resolution string         `json:"resolution"`
+	Range      string         `json:"range"`
+	Points     []HistoryPoint `json:"points"`
 }
 
 // MarketPrice compares one key across markets.
@@ -154,6 +157,8 @@ type Store interface {
 	UpsertItems(ctx context.Context, items []ItemMeta) error
 	SearchItems(ctx context.Context, market, query string, limit int) ([]SearchResult, error)
 	ItemHistory(ctx context.Context, market, key string, limit int) (History, error)
+	HistoryPoints(ctx context.Context, market, key, resolution string, since time.Time, limit int) (History, error)
+	CleanupHistory(ctx context.Context) error
 	ItemMarkets(ctx context.Context, key string) ([]MarketPrice, error)
 
 	CreateLoginCode(ctx context.Context, codeHash []byte, clientID, character string, expires time.Time) error

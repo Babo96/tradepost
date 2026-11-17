@@ -93,6 +93,7 @@ func (p *Postgres) Ingest(ctx context.Context, clientID string, scan Scan) (Inge
 
 	batch := &pgx.Batch{}
 	bucket := scan.ScannedAt.Truncate(time.Hour)
+	bucket15 := scan.ScannedAt.Truncate(15 * time.Minute)
 	for _, item := range scan.Items {
 		batch.Queue(
 			`INSERT INTO prices_latest (market, item_key, price, quantity, listings, scanned_at, samples)
@@ -107,6 +108,16 @@ func (p *Postgres) Ingest(ctx context.Context, clientID string, scan Scan) (Inge
 			scan.Market, item.Key, item.Price, item.Quantity, item.Listings, scan.ScannedAt,
 		)
 		batch.Queue(
+			`INSERT INTO prices_15m (market, item_key, bucket, min_price, max_price, quantity, samples)
+			 VALUES ($1, $2, $3, $4, $4, $5, 1)
+			 ON CONFLICT (market, item_key, bucket) DO UPDATE SET
+			   min_price = LEAST(prices_15m.min_price, EXCLUDED.min_price),
+			   max_price = GREATEST(prices_15m.max_price, EXCLUDED.max_price),
+			   quantity = GREATEST(prices_15m.quantity, EXCLUDED.quantity),
+			   samples = prices_15m.samples + 1`,
+			scan.Market, item.Key, bucket15, item.Price, item.Quantity,
+		)
+		batch.Queue(
 			`INSERT INTO prices_hourly (market, item_key, bucket, min_price, max_price, quantity, samples)
 			 VALUES ($1, $2, $3, $4, $4, $5, 1)
 			 ON CONFLICT (market, item_key, bucket) DO UPDATE SET
@@ -116,18 +127,21 @@ func (p *Postgres) Ingest(ctx context.Context, clientID string, scan Scan) (Inge
 			   samples = prices_hourly.samples + 1`,
 			scan.Market, item.Key, bucket, item.Price, item.Quantity,
 		)
+		batch.Queue(
+			`INSERT INTO prices_raw (market, item_key, price, quantity, listings, scanned_at)
+			 VALUES ($1, $2, $3, $4, $5, $6)`,
+			scan.Market, item.Key, item.Price, item.Quantity, item.Listings, scan.ScannedAt,
+		)
 	}
 
 	if batch.Len() > 0 {
 		results := tx.SendBatch(ctx, batch)
 		for range scan.Items {
-			if _, err := results.Exec(); err != nil {
-				results.Close()
-				return IngestResult{}, err
-			}
-			if _, err := results.Exec(); err != nil {
-				results.Close()
-				return IngestResult{}, err
+			for range 4 {
+				if _, err := results.Exec(); err != nil {
+					results.Close()
+					return IngestResult{}, err
+				}
 			}
 		}
 		if err := results.Close(); err != nil {
