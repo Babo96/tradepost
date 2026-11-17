@@ -265,7 +265,33 @@ local function cmdGetKey(key)
   key = key or "CTRL-ALT-SHIFT-F1"
   local action = GetBindingAction(key)
   out("getkey " .. key .. " = " .. tostring(action))
+  out("  (in-memory only; does not call LoadBindings)")
   record("getkey", { key = key, action = action })
+end
+
+-- Calls LoadBindings first, then reads the key. This is the unambiguous test
+-- for whether the client re-reads bindings-cache.wtf mid-session.
+local function cmdGetKeyFresh(key)
+  key = key or "Y"
+  local set = currentSet()
+  local ok, err = pcall(LoadBindings, set)
+  local action = GetBindingAction(key)
+  out("getkeyfresh " .. key .. " = " .. tostring(action))
+  out("  set=" .. tostring(set), "loadOk=" .. tostring(ok), "err=" .. tostring(err))
+  record("getkeyfresh", {
+    key = key,
+    action = action,
+    set = set,
+    loadOk = ok,
+    err = err,
+  })
+end
+
+local function cmdReloadBind()
+  local set = currentSet()
+  local ok, err = pcall(LoadBindings, set)
+  out("reloadbind set=" .. tostring(set), "ok=" .. tostring(ok), "err=" .. tostring(err))
+  record("reloadbind", { set = set, ok = ok, err = err })
 end
 
 local function cmdKeyVariants()
@@ -569,7 +595,9 @@ local function cmdHelp()
   out("  /bfprobe scan                 -- call ReplicateItems")
   out("  /bfprobe count                -- current replicate count")
   out("  /bfprobe bench [limit]        -- iterate the list, measure time/memory")
-  out("  /bfprobe getkey [key]         -- read any binding key")
+  out("  /bfprobe getkey [key]         -- read any binding key (in-memory)")
+  out("  /bfprobe getkeyfresh [key]    -- LoadBindings + read key")
+  out("  /bfprobe reloadbind           -- LoadBindings only")
   out("  /bfprobe keyvariants          -- try key-order variants")
   out("  /bfprobe findbind [needle]    -- search all bindings")
   out("  /bfprobe item [id]            -- commodity status for an item")
@@ -604,6 +632,8 @@ SlashCmdList["BABOFOREVERPROBE"] = function(msg)
     count = function() cmdCount() end,
     bench = function() cmdBench(args[1]) end,
     getkey = function() cmdGetKey(args[1]) end,
+    getkeyfresh = function() cmdGetKeyFresh(args[1]) end,
+    reloadbind = function() cmdReloadBind() end,
     keyvariants = function() cmdKeyVariants() end,
     findbind = function() cmdFindBind(args[1]) end,
     item = function() cmdItem(args[1]) end,
