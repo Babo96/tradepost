@@ -212,14 +212,40 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 		interval = 60 * time.Second
 	}
 	_ = s.Sync(ctx)
-	ticker := time.NewTicker(interval)
+
+	// The addon calls C_AddOns.SaveAddOns() after a scan, so watching the
+	// SavedVariables mtime gives near-live uploads without /reload.
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+
+	lastMod := time.Time{}
+	if info, err := os.Stat(s.savedVariablesPath()); err == nil {
+		lastMod = info.ModTime()
+	}
+	lastFull := time.Now()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_ = s.Sync(ctx)
+			info, err := os.Stat(s.savedVariablesPath())
+			changed := err == nil && !info.ModTime().Equal(lastMod)
+			if changed {
+				lastMod = info.ModTime()
+			}
+			if changed || time.Since(lastFull) >= interval {
+				_ = s.Sync(ctx)
+				if changed {
+					lastFull = time.Now()
+				}
+			}
 		}
 	}
+}
+
+func (s *Service) savedVariablesPath() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.status.SavedVariables
 }

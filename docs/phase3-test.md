@@ -84,7 +84,7 @@ Watch the dashboard:
 http://127.0.0.1:8787
 ```
 
-Within ~60 seconds after the SavedVariables write:
+Within ~5 seconds after `SaveAddOns` (or ~60 seconds for a periodic refresh):
 
 - `last upload` updates
 - `accepted` increments by 1

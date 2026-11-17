@@ -9,6 +9,21 @@ function BF:ExportDB()
   return BABOFOREVER_EXPORT
 end
 
+function BF:SaveExport()
+  local saver = (C_AddOns and C_AddOns.SaveAddOns) or SaveAddOns
+  if type(saver) ~= "function" then
+    self:Print("SaveAddOns is not available; export will be written on /reload")
+    return false
+  end
+  local ok, err = pcall(saver)
+  if not ok then
+    self:ReportError("export-save", err)
+    return false
+  end
+  self.lastSave = time()
+  return true
+end
+
 -- One ASCII record per scan:
 --   market|scanned_at|key,price,quantity,listings;key,price,...
 -- The companion parses this without needing a Lua interpreter.
@@ -39,6 +54,7 @@ function BF:RecordExport(marketKey, timestamp, accumulator)
   end
   db.lastRecord = timestamp
   db.lastSize = #payload
+  self:SaveExport()
 end
 
 function BF:ClearExport()
@@ -54,5 +70,7 @@ function BF:ExportStatus()
   self:Print("export: " .. #db.scans .. " scan(s), last " ..
     (db.lastRecord and date("%Y-%m-%d %H:%M", db.lastRecord) or "never") ..
     (db.lastSize and (" (" .. db.lastSize .. " bytes)") or ""))
-  self:Print("SavedVariables: BABOFOREVER_EXPORT (written on /reload or logout)")
+  self:Print("live flush: " .. (self.lastSave and ("last " .. date("%H:%M:%S", self.lastSave)) or "not yet") ..
+    " (C_AddOns.SaveAddOns)")
+  self:Print("SavedVariables: BABOFOREVER_EXPORT (also written on /reload or logout)")
 end

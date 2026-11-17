@@ -116,3 +116,20 @@ BABOFOREVER_RING = {
 - Choose 48 vs 64 vs 96 slots after measuring typical session length and slot
   size.
 - Delta vs full snapshot per window; cumulative deltas are the current default.
+
+## Live upload (outbound)
+
+The inbound ring has an outbound counterpart: the addon calls
+`C_AddOns.SaveAddOns()` after a scan. That writes `BABOFOREVER_EXPORT` to
+`SavedVariables/BaboForever.lua` immediately, without `/reload`.
+
+The companion watches the SavedVariables mtime every 5 seconds, parses
+`BABOFOREVER_EXPORT`, uploads new scan hashes, and records them in
+`~/.config/babo-forever/state.json`.
+
+Fallbacks if `SaveAddOns` is unavailable or restricted:
+
+- `/bf export save` to force a flush (for testing)
+- normal `/reload` or logout
+
+`/bf export` shows the last flush time and the export size.
