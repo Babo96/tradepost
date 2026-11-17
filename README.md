@@ -121,6 +121,7 @@ the BF tooltip line.
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/protocol.md`](docs/protocol.md)
 - [`docs/probe.md`](docs/probe.md)
+- [`docs/phase3-test.md`](docs/phase3-test.md)
 - [`docs/findings.md`](docs/findings.md)
 
 ## License
