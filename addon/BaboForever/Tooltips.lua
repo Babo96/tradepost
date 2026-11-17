@@ -90,21 +90,21 @@ function BF:AddPriceLines(tooltip, link)
   else
     price = "|cffffffff" .. price .. "|r"
   end
-  local text = price
 
+  -- Extra information stays on the left; the price goes in the right column so
+  -- it lines up with Vendor/Auction and the other right-aligned values.
+  local left = "|cff33ff99BF|r"
   if self.config.showAge then
-    text = text .. "  |c" .. ageColor(age) .. "(" .. ageString(age) .. ")|r"
+    left = left .. "  |c" .. ageColor(age) .. "(" .. ageString(age) .. ")|r"
   end
-
   if self.config.showSupply and entry.q then
-    text = text .. "  |cff9ca3af" .. tostring(entry.q) .. "x|r"
+    left = left .. "  |cff9ca3af" .. tostring(entry.q) .. "x|r"
   end
-
   if source == "central" then
-    text = text .. "  |cff60a5faC|r"
+    left = left .. "  |cff60a5faC|r"
   end
 
-  tooltip:AddDoubleLine("|cff33ff99BF|r", text)
+  tooltip:AddDoubleLine(left, price)
 end
 
 if TooltipDataProcessor and Enum and Enum.TooltipDataType then
