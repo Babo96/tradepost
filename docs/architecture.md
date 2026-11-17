@@ -11,7 +11,7 @@ scans instead of every player scanning alone.
 Forever has no realms. The auction house is identified by:
 
 ```
-region (EU for launch) × ruleset (GetRealmName, e.g. "PvE") × house
+region (EU for launch) × ruleset (suffix of GetRealmName, e.g. "PvE") × house
 ```
 
 Houses:
@@ -20,8 +20,13 @@ Houses:
 - `horde` — faction capitals
 - `neutral` — Blackwater houses (Gadgetzan, Booty Bay, Everlook)
 
-The addon computes a market key such as `eu:PvE:horde` and uses it for both
+The addon computes a market key such as `eu:pve:horde` and uses it for both
 local data and the central snapshot.
+
+Phase 0 showed that `GetRealmName()` is the full string
+`CAMWOW EU Realm 3 PvE`, not just `PvE`. The ruleset is the suffix
+(`PvE`, `PvP`, `RP`, `RP-PvP`, later `Hardcore`); the realm number is not part
+of the market key because the auction house is shared per ruleset.
 
 ## Components
 

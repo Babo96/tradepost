@@ -25,7 +25,7 @@ GET  /healthz  /metrics
 
 ## Scope
 
-EU only at launch. Market key: `eu:<realm>:<house>`, e.g. `eu:PvE:horde`.
+EU only at launch. Market key: `eu:<ruleset>:<house>`, e.g. `eu:pve:horde`.
 
 ## Deployment
 

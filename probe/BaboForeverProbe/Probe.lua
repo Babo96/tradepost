@@ -364,6 +364,60 @@ local function cmdItem(itemID)
   record("item", data)
 end
 
+local REGION_NAMES = { [1] = "us", [2] = "kr", [3] = "eu", [4] = "tw", [5] = "cn" }
+
+local function rulesetFromRealm(realm)
+  local candidates = { "RP-PvP", "PvE", "PvP", "RP", "Hardcore" }
+  for _, candidate in ipairs(candidates) do
+    if realm:sub(-#candidate) == candidate then
+      return candidate
+    end
+  end
+  return nil
+end
+
+local function parseMarket()
+  local realm = GetRealmName and GetRealmName() or ""
+  local ruleset = rulesetFromRealm(realm)
+  local faction = UnitFactionGroup and UnitFactionGroup("player") or nil
+  local house = "unknown"
+  if faction == "Alliance" then
+    house = "alliance"
+  elseif faction == "Horde" then
+    house = "horde"
+  end
+
+  local zone = GetZoneText and GetZoneText() or ""
+  local subzone = GetSubZoneText and GetSubZoneText() or ""
+  local neutralZone = zone == "Tanaris" or zone == "Stranglethorn Vale"
+    or zone == "Winterspring" or zone == "Zephras Isle"
+  if neutralZone then
+    house = "neutral?"
+  end
+
+  local regionNumber = GetCurrentRegion and GetCurrentRegion() or 0
+  local region = REGION_NAMES[regionNumber] or ("region" .. tostring(regionNumber))
+  local rulesetKey = ruleset and ruleset:lower():gsub("[^a-z0-9]+", "-") or "unknown"
+
+  return {
+    realm = realm,
+    ruleset = ruleset or "unknown",
+    regionNumber = regionNumber,
+    region = region,
+    faction = faction,
+    house = house,
+    zone = zone,
+    subzone = subzone,
+    marketKey = region .. ":" .. rulesetKey .. ":" .. house,
+  }
+end
+
+local function cmdMarket()
+  local data = parseMarket()
+  printTable("market", data)
+  record("market", data)
+end
+
 local function cmdReport()
   DB.results = DB.results or {}
   out("report entries=" .. #DB.results)
@@ -387,6 +441,7 @@ local function cmdHelp()
   out("  /bfprobe scan                 -- call ReplicateItems")
   out("  /bfprobe count                -- current replicate count")
   out("  /bfprobe item [id]            -- commodity status for an item")
+  out("  /bfprobe market               -- parsed region / ruleset / house")
   out("  /bfprobe bindwrite [mode] [payload] -- click|raw|macro|spell")
   out("  /bfprobe bindread             -- LoadBindings + read reserved keys")
   out("  /bfprobe bindlen [n]          -- write a long CLICK action")
@@ -416,6 +471,7 @@ SlashCmdList["BABOFOREVERPROBE"] = function(msg)
     scan = function() cmdScan() end,
     count = function() cmdCount() end,
     item = function() cmdItem(args[1]) end,
+    market = function() cmdMarket() end,
     bindwrite = function() cmdBindWrite(args[1], args[2]) end,
     bindread = function() cmdBindRead() end,
     bindlen = function() cmdBindLen(args[1]) end,

@@ -7,17 +7,17 @@ next design decision depends on it.
 
 | Field | Value |
 |---|---|
-| Build version | |
-| Build number | |
-| Interface | |
-| `WOW_PROJECT_ID` | |
-| `WOW_PROJECT_CAMELOT` | |
-| `GetRealmName()` | |
-| `GetCurrentRegion()` | |
-| Faction | |
-| Zone / subzone | |
-| Binding set (`GetCurrentBindingSet`) | |
-| Binding count (`GetNumBindings`) | |
+| Build version | 1.60.1 |
+| Build number | 70938 |
+| Interface | 16001 |
+| `WOW_PROJECT_ID` | 18 |
+| `WOW_PROJECT_CAMELOT` | 18 |
+| `GetRealmName()` | `CAMWOW EU Realm 3 PvE` |
+| `GetCurrentRegion()` | 3 |
+| Faction | Horde |
+| Zone / subzone | Thunder Bluff / (empty) |
+| Binding set (`GetCurrentBindingSet`) | 1 |
+| Binding count (`GetNumBindings`) | 320 |
 
 ## Auction house
 
@@ -34,11 +34,11 @@ next design decision depends on it.
 Notes on market structure observed in game:
 
 ```
-Region:
-Ruleset / realm name:
-Faction house:
-Neutral house (Booty Bay / Gadgetzan / Everlook):
-Valanaar:
+Region: 3 (EU)
+Ruleset / realm name: CAMWOW EU Realm 3 PvE -> ruleset suffix "PvE"
+Faction house: Horde (Thunder Bluff)
+Neutral house (Booty Bay / Gadgetzan / Everlook): not tested yet
+Valanaar: not tested yet
 ```
 
 ## Bindings mailbox
