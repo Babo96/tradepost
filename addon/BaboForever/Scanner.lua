@@ -47,6 +47,15 @@ function BF:TryScan(force)
   local lastScanAge = (db.lastScan and db.lastScan > 0) and (now - db.lastScan) or math.huge
   local recentScan = lastScanAge < 60
 
+  -- /bf scan force: reprocess the list already in the client. This does not
+  -- hit the 15-minute replicate throttle and is the way to force a fresh
+  -- export for the companion.
+  if force and count and count > 0 and sameMarket then
+    self:Print("reprocessing cached list (" .. count .. " auctions)")
+    self:StartProcessing(count)
+    return
+  end
+
   -- Harvest a fresh list for this market that we have not processed yet (first
   -- run, or another addon refreshed it). Do not reprocess our own recent scan.
   if not force and count and count > 0 and sameMarket and replicateAge < THROTTLE then
