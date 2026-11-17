@@ -53,19 +53,19 @@ function BF:PrintHelp()
   self:Print("  /bf scan [force]     scan the auction house")
   self:Print("  /bf status           local data and throttle state")
   self:Print("  /bf market           market detection details")
-  self:Print("  /bf house auto|alliance|horde|neutral")
-  self:Print("  /bf tooltips on|off  price tooltips")
-  self:Print("  /bf age on|off       show price age")
-  self:Print("  /bf supply on|off    show total supply")
-  self:Print("  /bf ring [now|on|off|count N]  live data ring")
+  self:Print("  /bf house auto/alliance/horde/neutral")
+  self:Print("  /bf tooltips on/off  price tooltips")
+  self:Print("  /bf age on/off       show price age")
+  self:Print("  /bf supply on/off    show total supply")
+  self:Print("  /bf ring [now/on/off/count N]  live data ring")
   self:Print("  /bf browse           open the auction data browser")
-  self:Print("  /bf watch [id|key]   toggle a watched item / list the watchlist")
+  self:Print("  /bf watch [id/key]   toggle a watched item / list the watchlist")
   self:Print("  /bf watch sync       rebuild the Auctionator watchlist")
-  self:Print("  /bf favourites on|off mirror Auctionator favourites into the watchlist")
+  self:Print("  /bf favourites on/off mirror Auctionator favourites into the watchlist")
   self:Print("  /bf login            get a short web login code")
-  self:Print("  /bf bridge [on|off]  Auctionator display bridge")
+  self:Print("  /bf bridge [on/off]  Auctionator display bridge")
   self:Print("  /bf bridgetest [id]  original vs current Auctionator price")
-  self:Print("  /bf export [clear|save|local] buffer status / flush / local test")
+  self:Print("  /bf export [clear/save/local] buffer status / flush / local test")
   self:Print("  /bf clear            clear local prices for this market")
   self:Print("  /bf debug            toggle debug output")
   self:Print("  /bf lasterror        show the last caught error")
@@ -90,7 +90,7 @@ SlashCmdList["BABOFOREVER"] = function(msg)
     elseif rest == "alliance" or rest == "horde" or rest == "neutral" then
       BF:SetConfig("houseOverride", rest)
     else
-      BF:Print("usage: /bf house auto|alliance|horde|neutral")
+      BF:Print("usage: /bf house auto/alliance/horde/neutral")
       return
     end
     BF:UpdateMarket()
@@ -158,7 +158,7 @@ SlashCmdList["BABOFOREVER"] = function(msg)
       if id then
         key = "i:" .. id
       elseif not key:match("^[igp]:") then
-        BF:Print("usage: /bf watch <itemID|i:id|g:id:ilvl>")
+        BF:Print("usage: /bf watch <itemID / i:id / g:id:ilvl>")
         return
       end
       local watched = BF:ToggleWatch(key)
