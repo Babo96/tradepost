@@ -67,6 +67,7 @@ function BF:SetWatched(key, watched)
   entry.updated = time()
   self:MarkActive()
   self:SaveExport()
+  self:SyncAuctionatorWatchList(false)
   if self.browser and self.browser.frame and self.browser.frame:IsShown() then
     self:RefreshBrowser()
   end
@@ -80,6 +81,71 @@ end
 
 -- Called from Ring.lua with the server watch list. The timestamp prevents an
 -- older ring slot from overwriting a newer local change.
+function BF:SyncAuctionatorWatchList(announce)
+  if not Auctionator or type(Auctionator.API) ~= "table" or type(Auctionator.API.v1) ~= "table" then
+    if announce then
+      self:Print("Auctionator API is not available")
+    end
+    return false
+  end
+  if type(Auctionator.API.v1.CreateShoppingList) ~= "function" then
+    if announce then
+      self:Print("Auctionator shopping list API is not available")
+    end
+    return false
+  end
+
+  local keys = self:WatchKeys()
+  local names = {}
+  local seen = {}
+  local missing = 0
+  for _, key in ipairs(keys) do
+    local itemID = tonumber(key:match("^[igp]:(%d+)"))
+    local name = nil
+    if itemID then
+      local meta = self:GetItemMeta(itemID, false)
+      name = meta and meta.n or nil
+      if not name then
+        name = C_Item.GetItemInfo(itemID)
+        if not name then
+          self:GetItemMeta(itemID, true)
+          missing = missing + 1
+        end
+      end
+    end
+    if name then
+      name = name:gsub("[;^\"]", ""):gsub("^%s+", ""):gsub("%s+$", "")
+      if name ~= "" and not seen[name] then
+        seen[name] = true
+        names[#names + 1] = '"' .. name .. '"'
+      end
+    end
+  end
+  table.sort(names)
+
+  if #names == 0 and #keys > 0 then
+    if announce then
+      self:Print("no item names cached yet; hover the items or reopen the browser first")
+    end
+    return false
+  end
+
+  local ok, err = pcall(Auctionator.API.v1.CreateShoppingList,
+    "BaboForever", "Babo Forever Watchlist", names)
+  if not ok then
+    self:Debug("auctionator watchlist: " .. tostring(err))
+    if announce then
+      self:Print("could not update Auctionator: " .. tostring(err))
+    end
+    return false
+  end
+  if announce then
+    self:Print("Auctionator watchlist updated: " .. #names .. " item(s)" ..
+      (missing > 0 and (" (" .. missing .. " waiting for item data)") or ""))
+  end
+  return true
+end
+
 function BF:ApplyRemoteWatch(items, updated)
   updated = tonumber(updated) or 0
   local entry = self:CurrentWatch()
@@ -95,6 +161,7 @@ function BF:ApplyRemoteWatch(items, updated)
   entry.updated = updated
   self:MarkActive()
   self:SaveExport()
+  self:SyncAuctionatorWatchList(false)
   if self.browser and self.browser.frame and self.browser.frame:IsShown() then
     self:RefreshBrowser()
   end

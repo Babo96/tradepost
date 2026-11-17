@@ -60,6 +60,7 @@ function BF:PrintHelp()
   self:Print("  /bf ring [now|on|off|count N]  live data ring")
   self:Print("  /bf browse           open the auction data browser")
   self:Print("  /bf watch [id|key]   toggle a watched item / list the watchlist")
+  self:Print("  /bf watch sync       rebuild the Auctionator watchlist")
   self:Print("  /bf login            get a short web login code")
   self:Print("  /bf bridge [on|off]  Auctionator display bridge")
   self:Print("  /bf bridgetest [id]  original vs current Auctionator price")
@@ -136,7 +137,9 @@ SlashCmdList["BABOFOREVER"] = function(msg)
   elseif command == "browse" or command == "browser" then
     BF:ToggleBrowser()
   elseif command == "watch" then
-    if rest == "" then
+    if rest == "sync" or rest == "auctionator" then
+      BF:SyncAuctionatorWatchList(true)
+    elseif rest == "" or rest == "list" then
       local keys = BF:WatchKeys()
       if #keys == 0 then
         BF:Print("watchlist is empty. Use /bf watch <itemID> or right-click a browser row.")

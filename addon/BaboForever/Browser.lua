@@ -53,6 +53,9 @@ local function finishQueue()
   queue = {}
   queued = {}
   queueIndex = 0
+  if BF.WatchKeys and #BF:WatchKeys() > 0 then
+    BF:SyncAuctionatorWatchList(false)
+  end
   if BF.browser and BF.browser.frame and BF.browser.frame:IsShown() then
     BF:FilterBrowser()
   end

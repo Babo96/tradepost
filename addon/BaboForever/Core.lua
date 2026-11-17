@@ -53,6 +53,11 @@ function BF:OnLogin()
       BF:SaveExport()
     end)
   end)
+  C_Timer.After(6, function()
+    pcall(function()
+      BF:SyncAuctionatorWatchList(false)
+    end)
+  end)
   self:Print("v" .. self.version .. " ready. Market: " .. self:MarketKey() .. ". /bf help")
 end
 
