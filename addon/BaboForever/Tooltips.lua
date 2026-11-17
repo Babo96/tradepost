@@ -1,51 +1,5 @@
 local ADDON, BF = ...
 
-local function ageString(seconds)
-  if seconds < 60 then
-    return "<1m"
-  elseif seconds < 3600 then
-    return string.format("%dm", math.floor(seconds / 60))
-  elseif seconds < 86400 then
-    return string.format("%dh", math.floor(seconds / 3600))
-  end
-  return string.format("%dd", math.floor(seconds / 86400))
-end
-
-local function ageColor(seconds)
-  if seconds < 900 then
-    return "ff22c55e"
-  elseif seconds < 3600 then
-    return "ffeab308"
-  end
-  return "ff9ca3af"
-end
-
-local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:12:12:0:0|t"
-local SILVER_ICON = "|TInterface\\MoneyFrame\\UI-SilverIcon:12:12:0:0|t"
-local COPPER_ICON = "|TInterface\\MoneyFrame\\UI-CopperIcon:12:12:0:0|t"
-
-local function moneyText(copper)
-  copper = math.max(0, math.floor(copper or 0))
-  local gold = math.floor(copper / 10000)
-  local silver = math.floor((copper % 10000) / 100)
-  local rest = copper % 100
-
-  local result = tostring(rest) .. " " .. COPPER_ICON
-  if gold ~= 0 or silver ~= 0 then
-    if rest < 10 then
-      result = "0" .. result
-    end
-    result = tostring(silver) .. " " .. SILVER_ICON .. " " .. result
-  end
-  if gold ~= 0 then
-    if silver < 10 then
-      result = "0" .. result
-    end
-    result = tostring(gold) .. " " .. GOLD_ICON .. " " .. result
-  end
-  return result
-end
-
 function BF:GetPrice(keys)
   local localEntry = self:GetLocalPrice(keys)
   local liveEntry, _, live = self:GetLivePrice(keys)
@@ -88,7 +42,7 @@ function BF:AddPriceLines(tooltip, link)
   end
 
   local age = math.max(0, time() - (entry.t or 0))
-  local price = moneyText(entry.p)
+  local price = self:MoneyText(entry.p)
   if WHITE_FONT_COLOR then
     price = WHITE_FONT_COLOR:WrapTextInColorCode(price)
   else
@@ -99,7 +53,7 @@ function BF:AddPriceLines(tooltip, link)
   -- it lines up with Vendor/Auction and the other right-aligned values.
   local left = "|cff33ff99BF|r"
   if self.config.showAge then
-    left = left .. "  |c" .. ageColor(age) .. "(" .. ageString(age) .. ")|r"
+    left = left .. "  |c" .. BF:AgeColor(age) .. "(" .. BF:AgeString(age) .. ")|r"
   end
   if self.config.showSupply and entry.q then
     left = left .. "  |cff9ca3af" .. tostring(entry.q) .. "x|r"

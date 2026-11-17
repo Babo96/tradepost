@@ -1,8 +1,32 @@
-# In-game price browser (planned)
+# In-game price browser
 
-Later phase. A minimal icon, similar in spirit to the Dungeon Journal button,
-opens a searchable auction-data window fed by the same local/live/central
-sources as the tooltips.
+A minimal icon, similar in spirit to the Dungeon Journal button, opens a
+searchable auction-data window fed by the same local/live/central sources as
+the tooltips.
+
+## Implemented (0.1.0)
+
+- Minimap coin button; left click toggles the window, `/bf browse` also works.
+- Search by item name or item ID, live filtering while typing.
+- Columns: item (quality colored), price, age, quantity, and source marker
+  (`R` live ring, `C` central snapshot, `L` local scan).
+- Sort cycle: name → price → age. The choice is stored as `browserSort`.
+- Mouse wheel and scrollbar over a fixed pool of 16 rows.
+- Hover shows the normal item tooltip (including the BF price line); shift
+  click inserts the item link into chat.
+- Market is the current character market (`eu:<ruleset>:<house>`), refreshed
+  whenever the window opens.
+- Item names/icons/quality come from the client item cache and are persisted
+  in `BABOFOREVER_ITEMS`; uncached items show `Item #<id>` and are resolved in
+  the background. No extra server round trip or data-addon size is needed.
+
+Known limits:
+
+- Rows are merged from local/live/central at open time; a scan while the window
+  is open is visible after closing and reopening (or `/reload`).
+- Gear rows show the item ID and price of the specific `g:<id>:<ilvl>` key, but
+  the tooltip uses the base item link, not the exact bonus/ilvl variant.
+- No market switch button yet; the window follows the character's market.
 
 ## Entry point
 

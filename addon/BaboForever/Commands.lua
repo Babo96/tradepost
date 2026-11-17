@@ -58,6 +58,7 @@ function BF:PrintHelp()
   self:Print("  /bf age on|off       show price age")
   self:Print("  /bf supply on|off    show total supply")
   self:Print("  /bf ring [now|on|off|count N]  live data ring")
+  self:Print("  /bf browse           open the auction data browser")
   self:Print("  /bf bridge [on|off]  Auctionator display bridge")
   self:Print("  /bf bridgetest [id]  original vs current Auctionator price")
   self:Print("  /bf export [clear|save|local] buffer status / flush / local test")
@@ -130,6 +131,8 @@ SlashCmdList["BABOFOREVER"] = function(msg)
     end
   elseif command == "bridgetest" then
     BF:BridgeTest(rest)
+  elseif command == "browse" or command == "browser" then
+    BF:ToggleBrowser()
   elseif command == "export" then
     if rest == "clear" then
       BF:ClearExport()
