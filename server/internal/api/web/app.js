@@ -280,7 +280,7 @@ function escapeHTML(value) {
 
 function renderChart(points, meta) {
   if (!points.length) {
-    return `<p class="empty">No hourly history yet. New scans will build this chart.</p>`;
+    return `<p class="empty">No history in this range yet. New scans will build it.</p>`;
   }
   const width = 620;
   const height = 180;
