@@ -16,7 +16,7 @@ ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 
 PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB
 
-.PHONY: help probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-restore lint test check
+.PHONY: help probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
 	@echo "Babo Forever - phase 0"
@@ -29,6 +29,7 @@ help:
 	@echo "  make probe-meta             rewrite X-BF-Data in slot SLOT with PAYLOAD"
 	@echo "  make probe-set              write a known-valid binding (KEY=COMMAND)"
 	@echo "  make probe-clear            remove BFD1 lines from the bindings file"
+	@echo "  make probe-reset            remove all probe/reserved binding lines"
 	@echo "  make probe-restore          restore the newest bindings backup"
 	@echo "  make lint                   syntax-check Lua and Python"
 	@echo "  make test                   run the Python unit tests"
@@ -62,6 +63,9 @@ probe-meta:
 
 probe-set:
 	@$(PYTHON) tools/probe/set_binding.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --key "$(KEY)" --command "$(COMMAND)" --write
+
+probe-reset:
+	@$(PYTHON) tools/probe/reset_probe.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --write
 
 probe-clear:
 	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --clear --write
