@@ -23,13 +23,17 @@ next design decision depends on it.
 
 | Field | Value |
 |---|---|
-| `GetNumReplicateItems()` when opened | |
-| Same after an Auctionator scan | |
-| `IsThrottledMessageSystemReady()` | |
-| `GetItemCommodityStatus(2589)` | |
-| `GetItemCommodityStatus(4496)` | |
-| Scan wall-clock time (if measured) | |
-| Memory before/after (`collectgarbage("count")`) | |
+| `GetNumReplicateItems()` when opened | 0 outside AH |
+| Same after `/bfprobe scan` | 105,472 then 280,707 |
+| `IsThrottledMessageSystemReady()` | true |
+| `GetItemCommodityStatus(2589)` | not captured yet |
+| `GetItemCommodityStatus(4496)` | not captured yet |
+| Scan wall-clock time (if measured) | pending `/bfprobe bench` |
+| Memory before/after (`collectgarbage("count")`) | pending `/bfprobe bench` |
+
+The live list reached **280,707** auctions after a full replicate. That is much
+larger than the ~80k example in the API docs, so the addon must aggregate in a
+streaming pass and must not keep the raw list or per-auction tables.
 
 Notes on market structure observed in game:
 
@@ -45,17 +49,21 @@ Valanaar: not tested yet
 
 | Test | Result |
 |---|---|
-| `SetBinding` with `CLICK BF...:LeftButton` returns ok | |
-| `GetBindingAction` preserves the full action | |
-| `SaveBindings` writes the line to `bindings-cache.wtf` | |
-| `LoadBindings` re-reads a file changed mid-session | |
-| Raw `BFD1:...` action preserved | |
-| `MACRO BF...` action preserved | |
-| Longest preserved action (255 / 1024 / 4096) | |
-| `SetBinding` accepts a data-carrying action for uplink | |
-| `LoadBindings` resets unsaved keybinds | |
-| Action-bar flicker / other side effects | |
-| Client rewrites the file during play | |
+| `SetBinding` with `CLICK BF...:LeftButton` returns ok | not run yet |
+| `GetBindingAction` preserves the full action | not run yet |
+| `SaveBindings` writes the line to `bindings-cache.wtf` | not run yet |
+| `LoadBindings` re-reads a file changed mid-session | pending; first `bindread` had no host-written lines |
+| Raw `BFD1:...` action preserved | not run yet |
+| `MACRO BF...` action preserved | not run yet |
+| Longest preserved action (255 / 1024 / 4096) | not run yet |
+| `SetBinding` accepts a data-carrying action for uplink | not run yet |
+| `LoadBindings` resets unsaved keybinds | not run yet |
+| Action-bar flicker / other side effects | not run yet |
+| Client rewrites the file during play | not run yet |
+
+First `bindread`: `set=1`, `numBindings=320`, `reserved keys with actions: 0`.
+That run did not follow a host-side `make probe-bind`, so it only proves the
+probe loaded; it is not a failure of the channel.
 
 Example action string after a successful write:
 

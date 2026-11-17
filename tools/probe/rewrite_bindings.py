@@ -40,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--keys", type=int, default=4, help="number of reserved keys to use (default: 4)")
     parser.add_argument("--chunk-size", type=int, default=200, help="characters per chunk (default: 200)")
     parser.add_argument("--seq", type=int, default=1, help="mailbox sequence number (default: 1)")
-    parser.add_argument("--mode", choices=("click", "raw"), default="click", help="CLICK action or raw command")
+    parser.add_argument("--mode", choices=("click", "raw", "spell", "item", "macro"), default="click", help="binding action wrapper")
     parser.add_argument("--write", action="store_true", help="actually write the file (default: dry run)")
     parser.add_argument("--clear", action="store_true", help="remove mailbox lines and exit")
     parser.add_argument("--restore", action="store_true", help="restore the newest backup and exit")

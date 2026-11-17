@@ -51,6 +51,16 @@ Open the auction house and run:
 Record `GetNumReplicateItems()`, throttle readiness, and the commodity status
 for linen cloth (2589) and a bag (4496).
 
+Once the count is stable, benchmark iterating the whole list:
+
+```
+/bfprobe bench
+```
+
+Record total auctions, unique item IDs, usable entries, missing item info,
+elapsed milliseconds and Lua memory delta. This decides whether a single full
+scan is feasible or whether the addon must shard/target scans.
+
 ## 2. Bindings baseline
 
 In game, out of combat:
@@ -91,6 +101,35 @@ Then in game:
   is dead and we fall back to the ring or reload.
 
 Repeat with a different payload and `SEQ=2` to confirm it keeps updating.
+
+### If `bindread` shows zero actions
+
+First confirm the host actually wrote the file:
+
+```sh
+make probe-show
+```
+
+If the `BFD1` line is there but the game shows nothing, test whether
+`LoadBindings` re-reads the file at all with a **known-valid** command:
+
+```sh
+make probe-set KEY=CTRL-ALT-SHIFT-F1 COMMAND=ACTIONBUTTON1
+```
+
+In game:
+
+```
+/bfprobe bindread
+/bfprobe getkey CTRL-ALT-SHIFT-F1
+```
+
+- `ACTIONBUTTON1` appears: the file is re-read, but the client drops unknown
+  actions. Try `--mode spell`, `--mode item`, `--mode macro` and
+  `--mode click` to find a wrapper it keeps.
+- Nothing appears: `LoadBindings` is cached; the bindings channel is dead.
+
+Restore the key afterwards with `make probe-clear` or `make probe-restore`.
 
 ## 4. Long payloads
 

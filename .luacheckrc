@@ -33,6 +33,7 @@ globals = {
   "WOW_PROJECT_CAMELOT",
   "WOW_PROJECT_ID",
   "date",
+  "debugprofilestop",
   "print",
   "time",
 }

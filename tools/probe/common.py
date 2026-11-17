@@ -180,7 +180,9 @@ def render_bindings(lines: list[BindingLine]) -> str:
 
 def is_mailbox_command(command: str, tag: str = "BFD1") -> bool:
     command = command.strip()
-    return command.startswith(tag + ":") or command.startswith(f"CLICK {tag}:")
+    if command.startswith(tag + ":"):
+        return True
+    return any(command.startswith(f"{prefix} {tag}:") for prefix in ("CLICK", "SPELL", "ITEM", "MACRO"))
 
 
 def strip_mailbox(lines: list[BindingLine], tag: str = "BFD1") -> list[BindingLine]:
@@ -215,6 +217,12 @@ def mailbox_lines(
         key = keys[index]
         if mode == "raw":
             command = f"{tag}:{seq}:{index}:{total}:{chunk}"
+        elif mode == "spell":
+            command = f"SPELL {tag}:{seq}:{index}:{total}:{chunk}"
+        elif mode == "item":
+            command = f"ITEM {tag}:{seq}:{index}:{total}:{chunk}"
+        elif mode == "macro":
+            command = f"MACRO {tag}:{seq}:{index}:{total}:{chunk}"
         else:
             command = f"CLICK {tag}:{seq}:{index}:{total}:{chunk}:LeftButton"
         lines.append(BindingLine(raw=f"bind {key} {command}", key=key, command=command))

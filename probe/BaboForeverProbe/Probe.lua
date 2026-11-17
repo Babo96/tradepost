@@ -261,6 +261,13 @@ local function cmdKeys()
   end
 end
 
+local function cmdGetKey(key)
+  key = key or "CTRL-ALT-SHIFT-F1"
+  local action = GetBindingAction(key)
+  out("getkey " .. key .. " = " .. tostring(action))
+  record("getkey", { key = key, action = action })
+end
+
 local function cmdReset()
   local removed = 0
   for _, key in ipairs(KEYS) do
@@ -352,6 +359,86 @@ local function cmdCount()
   record("count", { count = count, ready = ready })
 end
 
+local benchRunning = false
+local function cmdBench(limit)
+  if benchRunning then
+    out("bench already running")
+    return
+  end
+  local total = tonumber(limit) or ahCall("GetNumReplicateItems")
+  if type(total) ~= "number" or total <= 0 then
+    out("no replicate list; open the AH and run /bfprobe scan first")
+    return
+  end
+
+  benchRunning = true
+  collectgarbage("collect")
+  local memBefore = collectgarbage("count")
+  local started = debugprofilestop()
+  local index = 0
+  local seen = {}
+  local unique = 0
+  local missingInfo = 0
+  local usable = 0
+  local minPrice = nil
+  local maxPrice = nil
+  local ticker
+
+  out("bench start total=" .. total)
+  ticker = C_Timer.NewTicker(0, function()
+    local stop = math.min(index + 2000, total)
+    for i = index, stop - 1 do
+      local info = { C_AuctionHouse.GetReplicateItemInfo(i) }
+      local quantity = info[3]
+      local buyout = info[10]
+      local itemID = info[17]
+      local allInfo = info[18]
+
+      if itemID then
+        if not seen[itemID] then
+          seen[itemID] = true
+          unique = unique + 1
+        end
+        if not allInfo then
+          missingInfo = missingInfo + 1
+        end
+        if quantity and quantity > 0 and buyout and buyout > 0 then
+          local unit = buyout / quantity
+          usable = usable + 1
+          if not minPrice or unit < minPrice then minPrice = unit end
+          if not maxPrice or unit > maxPrice then maxPrice = unit end
+        end
+      end
+    end
+
+    index = stop
+    if index >= total then
+      ticker:Cancel()
+      collectgarbage("collect")
+      local memAfter = collectgarbage("count")
+      local elapsed = debugprofilestop() - started
+      local data = {
+        total = total,
+        uniqueItemIDs = unique,
+        usable = usable,
+        missingInfo = missingInfo,
+        elapsedMs = math.floor(elapsed),
+        memoryDeltaKB = math.floor(memAfter - memBefore),
+        minUnitPrice = minPrice,
+        maxUnitPrice = maxPrice,
+      }
+      out("bench done total=" .. total)
+      out("  uniqueItemIDs=" .. unique, "usable=" .. usable, "missingInfo=" .. missingInfo)
+      out("  elapsedMs=" .. data.elapsedMs, "memoryDeltaKB=" .. data.memoryDeltaKB)
+      out("  minUnitPrice=" .. tostring(minPrice), "maxUnitPrice=" .. tostring(maxPrice))
+      record("bench", data)
+      benchRunning = false
+    elseif index % 50000 == 0 then
+      out("bench progress " .. index .. "/" .. total)
+    end
+  end)
+end
+
 local function cmdItem(itemID)
   itemID = tonumber(itemID) or 2589
   local data = {
@@ -440,6 +527,8 @@ local function cmdHelp()
   out("  /bfprobe ah                   -- auction-house state only")
   out("  /bfprobe scan                 -- call ReplicateItems")
   out("  /bfprobe count                -- current replicate count")
+  out("  /bfprobe bench [limit]        -- iterate the list, measure time/memory")
+  out("  /bfprobe getkey [key]         -- read any binding key")
   out("  /bfprobe item [id]            -- commodity status for an item")
   out("  /bfprobe market               -- parsed region / ruleset / house")
   out("  /bfprobe bindwrite [mode] [payload] -- click|raw|macro|spell")
@@ -470,6 +559,8 @@ SlashCmdList["BABOFOREVERPROBE"] = function(msg)
     ah = function() cmdAh() end,
     scan = function() cmdScan() end,
     count = function() cmdCount() end,
+    bench = function() cmdBench(args[1]) end,
+    getkey = function() cmdGetKey(args[1]) end,
     item = function() cmdItem(args[1]) end,
     market = function() cmdMarket() end,
     bindwrite = function() cmdBindWrite(args[1], args[2]) end,

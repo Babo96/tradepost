@@ -9,12 +9,14 @@ MODE ?= click
 SLOT ?= A
 CHUNK_SIZE ?= 200
 SEQ ?= 1
+KEY ?= CTRL-ALT-SHIFT-F1
+COMMAND ?= ACTIONBUTTON1
 ACCOUNT ?=
 ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 
 PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB
 
-.PHONY: help probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-clear probe-restore lint test check
+.PHONY: help probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-restore lint test check
 
 help:
 	@echo "Babo Forever - phase 0"
@@ -25,13 +27,14 @@ help:
 	@echo "  make probe-bind             write PAYLOAD to the bindings mailbox"
 	@echo "  make probe-ring             rewrite LoadOnDemand slot SLOT with PAYLOAD"
 	@echo "  make probe-meta             rewrite X-BF-Data in slot SLOT with PAYLOAD"
+	@echo "  make probe-set              write a known-valid binding (KEY=COMMAND)"
 	@echo "  make probe-clear            remove BFD1 lines from the bindings file"
 	@echo "  make probe-restore          restore the newest bindings backup"
 	@echo "  make lint                   syntax-check Lua and Python"
 	@echo "  make test                   run the Python unit tests"
 	@echo "  make check                  lint + test"
 	@echo
-	@echo "Variables: WOW_DIR=$(WOW_DIR) ACCOUNT=$(ACCOUNT) PAYLOAD=$(PAYLOAD) KEYS=$(KEYS) MODE=$(MODE) SLOT=$(SLOT)"
+	@echo "Variables: WOW_DIR=$(WOW_DIR) ACCOUNT=$(ACCOUNT) PAYLOAD=$(PAYLOAD) KEYS=$(KEYS) MODE=$(MODE) SLOT=$(SLOT) KEY=$(KEY) COMMAND=$(COMMAND)"
 
 probe-install:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
@@ -56,6 +59,9 @@ probe-ring:
 
 probe-meta:
 	@$(PYTHON) tools/probe/write_toc.py --wow "$(WOW_DIR)" --addon "BFProbeData$(SLOT)" --payload "$(PAYLOAD)" --write
+
+probe-set:
+	@$(PYTHON) tools/probe/set_binding.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --key "$(KEY)" --command "$(COMMAND)" --write
 
 probe-clear:
 	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --clear --write
