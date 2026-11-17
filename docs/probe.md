@@ -35,6 +35,12 @@ Then log in and run:
 /bfprobe dump
 ```
 
+### Updating the probe
+
+WoW may keep addon file contents from startup. If new probe commands do not
+appear after `/reload`, restart the client. This behaviour is itself relevant
+to the LoadOnDemand ring test.
+
 Record build, `GetRealmName()`, `GetCurrentRegion()`, faction, zone and subzone.
 Open the auction house and run:
 
