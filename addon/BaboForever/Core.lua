@@ -44,6 +44,8 @@ end
 function BF:OnLogin()
   self:UpdateMarket()
   self:PruneLocal()
+  self:InitRing()
+  self:InitBridge()
   self:Print("v" .. self.version .. " ready. Market: " .. self:MarketKey() .. ". /bf help")
 end
 

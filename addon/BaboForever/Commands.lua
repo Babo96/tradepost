@@ -29,6 +29,8 @@ function BF:PrintStatus()
     ))
   end
   self:Print("central data: " .. self:CentralLabel())
+  self:RingStatus()
+  self:BridgeStatus()
   self:Print("next client replicate: " .. math.ceil(self:NextReplicateSeconds() / 60) .. " min")
 end
 
@@ -55,6 +57,8 @@ function BF:PrintHelp()
   self:Print("  /bf tooltips on|off  price tooltips")
   self:Print("  /bf age on|off       show price age")
   self:Print("  /bf supply on|off    show total supply")
+  self:Print("  /bf ring [now|on|off|count N]  live data ring")
+  self:Print("  /bf bridge [on|off]  Auctionator display bridge")
   self:Print("  /bf clear            clear local prices for this market")
   self:Print("  /bf debug            toggle debug output")
   self:Print("  /bf lasterror        show the last caught error")
@@ -96,6 +100,32 @@ SlashCmdList["BABOFOREVER"] = function(msg)
     BF:Print("show supply: " .. tostring(BF.config.showSupply))
   elseif command == "clear" then
     BF:ClearLocal()
+  elseif command == "ring" then
+    local sub, arg = string.match(rest or "", "^(%S*)%s*(.*)$")
+    if sub == "now" then
+      BF:RingNow(arg ~= "" and arg or nil)
+    elseif sub == "on" then
+      BF:SetConfig("ring", true)
+      BF:InitRing()
+      BF:RingStatus()
+    elseif sub == "off" then
+      BF:SetConfig("ring", false)
+      BF:Print("ring off")
+    elseif sub == "count" then
+      BF:RingSetCount(arg)
+    else
+      BF:RingStatus()
+    end
+  elseif command == "bridge" then
+    if rest == "on" then
+      BF:SetConfig("auctionatorBridge", true)
+      BF:InitBridge()
+      BF:BridgeStatus()
+    elseif rest == "off" then
+      BF:BridgeOff()
+    else
+      BF:BridgeStatus()
+    end
   elseif command == "debug" then
     BF:SetConfig("debug", not BF.config.debug)
     BF:Print("debug: " .. tostring(BF.config.debug))

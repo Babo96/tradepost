@@ -6,6 +6,10 @@ local DEFAULTS = {
   showSupply = true,
   debug = false,
   houseOverride = nil,
+  ring = true,
+  ringSlots = 64,
+  ringWindow = 300,
+  auctionatorBridge = true,
 }
 
 function BF:InitConfig()

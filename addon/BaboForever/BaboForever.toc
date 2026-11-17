@@ -14,6 +14,8 @@ Market.lua
 Keys.lua
 LocalDB.lua
 Central.lua
+Ring.lua
 Scanner.lua
 Tooltips.lua
+Bridge.lua
 Commands.lua

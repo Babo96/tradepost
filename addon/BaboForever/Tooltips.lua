@@ -48,21 +48,25 @@ end
 
 function BF:GetPrice(keys)
   local localEntry = self:GetLocalPrice(keys)
+  local liveEntry, _, live = self:GetLivePrice(keys)
   local centralEntry, _, centralMarket = self:GetCentralPrice(keys)
 
-  if localEntry and centralEntry then
-    if (centralEntry.t or 0) > (localEntry.t or 0) then
-      return centralEntry, "central", centralMarket
+  local best, source, market
+  local function consider(entry, entrySource, entryMarket)
+    if entry and entry.p then
+      if not best or (entry.t or 0) > (best.t or 0) then
+        best = entry
+        source = entrySource
+        market = entryMarket
+      end
     end
-    return localEntry, "local"
   end
-  if localEntry then
-    return localEntry, "local"
-  end
-  if centralEntry then
-    return centralEntry, "central", centralMarket
-  end
-  return nil
+
+  consider(localEntry, "local")
+  consider(liveEntry, "live", live)
+  consider(centralEntry, "central", centralMarket)
+
+  return best, source, market
 end
 
 function BF:AddPriceLines(tooltip, link)
@@ -102,6 +106,8 @@ function BF:AddPriceLines(tooltip, link)
   end
   if source == "central" then
     left = left .. "  |cff60a5faC|r"
+  elseif source == "live" then
+    left = left .. "  |cff60a5faR|r"
   end
 
   tooltip:AddDoubleLine(left, price)

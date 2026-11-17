@@ -3,6 +3,10 @@ max_line_length = false
 
 globals = {
   "BABOFOREVER_PROBE",
+  "AUCTIONATOR_L_AUCTION_AGE",
+  "Auctionator",
+  "BABOFOREVER_RING",
+  "IsAddOnLoaded",
   "BABOFOREVER_CONFIG",
   "BABOFOREVER_DATA",
   "BABOFOREVER_DB",

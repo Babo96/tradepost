@@ -44,8 +44,10 @@ end
 
 function BF:CentralLabel()
   local market = self.central[self:MarketKey()]
-  if not market then
-    return "none"
+  local base = market and ("base v" .. tostring(market.version)) or "base none"
+  local live = self.live and self.live[self:MarketKey()]
+  if live and live.seq > 0 then
+    return "live seq " .. tostring(live.seq) .. " + " .. base
   end
-  return string.format("v%s (%s)", tostring(market.version), tostring(market.generated))
+  return base
 end
