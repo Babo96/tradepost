@@ -33,6 +33,32 @@ local function currentSet()
   return 1
 end
 
+local function safe(fn, ...)
+  if type(fn) ~= "function" then
+    return nil
+  end
+  local ok, value = pcall(fn, ...)
+  if ok then
+    return value
+  end
+  return nil
+end
+
+-- GetItemCommodityStatus takes an ItemLocation, not an itemID.
+local function commodityStatus(itemID)
+  if not (C_AuctionHouse and C_AuctionHouse.GetItemCommodityStatus and ItemLocation) then
+    return nil
+  end
+  local ok, status = pcall(function()
+    local location = ItemLocation:CreateFromItemID(itemID)
+    return C_AuctionHouse.GetItemCommodityStatus(location)
+  end)
+  if ok then
+    return status
+  end
+  return nil
+end
+
 local function valueString(value)
   if type(value) == "table" then
     local parts = {}
@@ -95,12 +121,9 @@ local function environment()
     subzone = GetSubZoneText and GetSubZoneText() or nil,
     bindingSet = currentSet(),
     numBindings = GetNumBindings and GetNumBindings() or nil,
-    ahReplicateItems = C_AuctionHouse and C_AuctionHouse.GetNumReplicateItems
-      and C_AuctionHouse.GetNumReplicateItems() or nil,
-    ahThrottleReady = C_AuctionHouse and C_AuctionHouse.IsThrottledMessageSystemReady
-      and C_AuctionHouse.IsThrottledMessageSystemReady() or nil,
-    commodityLinen = C_AuctionHouse and C_AuctionHouse.GetItemCommodityStatus
-      and C_AuctionHouse.GetItemCommodityStatus(2589) or nil,
+    ahReplicateItems = C_AuctionHouse and safe(C_AuctionHouse.GetNumReplicateItems) or nil,
+    ahThrottleReady = C_AuctionHouse and safe(C_AuctionHouse.IsThrottledMessageSystemReady) or nil,
+    commodityLinen = commodityStatus(2589),
   }
 end
 
@@ -268,14 +291,10 @@ end
 
 local function cmdAh()
   local data = {
-    replicateItems = C_AuctionHouse and C_AuctionHouse.GetNumReplicateItems
-      and C_AuctionHouse.GetNumReplicateItems() or nil,
-    throttleReady = C_AuctionHouse and C_AuctionHouse.IsThrottledMessageSystemReady
-      and C_AuctionHouse.IsThrottledMessageSystemReady() or nil,
-    commodityLinen = C_AuctionHouse and C_AuctionHouse.GetItemCommodityStatus
-      and C_AuctionHouse.GetItemCommodityStatus(2589) or nil,
-    commodityBag = C_AuctionHouse and C_AuctionHouse.GetItemCommodityStatus
-      and C_AuctionHouse.GetItemCommodityStatus(4496) or nil,
+    replicateItems = C_AuctionHouse and safe(C_AuctionHouse.GetNumReplicateItems) or nil,
+    throttleReady = C_AuctionHouse and safe(C_AuctionHouse.IsThrottledMessageSystemReady) or nil,
+    commodityLinen = commodityStatus(2589),
+    itemBag = commodityStatus(4496),
     zone = GetZoneText and GetZoneText() or nil,
     subzone = GetSubZoneText and GetSubZoneText() or nil,
   }

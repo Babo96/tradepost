@@ -18,6 +18,7 @@ globals = {
   "GetRealmName",
   "GetSubZoneText",
   "GetZoneText",
+  "ItemLocation",
   "LoadAddOn",
   "LoadBindings",
   "PLAYER_LOGIN",
