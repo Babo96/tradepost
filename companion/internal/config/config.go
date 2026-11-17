@@ -29,12 +29,12 @@ func DefaultPath() string {
 func Defaults() Config {
 	return Config{
 		Server:          "http://127.0.0.1:8080",
-		WowDir:          "/games/World of Warcraft",
+		WowDir:          "",
 		Market:          "eu:pve:horde",
 		RingSlots:       64,
 		IntervalSeconds: 60,
 		DashboardAddr:   "127.0.0.1:8787",
-		AddonSource:     ".",
+		AddonSource:     "",
 	}
 }
 

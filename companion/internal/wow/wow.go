@@ -20,17 +20,46 @@ func Find(explicit string) (string, error) {
 	if env := os.Getenv("WOW_DIR"); env != "" {
 		candidates = append(candidates, env)
 	}
-	candidates = append(candidates, "/games/World of Warcraft")
+	candidates = append(candidates, defaultCandidates()...)
 
-	for _, candidate := range candidates {
-		if candidate == "" {
+	tried := []string{}
+	seen := map[string]bool{}
+	for _, raw := range candidates {
+		candidate := normalizeRoot(raw)
+		if candidate == "" || seen[candidate] {
 			continue
 		}
+		seen[candidate] = true
+		tried = append(tried, candidate)
 		if _, err := os.Stat(filepath.Join(candidate, foreverDir)); err == nil {
 			return candidate, nil
 		}
 	}
-	return "", fmt.Errorf("could not find a WoW install with %s (set --wow or WOW_DIR)", foreverDir)
+	return "", fmt.Errorf("could not find a WoW install with %s (tried %s; set --wow or WOW_DIR)",
+		foreverDir, strings.Join(tried, ", "))
+}
+
+// normalizeRoot accepts either the game root or its _forever_ directory and
+// returns the root that contains _forever_ (and the launcher files).
+func normalizeRoot(path string) string {
+	path = strings.TrimSpace(path)
+	path = strings.TrimRight(path, `/\`)
+	if path == "" {
+		return ""
+	}
+	trimmed := strings.TrimRight(path, `/\`)
+	index := strings.LastIndexAny(trimmed, `/\`)
+	base := trimmed
+	if index >= 0 {
+		base = trimmed[index+1:]
+	}
+	if strings.EqualFold(base, foreverDir) {
+		if index > 0 {
+			return strings.TrimRight(trimmed[:index], `/\`)
+		}
+		return "."
+	}
+	return path
 }
 
 func AddonsDir(wow string) string {

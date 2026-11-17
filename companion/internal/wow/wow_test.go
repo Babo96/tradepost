@@ -22,6 +22,37 @@ func TestSavedVariablesFile(t *testing.T) {
 	}
 }
 
+func TestNormalizeRoot(t *testing.T) {
+	cases := map[string]string{
+		"/games/World of Warcraft":              "/games/World of Warcraft",
+		"/games/World of Warcraft/_forever_":    "/games/World of Warcraft",
+		"/games/World of Warcraft/_forever_/":   "/games/World of Warcraft",
+		`C:\Games\World of Warcraft`:            `C:\Games\World of Warcraft`,
+		`C:\Games\World of Warcraft\_forever_`:  `C:\Games\World of Warcraft`,
+		`C:\Games\World of Warcraft\_forever_\`: `C:\Games\World of Warcraft`,
+		"":                                      "",
+	}
+	for input, want := range cases {
+		if got := normalizeRoot(input); got != want {
+			t.Errorf("normalizeRoot(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestFindAcceptsForeverDir(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "_forever_", "Interface", "AddOns"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Find(filepath.Join(root, "_forever_"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != root {
+		t.Fatalf("got %s, want %s", got, root)
+	}
+}
+
 func TestInstall(t *testing.T) {
 	source := t.TempDir()
 	addon := filepath.Join(source, "addon", "BaboForever")

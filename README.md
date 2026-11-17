@@ -101,16 +101,19 @@ the BF tooltip line.
 - [x] Linux companion: SavedVariables export, upload, snapshot/ring writer,
       local dashboard
 - [x] Deployment on `babo-forever.b4b0.de` (Argo app `babo-forever`)
-- [ ] Windows companion
-- [ ] v1 release packaging
-- [ ] In-game price browser (icon + search window)
+- [x] In-game price browser (icon + search window)
+- [x] Windows companion build + setup zip (cross-compiled; needs a real Windows
+      client test)
+- [ ] v1 release packaging (signed/tagged Linux + Windows artifacts)
+- [ ] Item metadata in the snapshot (server-side name search)
 - [ ] v2 web item browser + pins
 
 ## Design decisions
 
 - Lua addon, `Interface: 16001`, no external libraries.
 - Companion in Go, no CGO, local web dashboard on `127.0.0.1:8787`.
-- Linux companion first; Windows is a port, not a rewrite.
+- Linux companion first; Windows is the same Go program, cross-compiled with
+  `CGO_ENABLED=0` and packaged with the addon sources.
 - Server: Go + Postgres 17/18, EU markets only at launch.
 - Live data: LoadOnDemand ring; the `LoadBindings` mailbox was rejected in
   phase 0. See [`docs/protocol.md`](docs/protocol.md).
@@ -134,6 +137,7 @@ the BF tooltip line.
 - [`docs/probe.md`](docs/probe.md)
 - [`docs/phase3-test.md`](docs/phase3-test.md)
 - [`docs/browser.md`](docs/browser.md)
+- [`docs/windows.md`](docs/windows.md)
 - [`docs/findings.md`](docs/findings.md)
 
 ## License

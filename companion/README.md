@@ -1,25 +1,64 @@
 # bfc — Babo Forever Companion
 
-Linux-first Go companion. No CGO. Windows is a later port.
+Go companion for Linux and Windows. No CGO, no runtime dependencies.
 
 ## Build
 
 ```sh
-make companion-build      # dist/bfc
+make companion-build           # dist/bfc (host platform)
+make companion-build-windows   # dist/bfc.exe (windows/amd64)
+make release-windows           # dist/babo-forever-companion-<version>-windows-amd64.zip
 ```
+
+The Windows zip contains `bfc.exe`, `setup.cmd`, and the addon sources in the
+`addon/` and `data-addon/` layout expected by `bfc install`.
 
 ## Commands
 
 ```sh
-bfc enroll  --server https://babo-forever.b4b0.de --wow "/games/World of Warcraft"
-bfc install --source /path/to/babo-forever --wow "/games/World of Warcraft" --count 64
+bfc enroll  --server https://babo-forever.b4b0.de --market eu:pve:horde --count 64
+bfc install --count 64
 bfc sync
 bfc run
 bfc status
+bfc version
 ```
 
-Config: `~/.config/babo-forever/config.json` (0600)
-Upload state: `~/.config/babo-forever/state.json`
+`enroll` and `install` auto-detect the game root and save the resolved path to
+the config, so later `sync`/`run` calls do not depend on the working directory.
+Use `--wow DIR` or `WOW_DIR` to override detection.
+
+`install` defaults `--source` to the current directory when it contains
+`addon/BaboForever`, otherwise to the directory containing `bfc`. A packaged
+Windows build therefore works from a shortcut or any working directory.
+
+Config:
+
+- Linux: `~/.config/babo-forever/config.json`
+- Windows: `%AppData%\babo-forever\config.json`
+
+Upload state lives next to it as `state.json` (per server/client ID).
+
+## Windows quick start
+
+1. Extract the release zip to a permanent folder, for example `C:\BaboForever`.
+2. Close World of Warcraft.
+3. Run `setup.cmd` (or the commands above in a terminal).
+4. Start the game, `/reload`, then hover items and use `/bf browse`.
+5. Keep `bfc run` open for uploads and live data; dashboard:
+   `http://127.0.0.1:8787`.
+
+If auto-detection fails, pass the install root explicitly:
+
+```bat
+bfc.exe enroll --wow "C:\Program Files (x86)\World of Warcraft" ...
+bfc.exe install --source . --wow "C:\Program Files (x86)\World of Warcraft" --count 64
+```
+
+The same `--wow` value is accepted when it points at `_forever_` instead of the
+root.
+
+See [`../docs/windows.md`](../docs/windows.md) for the full checklist.
 
 ## What `run` does
 
@@ -48,16 +87,16 @@ does not re-upload them.
 
 ## Discovery
 
-Linux:
+Explicit first, then environment, then platform defaults:
 
-- `--wow` / `WOW_DIR`
-- `/games/World of Warcraft`
-- account directories under `_forever_/WTF/Account`
+1. `--wow DIR`
+2. `WOW_DIR`
+3. Linux: `/games/World of Warcraft`
+4. Windows: `%ProgramFiles(x86)%`, `%ProgramFiles%`, `%LOCALAPPDATA%` +
+   `\World of Warcraft`, then `C:\World of Warcraft` and
+   `C:\Games\World of Warcraft`
 
-Windows (later):
-
-- registry `HKLM\SOFTWARE\WOW6432Node\Blizzard Entertainment\World of Warcraft`
-- `%ProgramFiles(x86)%\World of Warcraft`
+A path ending in `_forever_` is accepted and resolved to its parent.
 
 ## Files
 

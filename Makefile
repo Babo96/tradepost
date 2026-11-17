@@ -18,10 +18,12 @@ KEY ?= CTRL-ALT-SHIFT-F1
 COMMAND ?= ACTIONBUTTON1
 ACCOUNT ?=
 ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.1.0)
+COMPANION_LDFLAGS := -s -w -X main.version=$(VERSION)
 
 PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB BFProbeDataC BFProbeDataD
 
-.PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
+.PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-build-windows release-windows companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
 	@echo "Babo Forever"
@@ -37,7 +39,9 @@ help:
 	@echo "  make db-up / db-down        local Postgres for the server"
 	@echo "  make server-run             run the API on :8080"
 	@echo "  make server-test            go test the API"
-	@echo "  make companion-build        build dist/bfc"
+	@echo "  make companion-build        build dist/bfc (host platform)"
+	@echo "  make companion-build-windows build dist/bfc.exe"
+	@echo "  make release-windows        package the Windows companion zip"
 	@echo "  make companion-install      install addon + COUNT slots via bfc"
 	@echo "  make companion-enroll       enroll this machine with SERVER"
 	@echo "  make companion-run          run bfc + dashboard :8787"
@@ -96,7 +100,14 @@ server-test:
 
 companion-build:
 	@mkdir -p dist
-	@cd companion && go build -o ../dist/bfc ./cmd/bfc
+	@cd companion && go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/bfc ./cmd/bfc
+
+companion-build-windows:
+	@mkdir -p dist
+	@cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/bfc.exe ./cmd/bfc
+
+release-windows: companion-build-windows
+	@$(PYTHON) tools/release/package_windows.py --version "$(VERSION)" --binary dist/bfc.exe
 
 companion-install: companion-build
 	@dist/bfc install --source "$(CURDIR)" --wow "$(WOW_DIR)" --count $(COUNT)
@@ -113,6 +124,7 @@ companion-test:
 go-lint:
 	@cd server && test -z "$$(gofmt -l .)" && go vet ./...
 	@cd companion && test -z "$$(gofmt -l .)" && go vet ./...
+	@cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build ./...
 
 addon-update:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	syncsvc "babo-forever/companion/internal/sync"
 	"babo-forever/companion/internal/wow"
 )
+
+var version = "0.1.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -37,7 +40,7 @@ func main() {
 	case "status":
 		err = cmdStatus(os.Args[2:])
 	case "version":
-		fmt.Println("bfc 0.1.0")
+		fmt.Println("bfc " + version)
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -53,7 +56,7 @@ func usage() {
 	fmt.Fprintf(os.Stderr, `Babo Forever Companion
 
   bfc enroll  --server URL [--wow DIR] [--market eu:pve:horde]
-  bfc install --source /path/to/babo-forever [--wow DIR] [--count 64]
+  bfc install [--source DIR] [--wow DIR] [--count 64]
   bfc sync    [--config PATH]
   bfc run     [--config PATH]
   bfc status  [--config PATH]
@@ -87,9 +90,11 @@ func cmdEnroll(args []string) error {
 	if *count > 0 {
 		cfg.RingSlots = *count
 	}
-	if _, err := wow.Find(cfg.WowDir); err != nil {
+	found, err := wow.Find(cfg.WowDir)
+	if err != nil {
 		return err
 	}
+	cfg.WowDir = found
 
 	client := api.New(cfg.Server, "")
 	enrolled, err := client.Enroll(context.Background())
@@ -127,11 +132,13 @@ func cmdInstall(args []string) error {
 		cfg.RingSlots = *count
 	}
 	if cfg.AddonSource == "" {
-		cfg.AddonSource = "."
+		cfg.AddonSource = defaultAddonSource()
 	}
-	if _, err := wow.Find(cfg.WowDir); err != nil {
+	found, err := wow.Find(cfg.WowDir)
+	if err != nil {
 		return err
 	}
+	cfg.WowDir = found
 	if err := wow.Install(cfg.AddonSource, cfg.WowDir, cfg.RingSlots); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
@@ -151,6 +158,11 @@ func cmdSync(args []string) error {
 	if err != nil {
 		return err
 	}
+	found, err := wow.Find(cfg.WowDir)
+	if err != nil {
+		return err
+	}
+	cfg.WowDir = found
 	service, err := syncsvc.New(cfg)
 	if err != nil {
 		return err
@@ -170,9 +182,11 @@ func cmdRun(args []string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := wow.Find(cfg.WowDir); err != nil {
+	found, err := wow.Find(cfg.WowDir)
+	if err != nil {
 		return err
 	}
+	cfg.WowDir = found
 	service, err := syncsvc.New(cfg)
 	if err != nil {
 		return err
@@ -204,6 +218,9 @@ func cmdStatus(args []string) error {
 	if err != nil {
 		return err
 	}
+	if found, err := wow.Find(cfg.WowDir); err == nil {
+		cfg.WowDir = found
+	}
 	redacted := cfg
 	if redacted.Token != "" {
 		redacted.Token = "***"
@@ -218,6 +235,24 @@ func cmdStatus(args []string) error {
 	}
 	fmt.Println("status:")
 	return printJSON(service.Status())
+}
+
+// defaultAddonSource prefers the current directory when it looks like a
+// repository checkout, otherwise the directory containing bfc. That makes a
+// packaged Windows build work when started from a shortcut or another CWD.
+func defaultAddonSource() string {
+	if _, err := os.Stat(filepath.Join("addon", "BaboForever")); err == nil {
+		return "."
+	}
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		for _, candidate := range []string{dir, filepath.Dir(dir)} {
+			if _, err := os.Stat(filepath.Join(candidate, "addon", "BaboForever")); err == nil {
+				return candidate
+			}
+		}
+	}
+	return "."
 }
 
 func printJSON(value any) error {
