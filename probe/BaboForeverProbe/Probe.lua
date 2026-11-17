@@ -35,19 +35,26 @@ end
 
 local function safe(fn, ...)
   if type(fn) ~= "function" then
-    return nil
+    return "ERR: missing function"
   end
   local ok, value = pcall(fn, ...)
   if ok then
     return value
   end
-  return nil
+  return "ERR: " .. tostring(value)
+end
+
+local function ahCall(name, ...)
+  if not (C_AuctionHouse and C_AuctionHouse[name]) then
+    return "ERR: API missing"
+  end
+  return safe(C_AuctionHouse[name], ...)
 end
 
 -- GetItemCommodityStatus takes an ItemLocation, not an itemID.
 local function commodityStatus(itemID)
   if not (C_AuctionHouse and C_AuctionHouse.GetItemCommodityStatus and ItemLocation) then
-    return nil
+    return "ERR: API missing"
   end
   local ok, status = pcall(function()
     local location = ItemLocation:CreateFromItemID(itemID)
@@ -56,7 +63,30 @@ local function commodityStatus(itemID)
   if ok then
     return status
   end
-  return nil
+  return "ERR: " .. tostring(status)
+end
+
+-- Finds the first item in the backpack and asks the AH API about it. This
+-- distinguishes "the API is broken for item IDs" from "the API needs a real
+-- bag location".
+local function bagItemStatus()
+  if not (C_Container and C_Container.GetContainerNumSlots and ItemLocation) then
+    return "ERR: container API missing"
+  end
+  if not (C_AuctionHouse and C_AuctionHouse.GetItemCommodityStatus) then
+    return "ERR: AH API missing"
+  end
+  local bag = 0
+  local slots = C_Container.GetContainerNumSlots(bag) or 0
+  for slot = 1, slots do
+    local info = C_Container.GetContainerItemInfo(bag, slot)
+    if info and info.itemID then
+      local location = ItemLocation:CreateFromBagAndSlot(bag, slot)
+      local status = safe(C_AuctionHouse.GetItemCommodityStatus, location)
+      return string.format("bag=%d slot=%d itemID=%s status=%s", bag, slot, tostring(info.itemID), tostring(status))
+    end
+  end
+  return "no item in backpack"
 end
 
 local function valueString(value)
@@ -121,8 +151,8 @@ local function environment()
     subzone = GetSubZoneText and GetSubZoneText() or nil,
     bindingSet = currentSet(),
     numBindings = GetNumBindings and GetNumBindings() or nil,
-    ahReplicateItems = C_AuctionHouse and safe(C_AuctionHouse.GetNumReplicateItems) or nil,
-    ahThrottleReady = C_AuctionHouse and safe(C_AuctionHouse.IsThrottledMessageSystemReady) or nil,
+    ahReplicateItems = ahCall("GetNumReplicateItems"),
+    ahThrottleReady = ahCall("IsThrottledMessageSystemReady"),
     commodityLinen = commodityStatus(2589),
   }
 end
@@ -291,15 +321,47 @@ end
 
 local function cmdAh()
   local data = {
-    replicateItems = C_AuctionHouse and safe(C_AuctionHouse.GetNumReplicateItems) or nil,
-    throttleReady = C_AuctionHouse and safe(C_AuctionHouse.IsThrottledMessageSystemReady) or nil,
+    replicateItems = ahCall("GetNumReplicateItems"),
+    throttleReady = ahCall("IsThrottledMessageSystemReady"),
     commodityLinen = commodityStatus(2589),
     itemBag = commodityStatus(4496),
+    firstBagItem = bagItemStatus(),
     zone = GetZoneText and GetZoneText() or nil,
     subzone = GetSubZoneText and GetSubZoneText() or nil,
   }
   printTable("auction-house", data)
   record("ah", data)
+end
+
+local function cmdScan()
+  if not (C_AuctionHouse and C_AuctionHouse.ReplicateItems) then
+    out("no C_AuctionHouse.ReplicateItems")
+    return
+  end
+  local before = safe(C_AuctionHouse.GetNumReplicateItems)
+  local ok, err = pcall(C_AuctionHouse.ReplicateItems)
+  out("scan requested ok=" .. tostring(ok), "err=" .. tostring(err), "before=" .. tostring(before))
+  out("wait a few seconds, then /bfprobe count")
+  record("scan-request", { ok = ok, err = err, before = before })
+end
+
+local function cmdCount()
+  local count = ahCall("GetNumReplicateItems")
+  local ready = ahCall("IsThrottledMessageSystemReady")
+  out("count replicateItems=" .. tostring(count), "throttleReady=" .. tostring(ready))
+  record("count", { count = count, ready = ready })
+end
+
+local function cmdItem(itemID)
+  itemID = tonumber(itemID) or 2589
+  local data = {
+    itemID = itemID,
+    name = C_Item and C_Item.GetItemInfo and C_Item.GetItemInfo(itemID) or nil,
+    status = commodityStatus(itemID),
+    firstBagItem = bagItemStatus(),
+  }
+  printTable("item", data)
+  record("item", data)
 end
 
 local function cmdReport()
@@ -322,6 +384,9 @@ local function cmdHelp()
   out("commands:")
   out("  /bfprobe dump                 -- build, realm, faction, zone, AH state")
   out("  /bfprobe ah                   -- auction-house state only")
+  out("  /bfprobe scan                 -- call ReplicateItems")
+  out("  /bfprobe count                -- current replicate count")
+  out("  /bfprobe item [id]            -- commodity status for an item")
   out("  /bfprobe bindwrite [mode] [payload] -- click|raw|macro|spell")
   out("  /bfprobe bindread             -- LoadBindings + read reserved keys")
   out("  /bfprobe bindlen [n]          -- write a long CLICK action")
@@ -348,6 +413,9 @@ SlashCmdList["BABOFOREVERPROBE"] = function(msg)
     dump = function() cmdDump() end,
     env = function() cmdDump() end,
     ah = function() cmdAh() end,
+    scan = function() cmdScan() end,
+    count = function() cmdCount() end,
+    item = function() cmdItem(args[1]) end,
     bindwrite = function() cmdBindWrite(args[1], args[2]) end,
     bindread = function() cmdBindRead() end,
     bindlen = function() cmdBindLen(args[1]) end,
@@ -372,9 +440,33 @@ SlashCmdList["BABOFOREVERPROBE"] = function(msg)
   end
 end
 
+local replicateTimer
+local function scheduleReplicateAnnounce()
+  if replicateTimer then
+    return
+  end
+  local function announce()
+    replicateTimer = nil
+    local count = ahCall("GetNumReplicateItems")
+    out("replicate list update: n=" .. tostring(count))
+    record("replicate-update", { count = count })
+  end
+  if C_Timer and C_Timer.NewTimer then
+    replicateTimer = C_Timer.NewTimer(1, announce)
+  elseif C_Timer and C_Timer.After then
+    replicateTimer = true
+    C_Timer.After(1, announce)
+  else
+    announce()
+  end
+end
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("AUCTION_HOUSE_SHOW")
+frame:RegisterEvent("AUCTION_HOUSE_CLOSED")
+frame:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
 frame:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
     BABOFOREVER_PROBE = BABOFOREVER_PROBE or {}
@@ -384,5 +476,13 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     out("loaded. /bfprobe help")
   elseif event == "PLAYER_LOGIN" then
     out("ready. start with /bfprobe dump")
+  elseif event == "AUCTION_HOUSE_SHOW" then
+    out("AUCTION_HOUSE_SHOW")
+    record("ah-show", {})
+  elseif event == "AUCTION_HOUSE_CLOSED" then
+    out("AUCTION_HOUSE_CLOSED")
+    record("ah-closed", {})
+  elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
+    scheduleReplicateAnnounce()
   end
 end)
