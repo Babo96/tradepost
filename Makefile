@@ -12,6 +12,8 @@ SEQ ?= 1
 COUNT ?= 64
 MARKET ?= eu:pve:horde
 ITEMS ?= i:2589,1234,50,2
+SERVER ?= http://127.0.0.1:8080
+DB_URL ?= postgres://babo:babo@localhost:5432/babo?sslmode=disable
 KEY ?= CTRL-ALT-SHIFT-F1
 COMMAND ?= ACTIONBUTTON1
 ACCOUNT ?=
@@ -19,7 +21,7 @@ ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 
 PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB BFProbeDataC BFProbeDataD
 
-.PHONY: help addon-install addon-uninstall ring-install ring-uninstall ring-write probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
+.PHONY: help addon-install addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
 	@echo "Babo Forever"
@@ -31,6 +33,14 @@ help:
 	@echo "  make ring-uninstall         remove generated ring slots"
 	@echo "  make ring-write             write one test slot (MARKET, ITEMS, SEQ)"
 	@echo
+	@echo "  make db-up / db-down        local Postgres for the server"
+	@echo "  make server-run             run the API on :8080"
+	@echo "  make server-test            go test the API"
+	@echo "  make companion-build        build dist/bfc"
+	@echo "  make companion-install      install addon + COUNT slots via bfc"
+	@echo "  make companion-enroll       enroll this machine with SERVER"
+	@echo "  make companion-run          run bfc + dashboard :8787"
+	@echo
 	@echo "  make probe-install          copy the probe addons into $(ADDONS)"
 	@echo "  make probe-uninstall        remove the probe addons"
 	@echo "  make probe-show             show the current BFD1 mailbox lines"
@@ -41,9 +51,9 @@ help:
 	@echo "  make probe-clear            remove BFD1 lines from the bindings file"
 	@echo "  make probe-reset            remove all probe/reserved binding lines"
 	@echo "  make probe-restore          restore the newest bindings backup"
-	@echo "  make lint                   syntax-check Lua and Python"
+	@echo "  make go-lint                gofmt + go vet"
 	@echo "  make test                   run the Python unit tests"
-	@echo "  make check                  lint + test"
+	@echo "  make check                  all local checks"
 	@echo
 	@echo "Variables: WOW_DIR=$(WOW_DIR) ACCOUNT=$(ACCOUNT) COUNT=$(COUNT) MARKET=$(MARKET) ITEMS=$(ITEMS) KEYS=$(KEYS) SLOT=$(SLOT)"
 
@@ -64,6 +74,43 @@ ring-uninstall:
 
 ring-write:
 	@$(PYTHON) tools/ring/write_slot.py --wow "$(WOW_DIR)" --count $(COUNT) --market "$(MARKET)" --seq $(SEQ) --items "$(ITEMS)" --write
+
+db-up:
+	@docker compose -f server/docker-compose.yml up -d
+	@echo "Postgres on localhost:5432 (babo/babo)"
+
+db-down:
+	@docker compose -f server/docker-compose.yml down
+
+server-build:
+	@mkdir -p dist
+	@cd server && go build -o ../dist/bfd ./cmd/bfd
+
+server-run:
+	@cd server && BFD_DATABASE_URL="$(DB_URL)" BFD_ADDR=":8080" go run ./cmd/bfd
+
+server-test:
+	@cd server && go test ./...
+
+companion-build:
+	@mkdir -p dist
+	@cd companion && go build -o ../dist/bfc ./cmd/bfc
+
+companion-install: companion-build
+	@dist/bfc install --source "$(CURDIR)" --wow "$(WOW_DIR)" --count $(COUNT)
+
+companion-enroll: companion-build
+	@dist/bfc enroll --server "$(SERVER)" --wow "$(WOW_DIR)" --market "$(MARKET)" --count $(COUNT)
+
+companion-run: companion-build
+	@dist/bfc run
+
+companion-test:
+	@cd companion && go test ./...
+
+go-lint:
+	@cd server && test -z "$$(gofmt -l .)" && go vet ./...
+	@cd companion && test -z "$$(gofmt -l .)" && go vet ./...
 
 addon-uninstall:
 	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data"
@@ -113,4 +160,4 @@ lint:
 test:
 	@$(PYTHON) -m unittest discover -s tools/probe -p 'test_*.py' -v
 
-check: lint test
+check: lint test go-lint server-test companion-test

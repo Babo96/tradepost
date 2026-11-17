@@ -212,6 +212,8 @@ function BF:FinishScan()
     unique = unique + 1
   end
 
+  self:RecordExport(marketKey, timestamp, self.scan.acc)
+
   db.lastScan = timestamp
   db.lastScanMarket = marketKey
   db.lastAuctions = self.scan.auctions

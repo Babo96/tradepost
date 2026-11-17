@@ -10,6 +10,7 @@ globals = {
   "BABOFOREVER_CONFIG",
   "BABOFOREVER_DATA",
   "BABOFOREVER_DB",
+  "BABOFOREVER_EXPORT",
   "C_Item",
   "C_Map",
   "C_Timer",

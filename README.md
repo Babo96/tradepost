@@ -1,19 +1,19 @@
 # babo-forever
 
-Crowd-sourced auction house prices for **World of Warcraft: Forever**, with in-game
-tooltips and a self-hosted backend.
+Crowd-sourced auction house prices for **World of Warcraft: Forever**, with
+in-game tooltips, an Auctionator display bridge, and a self-hosted backend.
 
-The project is built in phases. This repository currently contains **phase 0**:
-the diagnostic probe used to verify the client APIs, the auction-house data
-shape, and the live file-mailbox idea before the real addon and companion are
-written.
+The addon scans the auction house, shows market-aware prices, and uses a
+pre-created **LoadOnDemand ring** to receive updates while the game is running.
+The Go companion uploads scans and writes snapshots into the game. A Go +
+Postgres server aggregates scans and serves snapshots.
 
 ## Why
 
 Forever has no realms. The auction house is split into a small number of markets:
 
 ```
-region × ruleset (GetRealmName) × house (alliance / horde / neutral)
+region × ruleset (suffix of GetRealmName) × house (alliance / horde / neutral)
 ```
 
 Existing price addons keep one database per realm and therefore mix faction and
@@ -22,97 +22,106 @@ central database fed by many players' scans.
 
 Each player still scans at most every 15 minutes (the client's account-wide
 replicate throttle), but the pool refreshes much faster than any single player
-could. The companion app uploads scans and writes a central snapshot back into
-the game.
+could.
 
-## Repository layout
+## Repository
 
 ```
-addon/              the real addon (phase 1)
-data-addon/         generated central snapshot addon
-probe/              phase 0 diagnostics (this phase)
-tools/probe/        host-side scripts that rewrite files while WoW runs
-companion/          host-side sync daemon (Linux first, Windows later)
-server/             API + Postgres + snapshot builder
-deploy/             k8s / docker-compose manifests
-docs/               architecture, probe guide, protocol, findings
+addon/BaboForever/       Lua addon (scan, local DB, tooltips, ring, bridge)
+data-addon/              generated central snapshot addon
+ring/                    generated live slots (via tools/ring)
+tools/ring/              slot generator and test writer
+tools/probe/             phase 0 diagnostics
+companion/               Go companion (Linux first, Windows later)
+server/                  Go API + Postgres
+deploy/                  k8s / compose manifests (later)
+docs/                    architecture, protocol, probe guide, findings
 ```
 
-## Phase 0: run the probe
+## Quick start
 
-Requirements:
-
-- WoW Forever installed (default `/games/World of Warcraft`)
-- Python 3.11+
-- Linux host (the Windows companion comes later)
+### 1. Install the addon and ring slots
 
 ```sh
-make probe-install
-# restart WoW (new addons are only noticed at startup), then /reload
+make addon-install
+make ring-install COUNT=64
 ```
+
+Restart WoW. The 64 `BaboForever_Data_XX` slots are LoadOnDemand and must be
+enabled in the AddOns list.
 
 In game:
 
 ```
-/bfprobe dump
-/bfprobe help
+/bf status
+/bf market
 ```
 
-While the game is running, rewrite the bindings mailbox from the host:
+### 2. Run the server
 
 ```sh
-make probe-bind PAYLOAD=TEST123 KEYS=4
-/bfprobe bindread
+make db-up
+make server-run
 ```
 
-Then test the LoadOnDemand ring:
+Server on `:8080`, Postgres on `localhost:5432` (`babo`/`babo`).
+
+### 3. Enroll and run the companion
 
 ```sh
-make probe-ring SLOT=A PAYLOAD=RING123
-/bfprobe ring A
+make companion-build
+dist/bfc enroll --server http://127.0.0.1:8080 --wow "/games/World of Warcraft"
+dist/bfc install --source "$PWD" --wow "/games/World of Warcraft" --count 64
+dist/bfc run
 ```
 
-And the TOC metadata cache:
+Dashboard: `http://127.0.0.1:8787`
+
+The companion reads `BABOFOREVER_EXPORT` from SavedVariables (written on
+`/reload` or logout), uploads scans, downloads snapshots, rewrites
+`BaboForever_Data/Data.lua`, and writes the current ring slot.
+
+### 4. Test
 
 ```sh
-make probe-meta PAYLOAD=META123
-/bfprobe meta
+make check
 ```
 
-Record the results in [`docs/findings.md`](docs/findings.md). The full test
-sequence is in [`docs/probe.md`](docs/probe.md).
+In game, `/bf scan`, hover items, and `/bf status`. Auctionator shows our prices
+through the read-only bridge; `/bf bridge off` restores Auctionator and enables
+the BF tooltip line.
 
-**Safety:** the host scripts back up `bindings-cache.wtf` before writing and
-only touch lines with the `BFD1` prefix. `/bfprobe reset` removes test bindings;
-`make probe-restore` restores the latest backup.
+## Phase status
+
+- [x] Phase 0: client/API probes, market model, 280k scan benchmark
+- [x] Addon core: scan, local DB, market-aware tooltips
+- [x] Live LoadOnDemand ring
+- [x] Auctionator display bridge
+- [x] Server: enroll, ingest, meta, snapshot, data-addon zip
+- [x] Linux companion: SavedVariables export, upload, snapshot/ring writer,
+      local dashboard
+- [ ] Deployment on `babo-forever.b4b0.de`
+- [ ] Windows companion
+- [ ] v1 release packaging
+- [ ] v2 web item browser + pins
 
 ## Design decisions
 
 - Lua addon, `Interface: 16001`, no external libraries.
 - Companion in Go, no CGO, local web dashboard on `127.0.0.1:8787`.
-- Linux companion first; Windows is a port behind `internal/platform`, not a
-  rewrite.
-- Server: Go + Postgres 17, EU markets only at launch.
-- Live data: the addon cannot make HTTP requests. Phase 0 confirmed a
-  **LoadOnDemand ring**: pre-created data slots written by the companion while
-  the game runs are loaded mid-session. The bindings-mailbox idea was rejected.
-  See [`docs/protocol.md`](docs/protocol.md).
+- Linux companion first; Windows is a port, not a rewrite.
+- Server: Go + Postgres 17/18, EU markets only at launch.
+- Live data: LoadOnDemand ring; the `LoadBindings` mailbox was rejected in
+  phase 0. See [`docs/protocol.md`](docs/protocol.md).
 - Auctionator integration: read-only display bridge. We never write its
   database or SavedVariables.
 
-See [`docs/architecture.md`](docs/architecture.md) and
-[`docs/protocol.md`](docs/protocol.md).
+## Documentation
 
-## Status
-
-- [x] Phase 0 scaffold
-- [ ] Phase 0 probe results
-- [ ] Addon core
-- [ ] Live mailbox + Auctionator bridge
-- [ ] Server
-- [ ] Linux companion
-- [ ] Deployment
-- [ ] v1 release
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/protocol.md`](docs/protocol.md)
+- [`docs/probe.md`](docs/probe.md)
+- [`docs/findings.md`](docs/findings.md)
 
 ## License
 
