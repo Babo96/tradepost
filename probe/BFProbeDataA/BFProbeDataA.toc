@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: BF Probe Data A
+## Notes: LoadOnDemand probe payload for Babo Forever. Not part of the addon.
+## Author: babo
+## Version: 0.1.0
+## LoadOnDemand: 1
+## X-BF-Data: INITIAL_META_A
+## X-Category: Utility
+
+Data.lua
