@@ -9,6 +9,8 @@ MODE ?= click
 SLOT ?= A
 CHUNK_SIZE ?= 200
 SEQ ?= 1
+ACCOUNT ?=
+ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 
 PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB
 
@@ -29,7 +31,7 @@ help:
 	@echo "  make test                   run the Python unit tests"
 	@echo "  make check                  lint + test"
 	@echo
-	@echo "Variables: WOW_DIR=$(WOW_DIR) PAYLOAD=$(PAYLOAD) KEYS=$(KEYS) MODE=$(MODE) SLOT=$(SLOT)"
+	@echo "Variables: WOW_DIR=$(WOW_DIR) ACCOUNT=$(ACCOUNT) PAYLOAD=$(PAYLOAD) KEYS=$(KEYS) MODE=$(MODE) SLOT=$(SLOT)"
 
 probe-install:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
@@ -44,10 +46,10 @@ probe-uninstall:
 	@echo "Removed probe addons from $(ADDONS)"
 
 probe-show:
-	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" --show
+	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --show
 
 probe-bind:
-	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" --payload "$(PAYLOAD)" --keys $(KEYS) --mode $(MODE) --chunk-size $(CHUNK_SIZE) --seq $(SEQ) --write
+	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --payload "$(PAYLOAD)" --keys $(KEYS) --mode $(MODE) --chunk-size $(CHUNK_SIZE) --seq $(SEQ) --write
 
 probe-ring:
 	@$(PYTHON) tools/probe/write_slot.py --wow "$(WOW_DIR)" --slot "$(SLOT)" --payload "$(PAYLOAD)" --write
@@ -56,10 +58,10 @@ probe-meta:
 	@$(PYTHON) tools/probe/write_toc.py --wow "$(WOW_DIR)" --addon "BFProbeData$(SLOT)" --payload "$(PAYLOAD)" --write
 
 probe-clear:
-	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" --clear --write
+	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --clear --write
 
 probe-restore:
-	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" --restore
+	@$(PYTHON) tools/probe/rewrite_bindings.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --restore
 
 lint:
 	@$(PYTHON) -m py_compile tools/probe/*.py
