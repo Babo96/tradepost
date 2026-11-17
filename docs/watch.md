@@ -23,6 +23,10 @@ gets an HttpOnly session cookie valid for 30 days.
 - Use the **star** at the right of a browser row, or
   `/bf watch <itemID>` / `/bf watch i:2589` / `/bf watch g:12345:70`.
 - `/bf watch` lists the current character's watchlist.
+- Auctionator's Selling → Favourites star is mirrored into the watchlist
+  (`auctionatorFavourites`, default on). `/bf favourites off` disables it and
+  `/bf favourites` shows the current state. Removing a favourite removes only
+  items that sync added; website/browser watches are preserved.
 - The watchlist is mirrored into the Auctionator shopping list
   **“Babo Forever Watchlist”** via `Auctionator.API.v1.CreateShoppingList`
   (public API, no direct SavedVariables writes). Use `/bf watch sync` to rebuild
@@ -30,6 +34,9 @@ gets an HttpOnly session cookie valid for 30 days.
   so an item that has never resolved appears after its data loads.
 - Changes are written to `BABOFOREVER_WATCH`, flushed with `SaveAddOns`, and
   uploaded by the companion on its next 5-second SavedVariables check.
+- A completed auction scan writes the export immediately (and again after two
+  seconds), so the companion uploads the new scan, item metadata, and any
+  watch/favourite changes automatically.
 
 ## On the website
 

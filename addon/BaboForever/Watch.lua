@@ -83,6 +83,73 @@ end
 
 -- Called from Ring.lua with the server watch list. The timestamp prevents an
 -- older ring slot from overwriting a newer local change.
+function BF:AuctionatorFavourites()
+  if not Auctionator or type(Auctionator.Groups) ~= "table" then
+    return nil
+  end
+  if type(Auctionator.Groups.GetGroupList) ~= "function" then
+    return nil
+  end
+  local ok, list = pcall(Auctionator.Groups.GetGroupList, "FAVOURITES")
+  if not ok or type(list) ~= "table" then
+    return nil
+  end
+  return list
+end
+
+-- Mirror Auctionator's Selling -> Favourites star into the watchlist. This is
+-- additive/differential: items removed from Favourites are removed only if
+-- they were added by this sync, so website/browser watches are not lost.
+function BF:SyncAuctionatorFavourites(announce)
+  if self.config and self.config.auctionatorFavourites == false then
+    return false
+  end
+  local list = self:AuctionatorFavourites()
+  if not list then
+    return false
+  end
+
+  local entry = self:CurrentWatch()
+  local previous = entry.auctionator or {}
+  local current = {}
+  local changed = false
+
+  for _, link in ipairs(list) do
+    local keys = self:KeysFromLink(link)
+    local key = keys and keys[1]
+    if key and not current[key] then
+      current[key] = true
+      if not entry.items[key] then
+        entry.items[key] = true
+        changed = true
+      end
+    end
+  end
+
+  for key in pairs(previous) do
+    if not current[key] and entry.items[key] then
+      entry.items[key] = nil
+      changed = true
+    end
+  end
+  entry.auctionator = current
+
+  if changed then
+    entry.updated = time()
+    self:MarkActive()
+    self:SaveExport()
+    self:SyncAuctionatorWatchList(false)
+    if self.browser and self.browser.frame and self.browser.frame:IsShown() then
+      self:RefreshBrowser()
+    end
+  end
+  if announce then
+    self:Print("Auctionator favourites: " .. #list .. " item(s), watchlist now " ..
+      #self:WatchKeys() .. " item(s)")
+  end
+  return true
+end
+
 function BF:SyncAuctionatorWatchList(announce)
   if not Auctionator or type(Auctionator.API) ~= "table" or type(Auctionator.API.v1) ~= "table" then
     if announce then

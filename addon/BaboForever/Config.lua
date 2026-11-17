@@ -10,6 +10,7 @@ local DEFAULTS = {
   ringSlots = 64,
   ringWindow = 300,
   auctionatorBridge = true,
+  auctionatorFavourites = true,
 }
 
 function BF:InitConfig()

@@ -55,9 +55,17 @@ function BF:OnLogin()
   end)
   C_Timer.After(6, function()
     pcall(function()
+      BF:SyncAuctionatorFavourites(false)
       BF:SyncAuctionatorWatchList(false)
     end)
   end)
+  if not self.favouritesTimer then
+    self.favouritesTimer = C_Timer.NewTicker(60, function()
+      pcall(function()
+        BF:SyncAuctionatorFavourites(false)
+      end)
+    end)
+  end
   self:Print("v" .. self.version .. " ready. Market: " .. self:MarketKey() .. ". /bf help")
 end
 

@@ -243,7 +243,13 @@ function BF:FinishScan()
 
   self:RecordExport(marketKey, timestamp, self.scan.acc)
   pcall(function()
+    BF:SyncAuctionatorFavourites(false)
     BF:SyncAuctionatorWatchList(false)
+  end)
+  C_Timer.After(2, function()
+    pcall(function()
+      BF:SaveExport()
+    end)
   end)
 
   db.lastScan = timestamp
