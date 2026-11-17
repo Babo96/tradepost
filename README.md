@@ -100,9 +100,10 @@ the BF tooltip line.
 - [x] Server: enroll, ingest, meta, snapshot, data-addon zip
 - [x] Linux companion: SavedVariables export, upload, snapshot/ring writer,
       local dashboard
-- [ ] Deployment on `babo-forever.b4b0.de`
+- [x] Deployment on `babo-forever.b4b0.de` (Argo app `babo-forever`)
 - [ ] Windows companion
 - [ ] v1 release packaging
+- [ ] In-game price browser (icon + search window)
 - [ ] v2 web item browser + pins
 
 ## Design decisions
@@ -118,10 +119,21 @@ the BF tooltip line.
 
 ## Documentation
 
+## Deployed
+
+- API: `https://babo-forever.b4b0.de`
+- Image: `git.babocraft.de/babo/babo-forever-server`
+- Namespace: `babo-forever`
+- Manifests: `homelab-argo/babo-forever`
+- Argo app: `homelab-argo/argocd/apps/babo-forever.yaml`
+
+## Documentation
+
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/protocol.md`](docs/protocol.md)
 - [`docs/probe.md`](docs/probe.md)
 - [`docs/phase3-test.md`](docs/phase3-test.md)
+- [`docs/browser.md`](docs/browser.md)
 - [`docs/findings.md`](docs/findings.md)
 
 ## License

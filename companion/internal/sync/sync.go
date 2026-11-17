@@ -63,7 +63,7 @@ func New(cfg config.Config) (*Service, error) {
 		cfg:      cfg,
 		client:   api.New(cfg.Server, cfg.Token),
 		account:  account,
-		uploaded: loadUploaded(),
+		uploaded: loadUploaded(cfg.Server, cfg.ClientID),
 		status: Status{
 			Account:        account,
 			Market:         cfg.Market,
@@ -147,7 +147,7 @@ func (s *Service) sync(ctx context.Context) error {
 		for _, scan := range newScans {
 			s.uploaded[scan.Hash] = true
 		}
-		if err := saveUploaded(s.uploaded); err != nil {
+		if err := saveUploaded(s.cfg.Server, s.cfg.ClientID, s.uploaded); err != nil {
 			return fmt.Errorf("save upload state: %w", err)
 		}
 		s.mu.Lock()

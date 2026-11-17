@@ -7,6 +7,8 @@ import (
 )
 
 type stateFile struct {
+	Server   string   `json:"server"`
+	ClientID string   `json:"client_id"`
 	Uploaded []string `json:"uploaded"`
 }
 
@@ -18,7 +20,7 @@ func statePath() string {
 	return filepath.Join(dir, "babo-forever", "state.json")
 }
 
-func loadUploaded() map[string]bool {
+func loadUploaded(server, clientID string) map[string]bool {
 	result := map[string]bool{}
 	data, err := os.ReadFile(statePath())
 	if err != nil {
@@ -28,14 +30,17 @@ func loadUploaded() map[string]bool {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return result
 	}
+	if state.Server != server || state.ClientID != clientID {
+		return result
+	}
 	for _, hash := range state.Uploaded {
 		result[hash] = true
 	}
 	return result
 }
 
-func saveUploaded(uploaded map[string]bool) error {
-	state := stateFile{}
+func saveUploaded(server, clientID string, uploaded map[string]bool) error {
+	state := stateFile{Server: server, ClientID: clientID}
 	for hash := range uploaded {
 		state.Uploaded = append(state.Uploaded, hash)
 	}
