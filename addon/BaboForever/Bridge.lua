@@ -44,6 +44,7 @@ function BF:InitBridge()
     return
   end
   if self.bridge and self.bridge.active then
+    self:SetConfig("tooltips", false)
     return
   end
 
@@ -147,6 +148,8 @@ function BF:BridgeOff()
     end
     if self.bridge.originals.GetPriceAge then
       db.GetPriceAge = self.bridge.originals.GetPriceAge
+    else
+      db.GetPriceAge = nil
     end
   end
 
@@ -163,5 +166,34 @@ end
 function BF:BridgeStatus()
   local active = self.bridge and self.bridge.active
   self:Print("Auctionator bridge: " .. (active and "on" or "off") ..
-    "  (config=" .. tostring(self.config.auctionatorBridge) .. ")")
+    "  (config=" .. tostring(self.config.auctionatorBridge) ..
+    ", BF tooltips=" .. tostring(self.config.tooltips) .. ")")
+end
+
+function BF:BridgeTest(itemID)
+  itemID = tonumber(itemID) or 2318
+  local db = Auctionator and Auctionator.Database
+  if not db then
+    self:Print("Auctionator is not loaded")
+    return
+  end
+
+  local dbKey = tostring(itemID)
+  local keys = keysFor(dbKey)
+  local our = ourEntry(dbKey)
+  local originals = self.bridge and self.bridge.originals
+  local originalPrice = originals and originals.GetPrice and originals.GetPrice(db, dbKey) or nil
+  local originalAge = originals and originals.GetPriceAge and originals.GetPriceAge(db, dbKey) or nil
+  local currentPrice = db.GetPrice and db.GetPrice(db, dbKey) or nil
+  local currentAge = db.GetPriceAge and db.GetPriceAge(db, dbKey) or nil
+
+  self:Print("bridgetest item=" .. itemID .. " keys=" .. table.concat(keys, ","))
+  self:Print("  our=" .. tostring(our and our.p) ..
+    "  ageSec=" .. tostring(our and our.t and (time() - our.t)))
+  self:Print("  original=" .. tostring(originalPrice) ..
+    "  ageDays=" .. tostring(originalAge))
+  self:Print("  current=" .. tostring(currentPrice) ..
+    "  ageDays=" .. tostring(currentAge))
+  self:Print("  bridge=" .. tostring(self.bridge and self.bridge.active) ..
+    "  tooltips=" .. tostring(self.config.tooltips))
 end

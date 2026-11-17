@@ -59,6 +59,7 @@ function BF:PrintHelp()
   self:Print("  /bf supply on|off    show total supply")
   self:Print("  /bf ring [now|on|off|count N]  live data ring")
   self:Print("  /bf bridge [on|off]  Auctionator display bridge")
+  self:Print("  /bf bridgetest [id]  original vs current Auctionator price")
   self:Print("  /bf clear            clear local prices for this market")
   self:Print("  /bf debug            toggle debug output")
   self:Print("  /bf lasterror        show the last caught error")
@@ -126,6 +127,8 @@ SlashCmdList["BABOFOREVER"] = function(msg)
     else
       BF:BridgeStatus()
     end
+  elseif command == "bridgetest" then
+    BF:BridgeTest(rest)
   elseif command == "debug" then
     BF:SetConfig("debug", not BF.config.debug)
     BF:Print("debug: " .. tostring(BF.config.debug))
