@@ -87,6 +87,9 @@ function BF:ApplyRing(data, targetWindow)
 
   if data.pins then
     live.pins = data.pins
+    if data.pins_updated then
+      self:ApplyRemoteWatch(data.pins, data.pins_updated)
+    end
   end
 
   self:Debug(string.format(

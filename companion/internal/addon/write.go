@@ -32,7 +32,7 @@ func WriteDataAddon(wowDir string, snapshots []api.Snapshot) error {
 	return wow.WriteAtomic(wow.DataAddonPath(wowDir), []byte(b.String()))
 }
 
-func WriteRingSlot(wowDir, market string, snapshot api.Snapshot, ringSlots int, window int64) (string, error) {
+func WriteRingSlot(wowDir, market string, snapshot api.Snapshot, ringSlots int, window int64, pins []string, pinsUpdated int64) (string, error) {
 	if ringSlots < 1 {
 		ringSlots = 64
 	}
@@ -60,7 +60,15 @@ func WriteRingSlot(wowDir, market string, snapshot api.Snapshot, ringSlots int, 
 	}
 	b.WriteString("  },\n")
 	b.WriteString("  removed = {},\n")
-	b.WriteString("  pins = {},\n")
+	b.WriteString("  pins = {")
+	for index, key := range pins {
+		if index > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%q", key)
+	}
+	b.WriteString("},\n")
+	fmt.Fprintf(&b, "  pins_updated = %d,\n", pinsUpdated)
 	b.WriteString("}\n")
 
 	path := wow.SlotPath(wowDir, slot)

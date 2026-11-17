@@ -4,7 +4,7 @@
 ## Notes: Auction house prices for WoW Forever. Market-aware tooltips and crowd-sourced data.
 ## Author: babo
 ## Version: 0.1.0
-## SavedVariables: BABOFOREVER_DB, BABOFOREVER_CONFIG, BABOFOREVER_EXPORT, BABOFOREVER_ITEMS
+## SavedVariables: BABOFOREVER_DB, BABOFOREVER_CONFIG, BABOFOREVER_EXPORT, BABOFOREVER_ITEMS, BABOFOREVER_WATCH, BABOFOREVER_ACTIVE, BABOFOREVER_AUTH
 ## X-Category: Auction/Economy
 ## OptionalDeps: Auctionator
 ## IconTexture: Interface\Icons\inv_misc_coin_01
@@ -21,5 +21,6 @@ Scanner.lua
 Format.lua
 Tooltips.lua
 Browser.lua
+Watch.lua
 Bridge.lua
 Commands.lua

@@ -302,9 +302,18 @@ function BF:RefreshBrowser()
       ))
       row.itemID = item.itemID
       row.itemLevel = item.ilvl
+      row.itemKey = item.key
+      local watched = self:IsWatched(item.key)
+      row.star.text:SetText(watched and "★" or "☆")
+      if watched then
+        row.star.text:SetTextColor(1, 0.82, 0.25)
+      else
+        row.star.text:SetTextColor(0.45, 0.5, 0.58)
+      end
       row:Show()
     else
       row.itemID = nil
+      row.itemKey = nil
       row:Hide()
     end
   end
@@ -425,10 +434,10 @@ function BF:CreateBrowser()
   headerName:SetPoint("TOPLEFT", 52, -84)
   headerName:SetText("ITEM")
   local headerPrice = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  headerPrice:SetPoint("TOPRIGHT", -238, -84)
+  headerPrice:SetPoint("TOPRIGHT", -256, -84)
   headerPrice:SetText("PRICE")
   local headerMeta = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-  headerMeta:SetPoint("TOPRIGHT", -96, -84)
+  headerMeta:SetPoint("TOPRIGHT", -114, -84)
   headerMeta:SetText("AGE / QTY")
 
   local list = CreateFrame("Frame", nil, frame)
@@ -479,12 +488,34 @@ function BF:CreateBrowser()
     row.name:SetJustifyH("LEFT")
 
     row.price = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    row.price:SetPoint("RIGHT", row, "RIGHT", -150, 0)
+    row.price:SetPoint("RIGHT", row, "RIGHT", -168, 0)
     row.price:SetJustifyH("RIGHT")
 
     row.meta = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.meta:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    row.meta:SetPoint("RIGHT", row, "RIGHT", -26, 0)
     row.meta:SetJustifyH("RIGHT")
+
+    row.star = CreateFrame("Button", nil, row)
+    row.star:SetSize(18, 18)
+    row.star:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    row.star.text = row.star:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    row.star.text:SetPoint("CENTER")
+    row.star.text:SetText("☆")
+    row.star:SetScript("OnClick", function(button)
+      local parent = button:GetParent()
+      if parent.itemKey then
+        BF:ToggleWatch(parent.itemKey)
+      end
+    end)
+    row.star:SetScript("OnEnter", function(button)
+      GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+      GameTooltip:AddLine(button:GetParent().itemKey and "Toggle watchlist" or "Watchlist")
+      GameTooltip:AddLine("Click to watch or unwatch this item", 0.8, 0.8, 0.8)
+      GameTooltip:Show()
+    end)
+    row.star:SetScript("OnLeave", function()
+      GameTooltip:Hide()
+    end)
 
     row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
     row:SetScript("OnEnter", function(button)

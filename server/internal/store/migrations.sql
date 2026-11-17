@@ -66,3 +66,34 @@ CREATE INDEX IF NOT EXISTS items_name_lower
 
 CREATE INDEX IF NOT EXISTS prices_latest_item_id
   ON prices_latest ((split_part(item_key, ':', 2)::bigint));
+
+CREATE TABLE IF NOT EXISTS login_codes (
+  code_hash bytea PRIMARY KEY,
+  client_id text NOT NULL REFERENCES clients(id),
+  character text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS login_codes_expires
+  ON login_codes (expires_at);
+
+CREATE TABLE IF NOT EXISTS web_sessions (
+  token_hash bytea PRIMARY KEY,
+  client_id text NOT NULL REFERENCES clients(id),
+  character text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS web_sessions_expires
+  ON web_sessions (expires_at);
+
+CREATE TABLE IF NOT EXISTS watch_lists (
+  client_id text NOT NULL REFERENCES clients(id),
+  character text NOT NULL,
+  items text[] NOT NULL DEFAULT '{}',
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (client_id, character)
+);

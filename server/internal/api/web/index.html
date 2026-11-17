@@ -14,6 +14,9 @@
       <select id="market"></select>
     </label>
     <div id="meta" class="meta"></div>
+    <div id="auth-area" class="auth">
+      <button type="button" id="auth-open" class="ghost">Sync watch</button>
+    </div>
   </header>
 
   <main>
@@ -26,6 +29,7 @@
         <label class="watch-toggle">
           <input id="watch-only" type="checkbox"> Watchlist only
         </label>
+        <span id="sync-state" class="sync-state"></span>
         <span id="status" class="status"></span>
       </div>
       <div id="results" class="results">
@@ -37,6 +41,20 @@
       <p class="empty">Select an item to see price history and the market comparison.</p>
     </aside>
   </main>
+
+  <dialog id="auth-dialog">
+    <form id="auth-form" method="dialog">
+      <h2>Sync your watchlist</h2>
+      <p>In game, type <code>/bf login</code> and enter the short code below.</p>
+      <input id="auth-code" type="text" maxlength="12" placeholder="ABCD2345"
+             autocomplete="off" spellcheck="false">
+      <p id="auth-error" class="error"></p>
+      <div class="dialog-actions">
+        <button type="button" id="auth-cancel" class="ghost">Cancel</button>
+        <button type="submit">Log in</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="app.js"></script>
 </body>

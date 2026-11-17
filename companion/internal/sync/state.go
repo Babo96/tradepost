@@ -12,6 +12,7 @@ type stateFile struct {
 	ClientID string            `json:"client_id"`
 	Uploaded []string          `json:"uploaded,omitempty"`
 	Items    map[string]string `json:"items,omitempty"`
+	AuthSeq  int64             `json:"auth_seq,omitempty"`
 }
 
 func statePath() string {
@@ -73,6 +74,16 @@ func saveUploaded(server, clientID string, uploaded map[string]bool) error {
 		hashes = hashes[len(hashes)-5000:]
 	}
 	state.Uploaded = hashes
+	return writeState(state)
+}
+
+func loadAuthSeq(server, clientID string) int64 {
+	return stateFor(server, clientID).AuthSeq
+}
+
+func saveAuthSeq(server, clientID string, seq int64) error {
+	state := stateFor(server, clientID)
+	state.AuthSeq = seq
 	return writeState(state)
 }
 

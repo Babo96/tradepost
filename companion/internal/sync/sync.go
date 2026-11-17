@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"sync"
@@ -28,6 +29,7 @@ type Status struct {
 	Accepted       int    `json:"accepted"`
 	Rejected       int    `json:"rejected"`
 	Meta           int    `json:"meta"`
+	Watch          int    `json:"watch"`
 	RingSlot       string `json:"ring_slot"`
 	Error          string `json:"error"`
 	Account        string `json:"account"`
@@ -42,10 +44,16 @@ type Service struct {
 	account  string
 	uploaded map[string]bool
 	meta     map[string]string
+	authSeq  int64
+	watch    []string
+	watchAt  int64
 	status   Status
 }
 
 func New(cfg config.Config) (*Service, error) {
+	if err := wow.EnsureAuthSlots(cfg.WowDir); err != nil {
+		return nil, fmt.Errorf("auth slots: %w", err)
+	}
 	accounts, err := wow.AccountDirs(cfg.WowDir)
 	if err != nil {
 		return nil, err
@@ -68,6 +76,7 @@ func New(cfg config.Config) (*Service, error) {
 		account:  account,
 		uploaded: loadUploaded(cfg.Server, cfg.ClientID),
 		meta:     loadMeta(cfg.Server, cfg.ClientID),
+		authSeq:  loadAuthSeq(cfg.Server, cfg.ClientID),
 		status: Status{
 			Account:        account,
 			Market:         cfg.Market,
@@ -119,6 +128,8 @@ func (s *Service) sync(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.syncAuth(ctx, data)
+	s.syncWatch(ctx, data)
 	newScans := make([]export.Scan, 0, len(data.Scans))
 	for _, scan := range data.Scans {
 		if !s.uploaded[scan.Hash] {
@@ -225,7 +236,7 @@ func (s *Service) sync(ctx context.Context) error {
 	s.mu.Unlock()
 
 	if selected != nil {
-		path, err := addon.WriteRingSlot(s.cfg.WowDir, selected.Market, *selected, s.cfg.RingSlots, 0)
+		path, err := addon.WriteRingSlot(s.cfg.WowDir, selected.Market, *selected, s.cfg.RingSlots, 0, s.watch, s.watchAt)
 		if err != nil {
 			return fmt.Errorf("write ring slot: %w", err)
 		}
@@ -234,6 +245,59 @@ func (s *Service) sync(ctx context.Context) error {
 		s.mu.Unlock()
 	}
 	return nil
+}
+
+func (s *Service) syncAuth(ctx context.Context, data export.Data) {
+	request := data.Auth
+	if request == nil || request.Seq <= s.authSeq {
+		return
+	}
+	if request.Action != "login" {
+		s.authSeq = request.Seq
+		if err := saveAuthSeq(s.cfg.Server, s.cfg.ClientID, s.authSeq); err != nil {
+			log.Printf("auth state: %v", err)
+		}
+		return
+	}
+	response, err := s.client.LoginCode(ctx, request.Character)
+	if err != nil {
+		log.Printf("auth code: %v", err)
+		return
+	}
+	if err := wow.WriteAuthReply(s.cfg.WowDir, request.Seq, response.Code, response.Character, response.ExpiresAt); err != nil {
+		log.Printf("auth reply: %v", err)
+		return
+	}
+	s.authSeq = request.Seq
+	if err := saveAuthSeq(s.cfg.Server, s.cfg.ClientID, s.authSeq); err != nil {
+		log.Printf("auth state: %v", err)
+	}
+}
+
+func (s *Service) syncWatch(ctx context.Context, data export.Data) {
+	character := data.Active
+	if character == "" {
+		return
+	}
+	local := data.Watch[character]
+	remote, err := s.client.Watch(ctx, character)
+	if err != nil {
+		log.Printf("watch: %v", err)
+		return
+	}
+	if local.Updated > remote.UpdatedAt+2 {
+		updated, err := s.client.SetWatch(ctx, character, local.Items)
+		if err != nil {
+			log.Printf("watch upload: %v", err)
+			return
+		}
+		remote = updated
+	}
+	s.watch = remote.Items
+	s.watchAt = remote.UpdatedAt
+	s.mu.Lock()
+	s.status.Watch = len(remote.Items)
+	s.mu.Unlock()
 }
 
 func (s *Service) Run(ctx context.Context, interval time.Duration) {

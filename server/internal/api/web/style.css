@@ -79,6 +79,44 @@ button:hover { filter: brightness(1.08); }
 button:disabled { opacity: .5; cursor: default; }
 
 .meta { margin-left: auto; color: var(--muted); font-size: 13px; }
+.auth { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.auth .who { color: var(--gold); font-weight: 600; }
+
+button.ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--line);
+}
+button.ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+.sync-state { color: #6b7787; font-size: 12px; }
+.sync-state.on { color: var(--green); }
+
+dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 22px;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .7);
+}
+dialog::backdrop { background: rgba(2, 6, 12, .72); backdrop-filter: blur(3px); }
+dialog h2 { margin: 0 0 8px; color: var(--gold); font-size: 19px; }
+dialog p { color: var(--muted); font-size: 13px; }
+dialog code { color: var(--text); background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+#auth-code {
+  width: 100%;
+  margin: 6px 0 4px;
+  padding: 12px 14px;
+  font: 600 22px/1 ui-monospace, monospace;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  text-align: center;
+}
+#auth-code::placeholder { color: #44505f; letter-spacing: 4px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+dialog .error { min-height: 18px; color: var(--red); margin: 4px 0; }
 
 main {
   display: grid;

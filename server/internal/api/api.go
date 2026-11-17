@@ -55,6 +55,12 @@ func New(st store.Store) *Server {
 	s.mux.HandleFunc("GET /v1/items", s.handleItems)
 	s.mux.HandleFunc("GET /v1/item/history", s.handleItemHistory)
 	s.mux.HandleFunc("GET /v1/item/markets", s.handleItemMarkets)
+	s.mux.HandleFunc("POST /v1/auth/code", s.handleAuthCode)
+	s.mux.HandleFunc("POST /v1/auth/redeem", s.handleAuthRedeem)
+	s.mux.HandleFunc("GET /v1/auth/me", s.handleAuthMe)
+	s.mux.HandleFunc("POST /v1/auth/logout", s.handleAuthLogout)
+	s.mux.HandleFunc("GET /v1/watch", s.handleWatchGet)
+	s.mux.HandleFunc("PUT /v1/watch", s.handleWatchPut)
 	s.mux.Handle("GET /", s.webHandler())
 	return s
 }

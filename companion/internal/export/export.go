@@ -42,9 +42,25 @@ func (m Meta) Hash() string {
 	return hex.EncodeToString(sum[:8])
 }
 
+type AuthRequest struct {
+	Seq       int64
+	Action    string
+	Character string
+	Market    string
+	At        int64
+}
+
+type WatchSet struct {
+	Updated int64
+	Items   []string
+}
+
 type Data struct {
-	Scans []Scan
-	Items []Meta
+	Scans  []Scan
+	Items  []Meta
+	Auth   *AuthRequest
+	Watch  map[string]WatchSet
+	Active string
 }
 
 func Load(path string) ([]Scan, error) {
@@ -69,7 +85,13 @@ func LoadData(path string) (Data, error) {
 		return Data{}, fmt.Errorf("parse SavedVariables: %w", err)
 	}
 
-	data := Data{Scans: loadScans(L), Items: loadItems(L)}
+	data := Data{
+		Scans:  loadScans(L),
+		Items:  loadItems(L),
+		Auth:   loadAuth(L),
+		Watch:  loadWatch(L),
+		Active: loadActive(L),
+	}
 	sort.Slice(data.Items, func(i, j int) bool { return data.Items[i].ID < data.Items[j].ID })
 	return data, nil
 }
@@ -128,6 +150,71 @@ func loadItems(L *lua.LState) []Meta {
 		})
 	})
 	return result
+}
+
+func loadAuth(L *lua.LState) *AuthRequest {
+	table, ok := L.GetGlobal("BABOFOREVER_AUTH").(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	request, ok := table.RawGetString("request").(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	seq := int64(lua.LVAsNumber(table.RawGetString("seq")))
+	if seq <= 0 {
+		return nil
+	}
+	action := lua.LVAsString(request.RawGetString("action"))
+	character := lua.LVAsString(request.RawGetString("character"))
+	if action == "" || character == "" {
+		return nil
+	}
+	return &AuthRequest{
+		Seq:       seq,
+		Action:    action,
+		Character: character,
+		Market:    lua.LVAsString(request.RawGetString("market")),
+		At:        int64(lua.LVAsNumber(request.RawGetString("at"))),
+	}
+}
+
+func loadWatch(L *lua.LState) map[string]WatchSet {
+	table, ok := L.GetGlobal("BABOFOREVER_WATCH").(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	result := map[string]WatchSet{}
+	table.ForEach(func(key, value lua.LValue) {
+		character := lua.LVAsString(key)
+		entry, ok := value.(*lua.LTable)
+		if character == "" || !ok {
+			return
+		}
+		itemsTable, _ := entry.RawGetString("items").(*lua.LTable)
+		items := []string{}
+		if itemsTable != nil {
+			itemsTable.ForEach(func(itemKey, enabled lua.LValue) {
+				if lua.LVAsBool(enabled) {
+					items = append(items, lua.LVAsString(itemKey))
+				}
+			})
+		}
+		sort.Strings(items)
+		result[character] = WatchSet{
+			Updated: int64(lua.LVAsNumber(entry.RawGetString("updated"))),
+			Items:   items,
+		}
+	})
+	return result
+}
+
+func loadActive(L *lua.LState) string {
+	table, ok := L.GetGlobal("BABOFOREVER_ACTIVE").(*lua.LTable)
+	if !ok {
+		return ""
+	}
+	return lua.LVAsString(table.RawGetString("character"))
 }
 
 func parseRecord(record string) (Scan, error) {

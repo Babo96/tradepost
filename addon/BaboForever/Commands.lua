@@ -59,6 +59,8 @@ function BF:PrintHelp()
   self:Print("  /bf supply on|off    show total supply")
   self:Print("  /bf ring [now|on|off|count N]  live data ring")
   self:Print("  /bf browse           open the auction data browser")
+  self:Print("  /bf watch [id|key]   toggle a watched item / list the watchlist")
+  self:Print("  /bf login            get a short web login code")
   self:Print("  /bf bridge [on|off]  Auctionator display bridge")
   self:Print("  /bf bridgetest [id]  original vs current Auctionator price")
   self:Print("  /bf export [clear|save|local] buffer status / flush / local test")
@@ -133,6 +135,33 @@ SlashCmdList["BABOFOREVER"] = function(msg)
     BF:BridgeTest(rest)
   elseif command == "browse" or command == "browser" then
     BF:ToggleBrowser()
+  elseif command == "watch" then
+    if rest == "" then
+      local keys = BF:WatchKeys()
+      if #keys == 0 then
+        BF:Print("watchlist is empty. Use /bf watch <itemID> or right-click a browser row.")
+      else
+        BF:Print("watchlist (" .. #keys .. "):")
+        for _, key in ipairs(keys) do
+          local itemID = tonumber(key:match("^[igp]:(%d+)"))
+          local meta = itemID and BF:GetItemMeta(itemID, false) or nil
+          BF:Print("  " .. key .. (meta and ("  " .. meta.n) or ""))
+        end
+      end
+    else
+      local key = rest
+      local id = tonumber(rest)
+      if id then
+        key = "i:" .. id
+      elseif not key:match("^[igp]:") then
+        BF:Print("usage: /bf watch <itemID|i:id|g:id:ilvl>")
+        return
+      end
+      local watched = BF:ToggleWatch(key)
+      BF:Print((watched and "watching " or "unwatched ") .. key)
+    end
+  elseif command == "login" then
+    BF:RequestLogin()
   elseif command == "export" then
     if rest == "clear" then
       BF:ClearExport()

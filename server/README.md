@@ -28,6 +28,11 @@ GET  /v1/snapshot/{market}/data-addon.zip
 GET  /v1/items?market=..&q=..        -> item search with latest prices
 GET  /v1/item/history?market=..&key= -> hourly min/max history
 GET  /v1/item/markets?key=..         -> latest price per market
+POST /v1/auth/code                   -> one-time web login code (bearer)
+POST /v1/auth/redeem                 -> exchange code for a session cookie
+GET  /v1/auth/me                     -> current website character
+POST /v1/auth/logout
+GET/PUT /v1/watch                    -> per-character watchlist
 GET  /                                -> web UI (search, history, watchlist)
 GET  /healthz
 ```

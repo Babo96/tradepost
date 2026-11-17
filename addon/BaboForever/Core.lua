@@ -44,9 +44,15 @@ end
 
 function BF:OnLogin()
   self:UpdateMarket()
+  self:MarkActive()
   self:PruneLocal()
   self:InitRing()
   self:InitBridge()
+  C_Timer.After(3, function()
+    pcall(function()
+      BF:SaveExport()
+    end)
+  end)
   self:Print("v" .. self.version .. " ready. Market: " .. self:MarketKey() .. ". /bf help")
 end
 

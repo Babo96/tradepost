@@ -54,7 +54,7 @@ func TestWriteRingSlot(t *testing.T) {
 			{Key: "i:2318", Price: 4567, Quantity: 100, Listings: 3, Scanned: 1794947776},
 		},
 	}
-	path, err := WriteRingSlot(wowDir, "eu:pve:horde", snapshot, 8, 10)
+	path, err := WriteRingSlot(wowDir, "eu:pve:horde", snapshot, 8, 10, []string{"i:2589"}, 1794947800)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,5 +67,8 @@ func TestWriteRingSlot(t *testing.T) {
 	}
 	if !strings.Contains(string(data), `window = 10`) || !strings.Contains(string(data), `seq = 9`) {
 		t.Fatalf("unexpected ring slot:\n%s", data)
+	}
+	if !strings.Contains(string(data), `"i:2589"`) || !strings.Contains(string(data), `pins_updated = 1794947800`) {
+		t.Fatalf("unexpected pins in ring slot:\n%s", data)
 	}
 }

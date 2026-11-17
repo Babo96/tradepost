@@ -21,6 +21,10 @@ type MemStore struct {
 	versions map[string]int64
 	items    map[int64]store.ItemMeta
 	history  map[string]map[string]map[int64]store.HistoryPoint
+	codes    map[string]store.LoginGrant
+	used     map[string]bool
+	sessions map[string]store.WebSession
+	watches  map[string]store.WatchList
 }
 
 func NewMemStore() *MemStore {
@@ -32,6 +36,10 @@ func NewMemStore() *MemStore {
 		versions: map[string]int64{},
 		items:    map[int64]store.ItemMeta{},
 		history:  map[string]map[string]map[int64]store.HistoryPoint{},
+		codes:    map[string]store.LoginGrant{},
+		used:     map[string]bool{},
+		sessions: map[string]store.WebSession{},
+		watches:  map[string]store.WatchList{},
 	}
 }
 
@@ -254,6 +262,83 @@ func (m *MemStore) ItemMarkets(_ context.Context, key string) ([]store.MarketPri
 		return result[i].Market < result[j].Market
 	})
 	return result, nil
+}
+
+func (m *MemStore) CreateLoginCode(_ context.Context, codeHash []byte, clientID, character string, expires time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.codes[hex.EncodeToString(codeHash)] = store.LoginGrant{
+		ClientID: clientID, Character: character, ExpiresAt: expires,
+	}
+	return nil
+}
+
+func (m *MemStore) RedeemLoginCode(_ context.Context, codeHash []byte, now time.Time) (store.LoginGrant, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	key := hex.EncodeToString(codeHash)
+	grant, ok := m.codes[key]
+	if !ok || m.used[key] || !grant.ExpiresAt.After(now) {
+		return store.LoginGrant{}, store.ErrNotFound
+	}
+	m.used[key] = true
+	return grant, nil
+}
+
+func (m *MemStore) CreateWebSession(_ context.Context, tokenHash []byte, clientID, character string, expires time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.sessions[hex.EncodeToString(tokenHash)] = store.WebSession{
+		ClientID: clientID, Character: character, ExpiresAt: expires,
+	}
+	return nil
+}
+
+func (m *MemStore) WebSession(_ context.Context, tokenHash []byte, now time.Time) (store.WebSession, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	session, ok := m.sessions[hex.EncodeToString(tokenHash)]
+	if !ok || !session.ExpiresAt.After(now) {
+		return store.WebSession{}, store.ErrNotFound
+	}
+	return session, nil
+}
+
+func (m *MemStore) DeleteWebSession(_ context.Context, tokenHash []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.sessions, hex.EncodeToString(tokenHash))
+	return nil
+}
+
+func watchKey(clientID, character string) string {
+	return clientID + "\x00" + character
+}
+
+func (m *MemStore) WatchList(_ context.Context, clientID, character string) (store.WatchList, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	list, ok := m.watches[watchKey(clientID, character)]
+	if !ok {
+		return store.WatchList{Character: character, Items: []string{}}, nil
+	}
+	list.Items = append([]string{}, list.Items...)
+	return list, nil
+}
+
+func (m *MemStore) SetWatchList(_ context.Context, clientID, character string, items []string) (store.WatchList, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if items == nil {
+		items = []string{}
+	}
+	list := store.WatchList{
+		Character: character,
+		Items:     append([]string{}, items...),
+		UpdatedAt: time.Now().Unix(),
+	}
+	m.watches[watchKey(clientID, character)] = list
+	return list, nil
 }
 
 func (m *MemStore) Markets(context.Context) ([]string, error) {

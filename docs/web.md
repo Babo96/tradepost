@@ -17,7 +17,8 @@ Node build or separate static host.
   quantity, listings, and scan age
 - item detail: hourly min/max chart (`prices_hourly`), market comparison across
   alliance/horde/neutral and rulesets
-- watchlist stored in `localStorage`, with a “watchlist only” filter
+- watchlist stored in `localStorage` when logged out, or per character on the
+  server after `/bf login`; see [`watch.md`](watch.md)
 - money formatting in gold/silver/copper
 
 ## Data flow

@@ -11,6 +11,7 @@ const state = {
   market: localStorage.getItem("bf-market") || "",
   results: [],
   selected: null,
+  session: null,
   watch: new Set(JSON.parse(localStorage.getItem("bf-watch") || "[]")),
 };
 
@@ -51,14 +52,22 @@ function itemLevel(key) {
   return "";
 }
 
-async function api(path, params) {
+async function api(path, params, options) {
   const url = new URL(path, window.location.origin);
   for (const [key, value] of Object.entries(params || {})) {
     if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, value);
     }
   }
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const init = { ...(options || {}) };
+  init.headers = { Accept: "application/json", ...(init.headers || {}) };
+  if (init.body && !init.headers["Content-Type"]) {
+    init.headers["Content-Type"] = "application/json";
+  }
+  const response = await fetch(url, init);
+  if (response.status === 204) {
+    return null;
+  }
   if (!response.ok) {
     let message = response.statusText;
     try {
@@ -105,16 +114,7 @@ function starButton(item) {
   button.title = state.watch.has(item.key) ? "Remove from watchlist" : "Add to watchlist";
   button.addEventListener("click", (event) => {
     event.stopPropagation();
-    if (state.watch.has(item.key)) {
-      state.watch.delete(item.key);
-    } else {
-      state.watch.add(item.key);
-    }
-    saveWatch();
-    renderResults();
-    if (state.selected && state.selected.key === item.key) {
-      renderDetail(state.selected);
-    }
+    toggleWatch(item.key);
   });
   return button;
 }
@@ -217,16 +217,7 @@ function renderDetail(item) {
   const watch = document.createElement("button");
   watch.type = "button";
   watch.textContent = state.watch.has(item.key) ? "★ Watching" : "☆ Watch";
-  watch.addEventListener("click", () => {
-    if (state.watch.has(item.key)) {
-      state.watch.delete(item.key);
-    } else {
-      state.watch.add(item.key);
-    }
-    saveWatch();
-    renderResults();
-    renderDetail(item);
-  });
+  watch.addEventListener("click", () => toggleWatch(item.key));
 
   detail.append(heading, key, current, watch);
 
@@ -421,6 +412,139 @@ function renderMarkets(markets) {
   return table;
 }
 
+function setSyncState(text, ok) {
+  const element = $("#sync-state");
+  element.textContent = text || "";
+  element.classList.toggle("on", Boolean(ok));
+}
+
+function toggleWatch(key) {
+  if (state.watch.has(key)) {
+    state.watch.delete(key);
+  } else {
+    state.watch.add(key);
+  }
+  renderResults();
+  if (state.selected) {
+    renderDetail(state.selected);
+  }
+  persistWatch();
+}
+
+let watchTimer;
+function persistWatch() {
+  if (!state.session) {
+    saveWatch();
+    setSyncState("Local only — /bf login to sync");
+    return;
+  }
+  setSyncState("Saving…");
+  clearTimeout(watchTimer);
+  watchTimer = setTimeout(async () => {
+    try {
+      const list = await api("/v1/watch", {}, {
+        method: "PUT",
+        body: JSON.stringify({ items: [...state.watch] }),
+      });
+      state.watch = new Set(list.items || []);
+      setSyncState("Watch synced", true);
+      renderResults();
+      if (state.selected) {
+        renderDetail(state.selected);
+      }
+    } catch (error) {
+      setSyncState(error.message);
+    }
+  }, 300);
+}
+
+async function loadWatch() {
+  if (state.session) {
+    try {
+      const list = await api("/v1/watch");
+      state.watch = new Set(list.items || []);
+      setSyncState("Watch synced", true);
+    } catch (error) {
+      setSyncState(error.message);
+    }
+  } else {
+    state.watch = new Set(JSON.parse(localStorage.getItem("bf-watch") || "[]"));
+    setSyncState("Local only — /bf login to sync");
+  }
+  renderResults();
+  if (state.selected) {
+    renderDetail(state.selected);
+  }
+}
+
+function updateAuthUI() {
+  const area = $("#auth-area");
+  area.innerHTML = "";
+  if (state.session) {
+    const who = document.createElement("span");
+    who.className = "who";
+    who.textContent = state.session.character;
+    const logout = document.createElement("button");
+    logout.type = "button";
+    logout.className = "ghost";
+    logout.textContent = "Log out";
+    logout.addEventListener("click", logoutWeb);
+    area.append(who, logout);
+  } else {
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "ghost";
+    open.textContent = "Sync watch";
+    open.addEventListener("click", openAuthDialog);
+    area.append(open);
+  }
+}
+
+function openAuthDialog() {
+  $("#auth-error").textContent = "";
+  $("#auth-code").value = "";
+  $("#auth-dialog").showModal();
+  $("#auth-code").focus();
+}
+
+async function mergeWatchAfterLogin() {
+  const local = new Set(JSON.parse(localStorage.getItem("bf-watch") || "[]"));
+  const list = await api("/v1/watch");
+  const merged = new Set([...local, ...(list.items || [])]);
+  state.watch = merged;
+  if (merged.size !== (list.items || []).length) {
+    const saved = await api("/v1/watch", {}, {
+      method: "PUT",
+      body: JSON.stringify({ items: [...merged] }),
+    });
+    state.watch = new Set(saved.items || []);
+  }
+  setSyncState("Watch synced", true);
+  renderResults();
+  if (state.selected) {
+    renderDetail(state.selected);
+  }
+}
+
+async function logoutWeb() {
+  try {
+    await api("/v1/auth/logout", {}, { method: "POST" });
+  } catch (_) { /* session is local anyway */ }
+  state.session = null;
+  updateAuthUI();
+  await loadWatch();
+}
+
+async function initAuth() {
+  try {
+    state.session = await api("/v1/auth/me");
+  } catch (_) {
+    state.session = null;
+  }
+  updateAuthUI();
+  await loadWatch();
+}
+
 async function search() {
   if (!state.market) return;
   $("#status").textContent = "Searching…";
@@ -451,6 +575,28 @@ $("#search-form").addEventListener("submit", (event) => {
 
 $("#watch-only").addEventListener("change", renderResults);
 
+$("#auth-cancel").addEventListener("click", () => $("#auth-dialog").close());
+$("#auth-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const code = $("#auth-code").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (code.length < 6) {
+    $("#auth-error").textContent = "Enter the code from /bf login.";
+    return;
+  }
+  try {
+    const result = await api("/v1/auth/redeem", {}, {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+    state.session = { character: result.character, expires_at: result.expires_at };
+    $("#auth-dialog").close();
+    updateAuthUI();
+    await mergeWatchAfterLogin();
+  } catch (error) {
+    $("#auth-error").textContent = error.message;
+  }
+});
+
 $("#market").addEventListener("change", (event) => {
   state.market = event.target.value;
   localStorage.setItem("bf-market", state.market);
@@ -461,6 +607,7 @@ $("#market").addEventListener("change", (event) => {
 });
 
 loadMeta()
+  .then(initAuth)
   .then(search)
   .catch((error) => {
     $("#status").textContent = error.message;

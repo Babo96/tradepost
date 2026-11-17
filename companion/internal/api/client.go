@@ -54,6 +54,18 @@ type IngestResponse struct {
 	Meta     int `json:"meta"`
 }
 
+type AuthCodeResponse struct {
+	Code      string `json:"code"`
+	Character string `json:"character"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+type WatchList struct {
+	Character string   `json:"character"`
+	Items     []string `json:"items"`
+	UpdatedAt int64    `json:"updated_at"`
+}
+
 type MarketMeta struct {
 	Market    string `json:"market"`
 	Version   int64  `json:"version"`
@@ -140,6 +152,81 @@ func (c *Client) Ingest(ctx context.Context, scans []IngestScan, meta []IngestMe
 	var result IngestResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return IngestResponse{}, err
+	}
+	return result, nil
+}
+
+func (c *Client) LoginCode(ctx context.Context, character string) (AuthCodeResponse, error) {
+	body, err := json.Marshal(map[string]string{"character": character})
+	if err != nil {
+		return AuthCodeResponse{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/v1/auth/code", bytes.NewReader(body))
+	if err != nil {
+		return AuthCodeResponse{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return AuthCodeResponse{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		return AuthCodeResponse{}, responseError(resp)
+	}
+	var result AuthCodeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return AuthCodeResponse{}, err
+	}
+	return result, nil
+}
+
+func (c *Client) Watch(ctx context.Context, character string) (WatchList, error) {
+	endpoint := c.BaseURL + "/v1/watch?character=" + url.QueryEscape(character)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return WatchList{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return WatchList{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return WatchList{}, responseError(resp)
+	}
+	var result WatchList
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return WatchList{}, err
+	}
+	return result, nil
+}
+
+func (c *Client) SetWatch(ctx context.Context, character string, items []string) (WatchList, error) {
+	body, err := json.Marshal(map[string][]string{"items": items})
+	if err != nil {
+		return WatchList{}, err
+	}
+	endpoint := c.BaseURL + "/v1/watch?character=" + url.QueryEscape(character)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return WatchList{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return WatchList{}, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return WatchList{}, responseError(resp)
+	}
+	var result WatchList
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return WatchList{}, err
 	}
 	return result, nil
 }

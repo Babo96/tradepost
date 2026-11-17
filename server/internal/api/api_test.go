@@ -12,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"babo-forever/server/internal/store"
 )
 
 type testClient struct {
@@ -332,5 +334,113 @@ func TestWebIndex(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "Babo Forever") {
 		t.Fatal("index does not contain the app title")
+	}
+}
+
+func TestLoginCodeAndWatchSync(t *testing.T) {
+	srv, _ := newTestServer(t)
+	client := enroll(t, srv)
+
+	codeBody := []byte(`{"character":"Schmoo-Boo"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/code", bytes.NewReader(codeBody))
+	req.Header.Set("Authorization", "Bearer "+client.Token)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("code status %d: %s", rec.Code, rec.Body.String())
+	}
+	var codeResponse struct {
+		Code      string `json:"code"`
+		Character string `json:"character"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &codeResponse); err != nil {
+		t.Fatal(err)
+	}
+	if len(codeResponse.Code) != 8 || codeResponse.Character != "Schmoo-Boo" {
+		t.Fatalf("unexpected code response: %+v", codeResponse)
+	}
+
+	redeemBody := []byte(fmt.Sprintf(`{"code":%q}`, codeResponse.Code))
+	redeemReq := httptest.NewRequest(http.MethodPost, "/v1/auth/redeem", bytes.NewReader(redeemBody))
+	redeemRec := httptest.NewRecorder()
+	srv.ServeHTTP(redeemRec, redeemReq)
+	if redeemRec.Code != http.StatusOK {
+		t.Fatalf("redeem status %d: %s", redeemRec.Code, redeemRec.Body.String())
+	}
+	cookies := redeemRec.Result().Cookies()
+	if len(cookies) == 0 || cookies[0].Name != sessionCookie || cookies[0].Value == "" {
+		t.Fatalf("missing session cookie: %+v", cookies)
+	}
+	sessionCookieValue := cookies[0].Value
+
+	// A code is single-use.
+	reuseReq := httptest.NewRequest(http.MethodPost, "/v1/auth/redeem", bytes.NewReader(redeemBody))
+	reuseRec := httptest.NewRecorder()
+	srv.ServeHTTP(reuseRec, reuseReq)
+	if reuseRec.Code != http.StatusUnauthorized {
+		t.Fatalf("reused code status %d", reuseRec.Code)
+	}
+
+	meReq := httptest.NewRequest(http.MethodGet, "/v1/auth/me", nil)
+	meReq.AddCookie(&http.Cookie{Name: sessionCookie, Value: sessionCookieValue})
+	meRec := httptest.NewRecorder()
+	srv.ServeHTTP(meRec, meReq)
+	if meRec.Code != http.StatusOK {
+		t.Fatalf("me status %d: %s", meRec.Code, meRec.Body.String())
+	}
+
+	putBody := []byte(`{"items":["i:1251","i:2589"]}`)
+	putReq := httptest.NewRequest(http.MethodPut, "/v1/watch", bytes.NewReader(putBody))
+	putReq.AddCookie(&http.Cookie{Name: sessionCookie, Value: sessionCookieValue})
+	putRec := httptest.NewRecorder()
+	srv.ServeHTTP(putRec, putReq)
+	if putRec.Code != http.StatusOK {
+		t.Fatalf("watch put status %d: %s", putRec.Code, putRec.Body.String())
+	}
+	var list store.WatchList
+	if err := json.Unmarshal(putRec.Body.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Items) != 2 || list.Character != "Schmoo-Boo" {
+		t.Fatalf("unexpected watch list: %+v", list)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v1/watch", nil)
+	getReq.AddCookie(&http.Cookie{Name: sessionCookie, Value: sessionCookieValue})
+	getRec := httptest.NewRecorder()
+	srv.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("watch get status %d: %s", getRec.Code, getRec.Body.String())
+	}
+
+	// Companion-style access uses the client token and character query.
+	bearerReq := httptest.NewRequest(http.MethodGet, "/v1/watch?character=Schmoo-Boo", nil)
+	bearerReq.Header.Set("Authorization", "Bearer "+client.Token)
+	bearerRec := httptest.NewRecorder()
+	srv.ServeHTTP(bearerRec, bearerReq)
+	if bearerRec.Code != http.StatusOK {
+		t.Fatalf("bearer watch status %d: %s", bearerRec.Code, bearerRec.Body.String())
+	}
+	var bearerList store.WatchList
+	if err := json.Unmarshal(bearerRec.Body.Bytes(), &bearerList); err != nil {
+		t.Fatal(err)
+	}
+	if len(bearerList.Items) != 2 {
+		t.Fatalf("unexpected bearer watch list: %+v", bearerList)
+	}
+
+	logoutReq := httptest.NewRequest(http.MethodPost, "/v1/auth/logout", nil)
+	logoutReq.AddCookie(&http.Cookie{Name: sessionCookie, Value: sessionCookieValue})
+	logoutRec := httptest.NewRecorder()
+	srv.ServeHTTP(logoutRec, logoutReq)
+	if logoutRec.Code != http.StatusNoContent {
+		t.Fatalf("logout status %d", logoutRec.Code)
+	}
+	meReq2 := httptest.NewRequest(http.MethodGet, "/v1/auth/me", nil)
+	meReq2.AddCookie(&http.Cookie{Name: sessionCookie, Value: sessionCookieValue})
+	meRec2 := httptest.NewRecorder()
+	srv.ServeHTTP(meRec2, meReq2)
+	if meRec2.Code != http.StatusUnauthorized {
+		t.Fatalf("me after logout status %d", meRec2.Code)
 	}
 }

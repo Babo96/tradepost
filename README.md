@@ -107,7 +107,7 @@ the BF tooltip line.
 - [ ] v1 release packaging (signed/tagged Linux + Windows artifacts)
 - [x] Item metadata ingest (client item cache -> server)
 - [x] v2 web browser: search, hourly history, market comparison, watchlist
-- [ ] v2 pins synced back into the addon
+- [x] Two-way watchlist sync with `/bf login` one-time codes
 - [ ] Server-side item metadata in the data addon (offline name search)
 
 ## Design decisions
@@ -141,6 +141,7 @@ the BF tooltip line.
 - [`docs/browser.md`](docs/browser.md)
 - [`docs/windows.md`](docs/windows.md)
 - [`docs/web.md`](docs/web.md)
+- [`docs/watch.md`](docs/watch.md)
 - [`docs/findings.md`](docs/findings.md)
 
 ## License

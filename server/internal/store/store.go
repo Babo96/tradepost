@@ -122,6 +122,27 @@ func ItemID(key string) int64 {
 	return id
 }
 
+// LoginGrant is the result of redeeming a short login code.
+type LoginGrant struct {
+	ClientID  string
+	Character string
+	ExpiresAt time.Time
+}
+
+// WebSession is a browser session bound to one character.
+type WebSession struct {
+	ClientID  string
+	Character string
+	ExpiresAt time.Time
+}
+
+// WatchList is one character's pinned item keys.
+type WatchList struct {
+	Character string   `json:"character"`
+	Items     []string `json:"items"`
+	UpdatedAt int64    `json:"updated_at"`
+}
+
 type Store interface {
 	Ping(ctx context.Context) error
 	CreateClient(ctx context.Context, id string, tokenHash []byte) error
@@ -134,4 +155,12 @@ type Store interface {
 	SearchItems(ctx context.Context, market, query string, limit int) ([]SearchResult, error)
 	ItemHistory(ctx context.Context, market, key string, limit int) (History, error)
 	ItemMarkets(ctx context.Context, key string) ([]MarketPrice, error)
+
+	CreateLoginCode(ctx context.Context, codeHash []byte, clientID, character string, expires time.Time) error
+	RedeemLoginCode(ctx context.Context, codeHash []byte, now time.Time) (LoginGrant, error)
+	CreateWebSession(ctx context.Context, tokenHash []byte, clientID, character string, expires time.Time) error
+	WebSession(ctx context.Context, tokenHash []byte, now time.Time) (WebSession, error)
+	DeleteWebSession(ctx context.Context, tokenHash []byte) error
+	WatchList(ctx context.Context, clientID, character string) (WatchList, error)
+	SetWatchList(ctx context.Context, clientID, character string, items []string) (WatchList, error)
 }

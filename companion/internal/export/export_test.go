@@ -99,3 +99,45 @@ BABOFOREVER_ITEMS = {
 		t.Fatal("expected different metadata hashes")
 	}
 }
+
+func TestLoadDataAuthWatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "BaboForever.lua")
+	data := `BABOFOREVER_AUTH = {
+  seq = 3,
+  request = {
+    action = "login",
+    character = "Schmoo-Boo",
+    market = "eu:pve:horde",
+    at = 1794947776,
+  },
+}
+BABOFOREVER_WATCH = {
+  ["Schmoo-Boo"] = {
+    updated = 1794947800,
+    items = {
+      ["i:1251"] = true,
+      ["i:2589"] = true,
+    },
+  },
+}
+BABOFOREVER_ACTIVE = { character = "Schmoo-Boo", seen = 1794947801 }
+`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadData(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Auth == nil || loaded.Auth.Seq != 3 || loaded.Auth.Character != "Schmoo-Boo" {
+		t.Fatalf("unexpected auth: %+v", loaded.Auth)
+	}
+	if loaded.Active != "Schmoo-Boo" {
+		t.Fatalf("unexpected active character: %q", loaded.Active)
+	}
+	watch := loaded.Watch["Schmoo-Boo"]
+	if watch.Updated != 1794947800 || len(watch.Items) != 2 || watch.Items[0] != "i:1251" {
+		t.Fatalf("unexpected watch: %+v", watch)
+	}
+}

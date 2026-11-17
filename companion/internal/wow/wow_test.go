@@ -3,6 +3,7 @@ package wow
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -97,5 +98,44 @@ func TestInstall(t *testing.T) {
 	}
 	if string(data) == "" {
 		t.Fatal("empty slot")
+	}
+}
+
+func TestAuthSlots(t *testing.T) {
+	wowDir := t.TempDir()
+	addons := AddonsDir(wowDir)
+	if err := os.MkdirAll(addons, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureAuthSlots(wowDir); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < AuthSlots; index++ {
+		if _, err := os.Stat(filepath.Join(addons, AuthSlotName(index), AuthSlotName(index)+".toc")); err != nil {
+			t.Fatalf("missing slot TOC %d: %v", index, err)
+		}
+	}
+	if err := WriteAuthReply(wowDir, 9, "ABCD2345", "Schmoo-Boo", 1794949000); err != nil {
+		t.Fatal(err)
+	}
+	path := AuthSlotPath(wowDir, 1)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `code = "ABCD2345"`) || !strings.Contains(string(data), `seq = 9`) {
+		t.Fatalf("unexpected auth reply:\n%s", data)
+	}
+
+	// Re-ensuring must not overwrite a pending reply.
+	if err := EnsureAuthSlots(wowDir); err != nil {
+		t.Fatal(err)
+	}
+	again, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(again) != string(data) {
+		t.Fatal("EnsureAuthSlots overwrote an existing reply")
 	}
 }
