@@ -67,3 +67,8 @@ PUT  /v1/watch            {"items":["i:1259", ...]}
 - The website session is per character. Run `/bf login` again to switch.
 - The addon has 16 load-on-demand sync slots. After many logins without a
   client restart, run `/reload` if a new code does not appear.
+- If the client was already running when the sync addons were first installed,
+  the companion also publishes the code into upcoming live-ring slots
+  (`auth` + `seq`). This makes `/bf login` work after `/reload` without a full
+  client restart. A restart is still needed once for the dedicated sync addons
+  to be discovered.
