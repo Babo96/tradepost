@@ -8,11 +8,12 @@ import (
 )
 
 type stateFile struct {
-	Server   string            `json:"server"`
-	ClientID string            `json:"client_id"`
-	Uploaded []string          `json:"uploaded,omitempty"`
-	Items    map[string]string `json:"items,omitempty"`
-	AuthSeq  int64             `json:"auth_seq,omitempty"`
+	Server     string            `json:"server"`
+	ClientID   string            `json:"client_id"`
+	Uploaded   []string          `json:"uploaded,omitempty"`
+	Items      map[string]string `json:"items,omitempty"`
+	AuthSeq    int64             `json:"auth_seq,omitempty"`
+	LastUpload int64             `json:"last_upload,omitempty"`
 }
 
 func statePath() string {
@@ -74,6 +75,16 @@ func saveUploaded(server, clientID string, uploaded map[string]bool) error {
 		hashes = hashes[len(hashes)-5000:]
 	}
 	state.Uploaded = hashes
+	return writeState(state)
+}
+
+func loadLastUpload(server, clientID string) int64 {
+	return stateFor(server, clientID).LastUpload
+}
+
+func saveLastUpload(server, clientID string, at int64) error {
+	state := stateFor(server, clientID)
+	state.LastUpload = at
 	return writeState(state)
 }
 

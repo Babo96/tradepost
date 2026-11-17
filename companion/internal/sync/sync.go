@@ -80,6 +80,7 @@ func New(cfg config.Config) (*Service, error) {
 		status: Status{
 			Account:        account,
 			Market:         cfg.Market,
+			LastUpload:     loadLastUpload(cfg.Server, cfg.ClientID),
 			SavedVariables: wow.SavedVariablesFile(cfg.WowDir, account),
 		},
 	}
@@ -189,8 +190,12 @@ func (s *Service) sync(ctx context.Context) error {
 		if err := saveMeta(s.cfg.Server, s.cfg.ClientID, s.meta); err != nil {
 			return fmt.Errorf("save metadata state: %w", err)
 		}
+		now := time.Now().Unix()
+		if err := saveLastUpload(s.cfg.Server, s.cfg.ClientID, now); err != nil {
+			return fmt.Errorf("save upload time: %w", err)
+		}
 		s.mu.Lock()
-		s.status.LastUpload = time.Now().Unix()
+		s.status.LastUpload = now
 		s.status.Accepted = result.Accepted
 		s.status.Rejected = result.Rejected
 		s.status.Meta = result.Meta
