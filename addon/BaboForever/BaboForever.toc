@@ -1,0 +1,19 @@
+## Interface: 16001
+## Title: Babo Forever
+## Notes: Auction house prices for WoW Forever. Market-aware tooltips and crowd-sourced data.
+## Author: babo
+## Version: 0.1.0
+## SavedVariables: BABOFOREVER_DB, BABOFOREVER_CONFIG
+## X-Category: Auction/Economy
+## OptionalDeps: Auctionator
+## IconTexture: Interface\Icons\inv_misc_coin_01
+
+Core.lua
+Config.lua
+Market.lua
+Keys.lua
+LocalDB.lua
+Central.lua
+Scanner.lua
+Tooltips.lua
+Commands.lua

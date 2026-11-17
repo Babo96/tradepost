@@ -16,10 +16,14 @@ ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 
 PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB BFProbeDataC BFProbeDataD
 
-.PHONY: help probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
+.PHONY: help addon-install addon-uninstall probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
-	@echo "Babo Forever - phase 0"
+	@echo "Babo Forever"
+	@echo
+	@echo "  make addon-install          install BaboForever + BaboForever_Data"
+	@echo
+	@echo "  make addon-uninstall        remove the real addon"
 	@echo
 	@echo "  make probe-install          copy the probe addons into $(ADDONS)"
 	@echo "  make probe-uninstall        remove the probe addons"
@@ -36,6 +40,19 @@ help:
 	@echo "  make check                  lint + test"
 	@echo
 	@echo "Variables: WOW_DIR=$(WOW_DIR) ACCOUNT=$(ACCOUNT) PAYLOAD=$(PAYLOAD) KEYS=$(KEYS) MODE=$(MODE) SLOT=$(SLOT) KEY=$(KEY) COMMAND=$(COMMAND)"
+
+addon-install:
+	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
+	@mkdir -p "$(ADDONS)"
+	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data"
+	@cp -R addon/BaboForever "$(ADDONS)/BaboForever"
+	@cp -R data-addon/BaboForever_Data "$(ADDONS)/BaboForever_Data"
+	@echo "Installed BaboForever into $(ADDONS)"
+	@echo "Restart WoW, then /reload and /bf status."
+
+addon-uninstall:
+	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data"
+	@echo "Removed BaboForever"
 
 probe-install:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
@@ -75,7 +92,7 @@ probe-restore:
 
 lint:
 	@$(PYTHON) -m py_compile tools/probe/*.py
-	@if command -v luac5.1 >/dev/null 2>&1; then luac5.1 -p probe/*/*.lua; else luac -p probe/*/*.lua; fi
+	@if command -v luac5.1 >/dev/null 2>&1; then luac5.1 -p probe/*/*.lua addon/*/*.lua data-addon/*/*.lua; else luac -p probe/*/*.lua addon/*/*.lua data-addon/*/*.lua; fi
 	@echo "syntax ok"
 
 test:

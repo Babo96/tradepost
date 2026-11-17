@@ -1,0 +1,106 @@
+local ADDON, BF = ...
+
+local function ageText(timestamp)
+  if not timestamp or timestamp <= 0 then
+    return "never"
+  end
+  local seconds = math.max(0, time() - timestamp)
+  if seconds < 60 then
+    return string.format("%ds ago", seconds)
+  elseif seconds < 3600 then
+    return string.format("%dm ago", math.floor(seconds / 60))
+  elseif seconds < 86400 then
+    return string.format("%dh ago", math.floor(seconds / 3600))
+  end
+  return string.format("%dd ago", math.floor(seconds / 86400))
+end
+
+function BF:PrintStatus()
+  self:UpdateMarket()
+  local db = self:LocalDB()
+  local localCount = self:CountLocal()
+
+  self:Print("market: " .. self:MarketLabel() .. "  [" .. self:MarketKey() .. "]")
+  self:Print("local prices: " .. localCount .. " items, last scan " .. ageText(db.lastScan))
+  if db.lastAuctions then
+    self:Print(string.format(
+      "last scan: %d auctions, %d items, %d missing info, %d ms",
+      db.lastAuctions, db.lastUnique or 0, db.lastMissing or 0, db.lastDuration or 0
+    ))
+  end
+  self:Print("central data: " .. self:CentralLabel())
+  self:Print("next client replicate: " .. math.ceil(self:NextReplicateSeconds() / 60) .. " min")
+end
+
+function BF:PrintMarket()
+  self:UpdateMarket()
+  local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player") or nil
+  self:Print("realm: " .. tostring(self.market.realm))
+  self:Print("region: " .. tostring(self.market.region) .. " (" .. tostring(self.market.regionNumber) .. ")")
+  self:Print("ruleset: " .. tostring(self.market.ruleset))
+  self:Print("faction: " .. tostring(self.market.faction))
+  self:Print("house: " .. tostring(self.market.house))
+  self:Print("key: " .. tostring(self.market.key))
+  self:Print("zone: " .. tostring(GetZoneText and GetZoneText() or "?") ..
+    " / " .. tostring(GetSubZoneText and GetSubZoneText() or "?") ..
+    " (map " .. tostring(mapID) .. ")")
+end
+
+function BF:PrintHelp()
+  self:Print("commands:")
+  self:Print("  /bf scan [force]     scan the auction house")
+  self:Print("  /bf status           local data and throttle state")
+  self:Print("  /bf market           market detection details")
+  self:Print("  /bf house auto|alliance|horde|neutral")
+  self:Print("  /bf tooltips on|off  price tooltips")
+  self:Print("  /bf age on|off       show price age")
+  self:Print("  /bf supply on|off    show total supply")
+  self:Print("  /bf clear            clear local prices for this market")
+  self:Print("  /bf debug            toggle debug output")
+end
+
+SLASH_BABOFOREVER1 = "/bf"
+SLASH_BABOFOREVER2 = "/babof"
+SlashCmdList["BABOFOREVER"] = function(msg)
+  local command, rest = string.match(msg or "", "^(%S*)%s*(.*)$")
+  command = string.lower(command or "")
+  rest = string.lower(rest or "")
+
+  if command == "scan" then
+    BF:TryScan(rest == "force")
+  elseif command == "status" then
+    BF:PrintStatus()
+  elseif command == "market" then
+    BF:PrintMarket()
+  elseif command == "house" then
+    if rest == "auto" then
+      BF:SetConfig("houseOverride", nil)
+    elseif rest == "alliance" or rest == "horde" or rest == "neutral" then
+      BF:SetConfig("houseOverride", rest)
+    else
+      BF:Print("usage: /bf house auto|alliance|horde|neutral")
+      return
+    end
+    BF:UpdateMarket()
+    BF:Print("house override: " .. tostring(BF.config.houseOverride or "auto") ..
+      " -> " .. BF:MarketKey())
+  elseif command == "tooltips" then
+    BF:SetConfig("tooltips", rest ~= "off")
+    BF:Print("tooltips: " .. tostring(BF.config.tooltips))
+  elseif command == "age" then
+    BF:SetConfig("showAge", rest ~= "off")
+    BF:Print("show age: " .. tostring(BF.config.showAge))
+  elseif command == "supply" then
+    BF:SetConfig("showSupply", rest ~= "off")
+    BF:Print("show supply: " .. tostring(BF.config.showSupply))
+  elseif command == "clear" then
+    BF:ClearLocal()
+  elseif command == "debug" then
+    BF:SetConfig("debug", not BF.config.debug)
+    BF:Print("debug: " .. tostring(BF.config.debug))
+  elseif command == "help" or command == "" then
+    BF:PrintHelp()
+  else
+    BF:PrintHelp()
+  end
+end
