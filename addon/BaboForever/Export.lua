@@ -65,6 +65,25 @@ function BF:ClearExport()
   self:Print("export buffer cleared")
 end
 
+-- Testing helper: turn the current local DB into an export record without
+-- scanning again. The record keeps the last scan timestamp, so it does not
+-- pretend the data is newer than it is.
+function BF:ExportLocal()
+  local db = self:LocalDB()
+  local count = 0
+  for _ in pairs(db.prices or {}) do
+    count = count + 1
+  end
+  if count == 0 then
+    self:Print("local DB is empty; run /bf scan after the client throttle")
+    return
+  end
+  local timestamp = db.lastScan or time()
+  self:RecordExport(self:MarketKey(), timestamp, db.prices)
+  self:Print("exported " .. count .. " local prices for " .. self:MarketKey() ..
+    " (scan " .. date("%H:%M", timestamp) .. ")")
+end
+
 function BF:ExportStatus()
   local db = self:ExportDB()
   self:Print("export: " .. #db.scans .. " scan(s), last " ..

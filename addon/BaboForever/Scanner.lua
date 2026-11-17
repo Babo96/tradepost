@@ -56,6 +56,12 @@ function BF:TryScan(force)
     return
   end
 
+  if force and (not count or count == 0) and replicateAge < THROTTLE then
+    self:Print("cached list is empty after restart; client throttle: " ..
+      remaining(THROTTLE - replicateAge))
+    return
+  end
+
   -- Harvest a fresh list for this market that we have not processed yet (first
   -- run, or another addon refreshed it). Do not reprocess our own recent scan.
   if not force and count and count > 0 and sameMarket and replicateAge < THROTTLE then
