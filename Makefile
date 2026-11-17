@@ -21,13 +21,14 @@ ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 
 PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB BFProbeDataC BFProbeDataD
 
-.PHONY: help addon-install addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
+.PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
 	@echo "Babo Forever"
 	@echo
 	@echo "  make addon-install          install BaboForever + BaboForever_Data"
 	@echo
+	@echo "  make addon-update           update the addon code only (keeps data)"
 	@echo "  make addon-uninstall        remove the real addon"
 	@echo "  make ring-install           generate COUNT LoadOnDemand ring slots"
 	@echo "  make ring-uninstall         remove generated ring slots"
@@ -111,6 +112,12 @@ companion-test:
 go-lint:
 	@cd server && test -z "$$(gofmt -l .)" && go vet ./...
 	@cd companion && test -z "$$(gofmt -l .)" && go vet ./...
+
+addon-update:
+	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
+	@rm -rf "$(ADDONS)/BaboForever"
+	@cp -R addon/BaboForever "$(ADDONS)/BaboForever"
+	@echo "Updated $(ADDONS)/BaboForever (data addon untouched)"
 
 addon-uninstall:
 	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data"

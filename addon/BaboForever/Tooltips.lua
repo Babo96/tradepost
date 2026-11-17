@@ -62,8 +62,8 @@ function BF:GetPrice(keys)
     end
   end
 
-  consider(localEntry, "local")
   consider(liveEntry, "live", live)
+  consider(localEntry, "local")
   consider(centralEntry, "central", centralMarket)
 
   return best, source, market
