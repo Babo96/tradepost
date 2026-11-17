@@ -8,6 +8,12 @@ on Linux now; the same steps apply on Windows later.
 The host scripts only touch lines that start with `BFD1`. Every write is
 preceded by a timestamped backup of `bindings-cache.wtf`.
 
+### Phase 0 status
+
+The first run rejected the bindings mailbox: changing a valid binding in the
+file was not visible until `/reload`. **Section 5 (LoadOnDemand ring) is now the
+key test.** Sections 2–4 are kept for re-testing and for the uplink idea.
+
 If anything looks wrong:
 
 ```

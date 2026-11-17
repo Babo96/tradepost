@@ -1,8 +1,10 @@
 # Live mailbox protocol (draft v0)
 
-Status: **experimental**. Phase 0 verifies whether the client re-reads
-`bindings-cache.wtf` mid-session. Do not build production code on this until
-`docs/findings.md` says the channel works.
+Status: **rejected for mid-session delivery (phase 0).** A valid binding change
+in `bindings-cache.wtf` was not visible until `/reload`; `LoadBindings` does not
+re-read the file while the client is running. Retained here for the uplink
+idea and as a record of the experiment. The LoadOnDemand ring is the remaining
+mid-session candidate.
 
 ## Idea
 

@@ -82,9 +82,10 @@ server (Go + Postgres 17)
 | Central snapshot at login/`/reload` | 2–15 min |
 
 The addon cannot make HTTP requests and the companion cannot push data through
-a socket. The live channel is a file that the client re-reads
-(`LoadBindings`), or a LoadOnDemand addon loaded mid-session. Phase 0 decides
-which one is usable.
+a socket. Phase 0 rejected the `LoadBindings` mailbox: a valid binding change
+was only visible after `/reload`. The remaining mid-session candidate is a ring
+of LoadOnDemand data addons; if it also fails, central data arrives at
+login/`/reload` and true real-time prices come from targeted AH searches.
 
 ## Auctionator
 

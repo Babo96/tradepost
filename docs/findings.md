@@ -49,21 +49,33 @@ Valanaar: not tested yet
 
 | Test | Result |
 |---|---|
-| `SetBinding` with `CLICK BF...:LeftButton` returns ok | not run yet |
-| `GetBindingAction` preserves the full action | not run yet |
-| `SaveBindings` writes the line to `bindings-cache.wtf` | not run yet |
-| `LoadBindings` re-reads a file changed mid-session | pending; first `bindread` had no host-written lines |
-| Raw `BFD1:...` action preserved | not run yet |
-| `MACRO BF...` action preserved | not run yet |
-| Longest preserved action (255 / 1024 / 4096) | not run yet |
-| `SetBinding` accepts a data-carrying action for uplink | not run yet |
-| `LoadBindings` resets unsaved keybinds | not run yet |
-| Action-bar flicker / other side effects | not run yet |
-| Client rewrites the file during play | not run yet |
+| `SetBinding` with `CLICK BF...:LeftButton` returns ok | not needed; inbound is dead |
+| `GetBindingAction` preserves the full action | not needed |
+| `SaveBindings` writes the line to `bindings-cache.wtf` | yes (line 49 observed) |
+| `LoadBindings` re-reads a file changed mid-session | **No.** `Y` was `ACTIONBUTTON11` before `/reload` and `ACTIONBUTTON5` after. The file is only re-read at login/reload. |
+| Raw `BFD1:...` action preserved | not needed |
+| `MACRO BF...` action preserved | not needed |
+| Longest preserved action (255 / 1024 / 4096) | not needed |
+| `SetBinding` accepts a data-carrying action for uplink | not needed |
+| `LoadBindings` resets unsaved keybinds | not observed |
+| Action-bar flicker / other side effects | none observed |
+| Client rewrites the file during play | not observed |
 
 First `bindread`: `set=1`, `numBindings=320`, `reserved keys with actions: 0`.
 That run did not follow a host-side `make probe-bind`, so it only proves the
-probe loaded; it is not a failure of the channel.
+probe loaded.
+
+Decisive test: changing an existing valid binding (`Y`) in the file was not
+visible until `/reload`:
+
+```
+before /reload: getkey Y = ACTIONBUTTON11
+after  /reload: getkey Y = ACTIONBUTTON5
+```
+
+Conclusion: **the bindings mailbox cannot deliver data mid-session.** The
+`LoadBindings` idea is rejected. `/reload` does re-read bindings and addon files,
+so the data-addon path still works at reload time.
 
 Example action string after a successful write:
 
@@ -91,10 +103,12 @@ Example action string after a successful write:
 
 Pick one:
 
-- [ ] **Bindings mailbox works.** Build downlink deltas via `LoadBindings`;
-      use `BFU1` for uplink if `SetBinding` accepts data.
-- [ ] **Ring works.** Use N LoadOnDemand slots for full/delta snapshots;
-      mailbox only if it also works.
+- [x] ~~**Bindings mailbox works.**~~ **Rejected in phase 0:** `LoadBindings`
+      does not re-read `bindings-cache.wtf` mid-session; only `/reload`/login
+      picks up changes.
+- [ ] **Ring works.** Use N LoadOnDemand slots for full/delta snapshots.
+      Test: write slot A while the game runs, then `/bfprobe ring A` without
+      reload.
 - [ ] **Neither works.** Central data at login/`/reload` only; keep live AH
       targeted queries and search-result capture for real-time prices.
 
