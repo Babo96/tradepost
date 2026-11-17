@@ -105,8 +105,10 @@ the BF tooltip line.
 - [x] Windows companion build + setup zip (cross-compiled; needs a real Windows
       client test)
 - [ ] v1 release packaging (signed/tagged Linux + Windows artifacts)
-- [ ] Item metadata in the snapshot (server-side name search)
-- [ ] v2 web item browser + pins
+- [x] Item metadata ingest (client item cache -> server)
+- [x] v2 web browser: search, hourly history, market comparison, watchlist
+- [ ] v2 pins synced back into the addon
+- [ ] Server-side item metadata in the data addon (offline name search)
 
 ## Design decisions
 
@@ -138,6 +140,7 @@ the BF tooltip line.
 - [`docs/phase3-test.md`](docs/phase3-test.md)
 - [`docs/browser.md`](docs/browser.md)
 - [`docs/windows.md`](docs/windows.md)
+- [`docs/web.md`](docs/web.md)
 - [`docs/findings.md`](docs/findings.md)
 
 ## License

@@ -61,3 +61,41 @@ func TestParseMalformed(t *testing.T) {
 		t.Fatal("expected item error")
 	}
 }
+
+func TestLoadDataItems(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "BaboForever.lua")
+	data := `BABOFOREVER_EXPORT = {
+  version = 1,
+  scans = {
+    "eu:pve:horde|1794947776|i:2589,1234,50,2",
+  },
+}
+BABOFOREVER_ITEMS = {
+  [2589] = { n = "Linen Cloth", q = 1, c = 7, s = 5, i = 132889 },
+  [12345] = { n = "Test Blade", q = 3, c = 2, s = 7, i = 135274 },
+}
+`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadData(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Scans) != 1 {
+		t.Fatalf("expected 1 scan, got %d", len(loaded.Scans))
+	}
+	if len(loaded.Items) != 2 {
+		t.Fatalf("expected 2 metadata entries, got %d", len(loaded.Items))
+	}
+	if loaded.Items[0].Name != "Linen Cloth" || loaded.Items[0].ID != 2589 {
+		t.Fatalf("unexpected metadata: %+v", loaded.Items[0])
+	}
+	if loaded.Items[1].Icon != 135274 || loaded.Items[1].Quality != 3 {
+		t.Fatalf("unexpected metadata: %+v", loaded.Items[1])
+	}
+	if loaded.Items[0].Hash() == loaded.Items[1].Hash() {
+		t.Fatal("expected different metadata hashes")
+	}
+}

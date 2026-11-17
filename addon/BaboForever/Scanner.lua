@@ -143,6 +143,7 @@ function BF:StartProcessing(total)
   self.scan.index = 0
   self.scan.total = total
   self.scan.acc = {}
+  self.scan.metaSeen = {}
   self.scan.auctions = 0
   self.scan.missing = 0
   self.scan.started = debugprofilestop()
@@ -166,6 +167,19 @@ function BF:StartProcessing(total)
 
         if not allInfo then
           self.scan.missing = self.scan.missing + 1
+        end
+
+        if itemID and not self.scan.metaSeen[itemID] then
+          self.scan.metaSeen[itemID] = true
+          local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
+          if not name then
+            name = type(info[1]) == "string" and info[1] or nil
+            quality = quality or (type(info[4]) == "number" and info[4] or nil)
+            icon = icon or info[2]
+          end
+          if name then
+            self:CacheItemMeta(itemID, name, quality, icon)
+          end
         end
 
         if itemID and quantity and quantity > 0 and buyout and buyout > 0 then

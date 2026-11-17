@@ -15,14 +15,13 @@ local queueIndex = 0
 local queueTicker
 local refreshTimer
 
-local function cacheItem(itemID)
+function BF:CacheItemMeta(itemID, name, quality, icon)
+  if not itemID or not name then
+    return nil
+  end
   local existing = BABOFOREVER_ITEMS[itemID]
   if existing and existing.n then
     return existing
-  end
-  local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
-  if not name then
-    return nil
   end
   local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(itemID)
   local meta = {
@@ -34,6 +33,18 @@ local function cacheItem(itemID)
   }
   BABOFOREVER_ITEMS[itemID] = meta
   return meta
+end
+
+local function cacheItem(itemID)
+  local existing = BABOFOREVER_ITEMS[itemID]
+  if existing and existing.n then
+    return existing
+  end
+  local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
+  if not name then
+    return nil
+  end
+  return BF:CacheItemMeta(itemID, name, quality, icon)
 end
 
 local function finishQueue()

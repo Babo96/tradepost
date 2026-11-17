@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ type MemStore struct {
 	seen     map[string]bool
 	markets  map[string]map[string]store.SnapshotItem
 	versions map[string]int64
+	items    map[int64]store.ItemMeta
+	history  map[string]map[string]map[int64]store.HistoryPoint
 }
 
 func NewMemStore() *MemStore {
@@ -27,6 +30,8 @@ func NewMemStore() *MemStore {
 		seen:     map[string]bool{},
 		markets:  map[string]map[string]store.SnapshotItem{},
 		versions: map[string]int64{},
+		items:    map[int64]store.ItemMeta{},
+		history:  map[string]map[string]map[int64]store.HistoryPoint{},
 	}
 }
 
@@ -80,6 +85,33 @@ func (m *MemStore) Ingest(_ context.Context, clientID string, scan store.Scan) (
 			Scanned:  scan.ScannedAt.Unix(),
 		}
 	}
+	if m.history[scan.Market] == nil {
+		m.history[scan.Market] = map[string]map[int64]store.HistoryPoint{}
+	}
+	bucket := scan.ScannedAt.Truncate(time.Hour).Unix()
+	for _, item := range scan.Items {
+		byKey := m.history[scan.Market][item.Key]
+		if byKey == nil {
+			byKey = map[int64]store.HistoryPoint{}
+			m.history[scan.Market][item.Key] = byKey
+		}
+		point, ok := byKey[bucket]
+		if !ok {
+			point = store.HistoryPoint{Bucket: bucket, Min: item.Price, Max: item.Price}
+		}
+		if item.Price < point.Min {
+			point.Min = item.Price
+		}
+		if item.Price > point.Max {
+			point.Max = item.Price
+		}
+		if item.Quantity > point.Quantity {
+			point.Quantity = item.Quantity
+		}
+		point.Samples++
+		byKey[bucket] = point
+	}
+
 	m.versions[scan.Market]++
 	return store.IngestResult{Accepted: 1, Items: len(scan.Items)}, nil
 }
@@ -127,6 +159,101 @@ func (m *MemStore) Snapshot(_ context.Context, market string) (store.Snapshot, e
 	}
 	sort.Slice(snapshot.Items, func(i, j int) bool { return snapshot.Items[i].Key < snapshot.Items[j].Key })
 	return snapshot, nil
+}
+
+func (m *MemStore) UpsertItems(_ context.Context, items []store.ItemMeta) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, item := range items {
+		m.items[item.ID] = item
+	}
+	return nil
+}
+
+func (m *MemStore) SearchItems(_ context.Context, market, query string, limit int) ([]store.SearchResult, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	query = strings.ToLower(strings.TrimSpace(query))
+	result := []store.SearchResult{}
+	for key, item := range m.markets[market] {
+		id := store.ItemID(key)
+		meta := m.items[id]
+		name := meta.Name
+		if query != "" {
+			if !strings.Contains(strings.ToLower(name), query) &&
+				!strings.Contains(key, query) &&
+				key != query {
+				continue
+			}
+		}
+		result = append(result, store.SearchResult{
+			Key:      key,
+			ItemID:   id,
+			Name:     name,
+			Quality:  meta.Quality,
+			Price:    item.Price,
+			Quantity: item.Quantity,
+			Listings: item.Listings,
+			Scanned:  item.Scanned,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Price != result[j].Price {
+			return result[i].Price < result[j].Price
+		}
+		if result[i].Name != result[j].Name {
+			return result[i].Name < result[j].Name
+		}
+		return result[i].Key < result[j].Key
+	})
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
+func (m *MemStore) ItemHistory(_ context.Context, market, key string, limit int) (store.History, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	history := store.History{Market: market, Key: key, Points: []store.HistoryPoint{}}
+	history.Name = m.items[store.ItemID(key)].Name
+	for bucket, point := range m.history[market][key] {
+		point.Bucket = bucket
+		history.Points = append(history.Points, point)
+	}
+	sort.Slice(history.Points, func(i, j int) bool {
+		return history.Points[i].Bucket < history.Points[j].Bucket
+	})
+	if limit > 0 && len(history.Points) > limit {
+		history.Points = history.Points[len(history.Points)-limit:]
+	}
+	return history, nil
+}
+
+func (m *MemStore) ItemMarkets(_ context.Context, key string) ([]store.MarketPrice, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := []store.MarketPrice{}
+	for market, items := range m.markets {
+		item, ok := items[key]
+		if !ok {
+			continue
+		}
+		result = append(result, store.MarketPrice{
+			Market:   market,
+			Price:    item.Price,
+			Quantity: item.Quantity,
+			Listings: item.Listings,
+			Scanned:  item.Scanned,
+		})
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Price != result[j].Price {
+			return result[i].Price < result[j].Price
+		}
+		return result[i].Market < result[j].Market
+	})
+	return result, nil
 }
 
 func (m *MemStore) Markets(context.Context) ([]string, error) {

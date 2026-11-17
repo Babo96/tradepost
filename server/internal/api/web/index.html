@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Babo Forever — Auction Data</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">Babo Forever <span>Auction Data</span></div>
+    <label class="market">Market
+      <select id="market"></select>
+    </label>
+    <div id="meta" class="meta"></div>
+  </header>
+
+  <main>
+    <section class="search-panel">
+      <form id="search-form" autocomplete="off">
+        <input id="query" type="search" placeholder="Search item name or item ID…">
+        <button type="submit">Search</button>
+      </form>
+      <div class="toolbar">
+        <label class="watch-toggle">
+          <input id="watch-only" type="checkbox"> Watchlist only
+        </label>
+        <span id="status" class="status"></span>
+      </div>
+      <div id="results" class="results">
+        <p class="empty">Loading…</p>
+      </div>
+    </section>
+
+    <aside id="detail" class="detail">
+      <p class="empty">Select an item to see price history and the market comparison.</p>
+    </aside>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

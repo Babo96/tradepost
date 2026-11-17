@@ -50,3 +50,19 @@ CREATE TABLE IF NOT EXISTS prices_hourly (
 
 CREATE INDEX IF NOT EXISTS prices_hourly_bucket
   ON prices_hourly (bucket);
+
+CREATE TABLE IF NOT EXISTS items (
+  item_id bigint PRIMARY KEY,
+  name text NOT NULL,
+  quality smallint NOT NULL DEFAULT 1,
+  class_id smallint NOT NULL DEFAULT 0,
+  subclass_id smallint NOT NULL DEFAULT 0,
+  icon bigint NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS items_name_lower
+  ON items (lower(name));
+
+CREATE INDEX IF NOT EXISTS prices_latest_item_id
+  ON prices_latest ((split_part(item_key, ':', 2)::bigint));

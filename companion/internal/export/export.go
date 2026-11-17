@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -25,30 +26,65 @@ type Scan struct {
 	Hash      string
 }
 
+// Meta is the client-side item cache uploaded separately from price scans.
+type Meta struct {
+	ID         int64
+	Name       string
+	Quality    int
+	ClassID    int
+	SubclassID int
+	Icon       int64
+}
+
+func (m Meta) Hash() string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%d|%s|%d|%d|%d|%d",
+		m.ID, m.Name, m.Quality, m.ClassID, m.SubclassID, m.Icon)))
+	return hex.EncodeToString(sum[:8])
+}
+
+type Data struct {
+	Scans []Scan
+	Items []Meta
+}
+
 func Load(path string) ([]Scan, error) {
+	data, err := LoadData(path)
+	if err != nil {
+		return nil, err
+	}
+	return data.Scans, nil
+}
+
+func LoadData(path string) (Data, error) {
 	if _, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return Data{}, nil
 		}
-		return nil, err
+		return Data{}, err
 	}
 
 	L := lua.NewState()
 	defer L.Close()
 	if err := L.DoFile(path); err != nil {
-		return nil, fmt.Errorf("parse SavedVariables: %w", err)
+		return Data{}, fmt.Errorf("parse SavedVariables: %w", err)
 	}
 
+	data := Data{Scans: loadScans(L), Items: loadItems(L)}
+	sort.Slice(data.Items, func(i, j int) bool { return data.Items[i].ID < data.Items[j].ID })
+	return data, nil
+}
+
+func loadScans(L *lua.LState) []Scan {
 	value := L.GetGlobal("BABOFOREVER_EXPORT")
 	table, ok := value.(*lua.LTable)
 	if !ok {
-		return nil, nil
+		return nil
 	}
 
 	scansValue := table.RawGetString("scans")
 	scansTable, ok := scansValue.(*lua.LTable)
 	if !ok {
-		return nil, nil
+		return nil
 	}
 
 	var result []Scan
@@ -62,7 +98,36 @@ func Load(path string) ([]Scan, error) {
 			result = append(result, scan)
 		}
 	})
-	return result, nil
+	return result
+}
+
+func loadItems(L *lua.LState) []Meta {
+	value := L.GetGlobal("BABOFOREVER_ITEMS")
+	table, ok := value.(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	var result []Meta
+	table.ForEach(func(key, value lua.LValue) {
+		id := int64(lua.LVAsNumber(key))
+		fields, ok := value.(*lua.LTable)
+		if id <= 0 || !ok {
+			return
+		}
+		name := lua.LVAsString(fields.RawGetString("n"))
+		if name == "" {
+			return
+		}
+		result = append(result, Meta{
+			ID:         id,
+			Name:       name,
+			Quality:    int(lua.LVAsNumber(fields.RawGetString("q"))),
+			ClassID:    int(lua.LVAsNumber(fields.RawGetString("c"))),
+			SubclassID: int(lua.LVAsNumber(fields.RawGetString("s"))),
+			Icon:       int64(lua.LVAsNumber(fields.RawGetString("i"))),
+		})
+	})
+	return result
 }
 
 func parseRecord(record string) (Scan, error) {

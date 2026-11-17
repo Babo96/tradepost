@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -62,6 +64,64 @@ type Snapshot struct {
 	Items     []SnapshotItem `json:"items"`
 }
 
+// ItemMeta is client-known item information. It is keyed by item ID, not by
+// price key, so equipment variants share one name/icon.
+type ItemMeta struct {
+	ID         int64
+	Name       string
+	Quality    int
+	ClassID    int
+	SubclassID int
+	Icon       int64
+}
+
+// SearchResult joins a latest price with optional item metadata.
+type SearchResult struct {
+	Key      string `json:"key"`
+	ItemID   int64  `json:"item_id"`
+	Name     string `json:"name"`
+	Quality  int    `json:"quality"`
+	Price    int64  `json:"price"`
+	Quantity int64  `json:"quantity"`
+	Listings int32  `json:"listings"`
+	Scanned  int64  `json:"scanned"`
+}
+
+// HistoryPoint is one hourly min/max bucket.
+type HistoryPoint struct {
+	Bucket   int64 `json:"t"`
+	Min      int64 `json:"min"`
+	Max      int64 `json:"max"`
+	Quantity int64 `json:"quantity"`
+	Samples  int64 `json:"samples"`
+}
+
+type History struct {
+	Market string         `json:"market"`
+	Key    string         `json:"key"`
+	Name   string         `json:"name"`
+	Points []HistoryPoint `json:"points"`
+}
+
+// MarketPrice compares one key across markets.
+type MarketPrice struct {
+	Market   string `json:"market"`
+	Price    int64  `json:"price"`
+	Quantity int64  `json:"quantity"`
+	Listings int32  `json:"listings"`
+	Scanned  int64  `json:"scanned"`
+}
+
+// ItemID extracts the numeric item ID from i:<id> or g:<id>:<ilvl> keys.
+func ItemID(key string) int64 {
+	parts := strings.Split(key, ":")
+	if len(parts) < 2 {
+		return 0
+	}
+	id, _ := strconv.ParseInt(parts[1], 10, 64)
+	return id
+}
+
 type Store interface {
 	Ping(ctx context.Context) error
 	CreateClient(ctx context.Context, id string, tokenHash []byte) error
@@ -70,4 +130,8 @@ type Store interface {
 	Meta(ctx context.Context) ([]MarketMeta, error)
 	Snapshot(ctx context.Context, market string) (Snapshot, error)
 	Markets(ctx context.Context) ([]string, error)
+	UpsertItems(ctx context.Context, items []ItemMeta) error
+	SearchItems(ctx context.Context, market, query string, limit int) ([]SearchResult, error)
+	ItemHistory(ctx context.Context, market, key string, limit int) (History, error)
+	ItemMarkets(ctx context.Context, key string) ([]MarketPrice, error)
 }

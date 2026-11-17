@@ -34,6 +34,7 @@ function BF:OnLoad()
 
   BABOFOREVER_DB = BABOFOREVER_DB or {}
   BABOFOREVER_DB.version = 1
+  BABOFOREVER_ITEMS = BABOFOREVER_ITEMS or {}
   BABOFOREVER_DB.markets = BABOFOREVER_DB.markets or {}
 
   self:UpdateMarket()

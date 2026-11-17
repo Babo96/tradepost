@@ -212,3 +212,125 @@ func TestDataAddon(t *testing.T) {
 		t.Fatal("Data.lua not found in zip")
 	}
 }
+
+func TestItemMetadataSearchHistory(t *testing.T) {
+	srv, _ := newTestServer(t)
+	client := enroll(t, srv)
+
+	body := []byte(fmt.Sprintf(`{
+	  "v": 1,
+	  "scans": [{
+	    "market": "eu:pve:horde",
+	    "scanned_at": %d,
+	    "client_version": "0.1.0",
+	    "items": [
+	      {"k": "i:2589", "p": 1234, "q": 50, "n": 2},
+	      {"k": "g:12345:70", "p": 4200, "q": 1, "n": 1}
+	    ]
+	  }],
+	  "items": [
+	    {"id": 2589, "name": "Linen Cloth", "quality": 1, "class_id": 7, "subclass_id": 5, "icon": 132889},
+	    {"id": 12345, "name": "Test Blade", "quality": 3, "class_id": 2, "subclass_id": 7, "icon": 135274}
+	  ]
+	}`, time.Now().Unix()))
+	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+client.Token)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ingest status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	searchReq := httptest.NewRequest(http.MethodGet, "/v1/items?market=eu:pve:horde&q=linen", nil)
+	searchRec := httptest.NewRecorder()
+	srv.ServeHTTP(searchRec, searchReq)
+	if searchRec.Code != http.StatusOK {
+		t.Fatalf("search status %d: %s", searchRec.Code, searchRec.Body.String())
+	}
+	var search struct {
+		Items []struct {
+			Key   string `json:"key"`
+			Name  string `json:"name"`
+			Price int64  `json:"price"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(searchRec.Body.Bytes(), &search); err != nil {
+		t.Fatal(err)
+	}
+	if len(search.Items) != 1 || search.Items[0].Key != "i:2589" || search.Items[0].Name != "Linen Cloth" {
+		t.Fatalf("unexpected search result: %+v", search.Items)
+	}
+
+	historyReq := httptest.NewRequest(http.MethodGet, "/v1/item/history?market=eu:pve:horde&key=i:2589", nil)
+	historyRec := httptest.NewRecorder()
+	srv.ServeHTTP(historyRec, historyReq)
+	if historyRec.Code != http.StatusOK {
+		t.Fatalf("history status %d: %s", historyRec.Code, historyRec.Body.String())
+	}
+	var history struct {
+		Name   string `json:"name"`
+		Points []struct {
+			Min int64 `json:"min"`
+			Max int64 `json:"max"`
+		} `json:"points"`
+	}
+	if err := json.Unmarshal(historyRec.Body.Bytes(), &history); err != nil {
+		t.Fatal(err)
+	}
+	if history.Name != "Linen Cloth" || len(history.Points) != 1 || history.Points[0].Min != 1234 {
+		t.Fatalf("unexpected history: %+v", history)
+	}
+
+	marketsReq := httptest.NewRequest(http.MethodGet, "/v1/item/markets?key=i:2589", nil)
+	marketsRec := httptest.NewRecorder()
+	srv.ServeHTTP(marketsRec, marketsReq)
+	if marketsRec.Code != http.StatusOK {
+		t.Fatalf("markets status %d: %s", marketsRec.Code, marketsRec.Body.String())
+	}
+	var markets struct {
+		Markets []struct {
+			Market string `json:"market"`
+			Price  int64  `json:"price"`
+		} `json:"markets"`
+	}
+	if err := json.Unmarshal(marketsRec.Body.Bytes(), &markets); err != nil {
+		t.Fatal(err)
+	}
+	if len(markets.Markets) != 1 || markets.Markets[0].Market != "eu:pve:horde" || markets.Markets[0].Price != 1234 {
+		t.Fatalf("unexpected markets: %+v", markets.Markets)
+	}
+}
+
+func TestMetadataOnlyIngest(t *testing.T) {
+	srv, _ := newTestServer(t)
+	client := enroll(t, srv)
+
+	body := []byte(`{"v":1,"scans":[],"items":[{"id":2589,"name":"Linen Cloth","quality":1,"class_id":7,"subclass_id":5,"icon":1}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+client.Token)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("metadata ingest status %d: %s", rec.Code, rec.Body.String())
+	}
+	var result ingestResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Meta != 1 || result.Accepted != 0 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+}
+
+func TestWebIndex(t *testing.T) {
+	srv, _ := newTestServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("index status %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Babo Forever") {
+		t.Fatal("index does not contain the app title")
+	}
+}

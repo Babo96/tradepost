@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ type Status struct {
 	Items          int    `json:"items"`
 	Accepted       int    `json:"accepted"`
 	Rejected       int    `json:"rejected"`
+	Meta           int    `json:"meta"`
 	RingSlot       string `json:"ring_slot"`
 	Error          string `json:"error"`
 	Account        string `json:"account"`
@@ -39,6 +41,7 @@ type Service struct {
 	client   *api.Client
 	account  string
 	uploaded map[string]bool
+	meta     map[string]string
 	status   Status
 }
 
@@ -64,6 +67,7 @@ func New(cfg config.Config) (*Service, error) {
 		client:   api.New(cfg.Server, cfg.Token),
 		account:  account,
 		uploaded: loadUploaded(cfg.Server, cfg.ClientID),
+		meta:     loadMeta(cfg.Server, cfg.ClientID),
 		status: Status{
 			Account:        account,
 			Market:         cfg.Market,
@@ -111,17 +115,35 @@ func (s *Service) sync(ctx context.Context) error {
 		return fmt.Errorf("no token; run bfc enroll first")
 	}
 
-	scans, err := export.Load(s.status.SavedVariables)
+	data, err := export.LoadData(s.status.SavedVariables)
 	if err != nil {
 		return err
 	}
-	newScans := make([]export.Scan, 0, len(scans))
-	for _, scan := range scans {
+	newScans := make([]export.Scan, 0, len(data.Scans))
+	for _, scan := range data.Scans {
 		if !s.uploaded[scan.Hash] {
 			newScans = append(newScans, scan)
 		}
 	}
-	if len(newScans) > 0 {
+	newMeta := make([]api.IngestMeta, 0, len(data.Items))
+	updatedMeta := map[string]string{}
+	for _, item := range data.Items {
+		id := strconv.FormatInt(item.ID, 10)
+		hash := item.Hash()
+		if s.meta[id] == hash {
+			continue
+		}
+		newMeta = append(newMeta, api.IngestMeta{
+			ID:         item.ID,
+			Name:       item.Name,
+			Quality:    item.Quality,
+			ClassID:    item.ClassID,
+			SubclassID: item.SubclassID,
+			Icon:       item.Icon,
+		})
+		updatedMeta[id] = hash
+	}
+	if len(newScans) > 0 || len(newMeta) > 0 {
 		payload := make([]api.IngestScan, 0, len(newScans))
 		for _, scan := range newScans {
 			items := make([]api.IngestItem, 0, len(scan.Items))
@@ -140,20 +162,27 @@ func (s *Service) sync(ctx context.Context) error {
 				Items:         items,
 			})
 		}
-		result, err := s.client.Ingest(ctx, payload)
+		result, err := s.client.Ingest(ctx, payload, newMeta)
 		if err != nil {
 			return fmt.Errorf("upload: %w", err)
 		}
 		for _, scan := range newScans {
 			s.uploaded[scan.Hash] = true
 		}
+		for id, hash := range updatedMeta {
+			s.meta[id] = hash
+		}
 		if err := saveUploaded(s.cfg.Server, s.cfg.ClientID, s.uploaded); err != nil {
 			return fmt.Errorf("save upload state: %w", err)
+		}
+		if err := saveMeta(s.cfg.Server, s.cfg.ClientID, s.meta); err != nil {
+			return fmt.Errorf("save metadata state: %w", err)
 		}
 		s.mu.Lock()
 		s.status.LastUpload = time.Now().Unix()
 		s.status.Accepted = result.Accepted
 		s.status.Rejected = result.Rejected
+		s.status.Meta = result.Meta
 		s.mu.Unlock()
 	}
 

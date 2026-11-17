@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,8 @@ const (
 	maxScansPerRequest = 10
 	maxItemsPerScan    = 100000
 	maxItemsTotal      = 300000
+	maxMetaPerRequest  = 20000
+	maxQueryLength     = 100
 )
 
 type Server struct {
@@ -49,6 +52,10 @@ func New(st store.Store) *Server {
 	s.mux.HandleFunc("GET /v1/meta", s.handleMeta)
 	s.mux.HandleFunc("GET /v1/snapshot/{market}", s.handleSnapshot)
 	s.mux.HandleFunc("GET /v1/snapshot/{market}/data-addon.zip", s.handleDataAddon)
+	s.mux.HandleFunc("GET /v1/items", s.handleItems)
+	s.mux.HandleFunc("GET /v1/item/history", s.handleItemHistory)
+	s.mux.HandleFunc("GET /v1/item/markets", s.handleItemMarkets)
+	s.mux.Handle("GET /", s.webHandler())
 	return s
 }
 
@@ -91,6 +98,16 @@ func (s *Server) handleEnroll(w http.ResponseWriter, r *http.Request) {
 type ingestRequest struct {
 	V     int          `json:"v"`
 	Scans []ingestScan `json:"scans"`
+	Items []ingestMeta `json:"items"`
+}
+
+type ingestMeta struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Quality    int    `json:"quality"`
+	ClassID    int    `json:"class_id"`
+	SubclassID int    `json:"subclass_id"`
+	Icon       int64  `json:"icon"`
 }
 
 type ingestScan struct {
@@ -111,6 +128,7 @@ type ingestResponse struct {
 	Accepted int `json:"accepted"`
 	Rejected int `json:"rejected"`
 	Items    int `json:"items"`
+	Meta     int `json:"meta"`
 }
 
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
@@ -135,9 +153,37 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unsupported payload version")
 		return
 	}
-	if len(req.Scans) == 0 || len(req.Scans) > maxScansPerRequest {
+	if len(req.Scans) > maxScansPerRequest {
 		writeError(w, http.StatusBadRequest, "invalid scan count")
 		return
+	}
+	if len(req.Scans) == 0 && len(req.Items) == 0 {
+		writeError(w, http.StatusBadRequest, "empty payload")
+		return
+	}
+	if len(req.Items) > maxMetaPerRequest {
+		writeError(w, http.StatusRequestEntityTooLarge, "too many item metadata entries")
+		return
+	}
+
+	meta := make([]store.ItemMeta, 0, len(req.Items))
+	for _, item := range req.Items {
+		if item.ID <= 0 || item.Name == "" || len(item.Name) > 200 {
+			writeError(w, http.StatusBadRequest, "invalid item metadata")
+			return
+		}
+		if item.Quality < 0 || item.Quality > 10 || item.ClassID < 0 || item.SubclassID < 0 || item.Icon < 0 {
+			writeError(w, http.StatusBadRequest, "invalid item metadata values")
+			return
+		}
+		meta = append(meta, store.ItemMeta{
+			ID:         item.ID,
+			Name:       item.Name,
+			Quality:    item.Quality,
+			ClassID:    item.ClassID,
+			SubclassID: item.SubclassID,
+			Icon:       item.Icon,
+		})
 	}
 
 	now := time.Now()
@@ -198,7 +244,12 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	result := ingestResponse{}
+	if err := s.store.UpsertItems(r.Context(), meta); err != nil {
+		writeError(w, http.StatusInternalServerError, "metadata ingest failed")
+		return
+	}
+
+	result := ingestResponse{Meta: len(meta)}
 	for _, scan := range parsed {
 		ingested, err := s.store.Ingest(r.Context(), client.ID, scan)
 		if err != nil {
@@ -255,6 +306,86 @@ func (s *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	gz := gzip.NewWriter(w)
 	defer gz.Close()
 	_ = json.NewEncoder(gz).Encode(snapshot)
+}
+
+func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	market := query.Get("market")
+	if !marketRE.MatchString(market) {
+		writeError(w, http.StatusBadRequest, "invalid market")
+		return
+	}
+	search := strings.TrimSpace(query.Get("q"))
+	if len(search) > maxQueryLength {
+		writeError(w, http.StatusBadRequest, "query too long")
+		return
+	}
+	limit := parseLimit(query.Get("limit"), 50, 200)
+	items, err := s.store.SearchItems(r.Context(), market, search, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "search failed")
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"market": market,
+		"query":  search,
+		"items":  items,
+	})
+}
+
+func (s *Server) handleItemHistory(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	market := query.Get("market")
+	key := query.Get("key")
+	if !marketRE.MatchString(market) {
+		writeError(w, http.StatusBadRequest, "invalid market")
+		return
+	}
+	if !itemRE.MatchString(key) {
+		writeError(w, http.StatusBadRequest, "invalid item key")
+		return
+	}
+	limit := parseLimit(query.Get("limit"), 168, 1000)
+	history, err := s.store.ItemHistory(r.Context(), market, key, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "history failed")
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	writeJSON(w, http.StatusOK, history)
+}
+
+func (s *Server) handleItemMarkets(w http.ResponseWriter, r *http.Request) {
+	key := r.URL.Query().Get("key")
+	if !itemRE.MatchString(key) {
+		writeError(w, http.StatusBadRequest, "invalid item key")
+		return
+	}
+	prices, err := s.store.ItemMarkets(r.Context(), key)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "markets failed")
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"key":     key,
+		"markets": prices,
+	})
+}
+
+func parseLimit(raw string, fallback, max int) int {
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return fallback
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func (s *Server) authenticate(r *http.Request) (store.Client, error) {

@@ -38,10 +38,20 @@ type IngestItem struct {
 	Listings int32  `json:"n"`
 }
 
+type IngestMeta struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Quality    int    `json:"quality"`
+	ClassID    int    `json:"class_id"`
+	SubclassID int    `json:"subclass_id"`
+	Icon       int64  `json:"icon"`
+}
+
 type IngestResponse struct {
 	Accepted int `json:"accepted"`
 	Rejected int `json:"rejected"`
 	Items    int `json:"items"`
+	Meta     int `json:"meta"`
 }
 
 type MarketMeta struct {
@@ -95,11 +105,12 @@ func (c *Client) Enroll(ctx context.Context) (EnrollResponse, error) {
 	return result, nil
 }
 
-func (c *Client) Ingest(ctx context.Context, scans []IngestScan) (IngestResponse, error) {
+func (c *Client) Ingest(ctx context.Context, scans []IngestScan, meta []IngestMeta) (IngestResponse, error) {
 	payload := struct {
 		V     int          `json:"v"`
 		Scans []IngestScan `json:"scans"`
-	}{V: 1, Scans: scans}
+		Items []IngestMeta `json:"items,omitempty"`
+	}{V: 1, Scans: scans, Items: meta}
 
 	var raw bytes.Buffer
 	gz := gzip.NewWriter(&raw)
