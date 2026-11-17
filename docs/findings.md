@@ -86,35 +86,47 @@ Example action string after a successful write:
 
 | Test | Result |
 |---|---|
-| `LoadAddOn` on an unloaded slot reads current file content | |
-| `LoadAddOn` on an already-loaded slot re-executes | |
-| New slot folder created at runtime is discoverable | |
-| Slots visible/enabled in the AddOns list | |
+| `LoadAddOn` on an unloaded slot reads current file content | **Yes.** `BFProbeDataA` written after startup loaded `RINGA123` mid-session, and `RINGA456` after `/reload`. |
+| `LoadAddOn` on an already-loaded slot re-executes | No (expected; slot B stayed `INITIAL_B`). |
+| New slot folder created at runtime is discoverable | **No.** `BFProbeDataC`/`D` created while the game ran returned `MISSING`. |
+| Slots visible/enabled in the AddOns list | Yes, when present at startup. |
 
 ## TOC metadata
 
 | Test | Result |
 |---|---|
-| `GetAddOnMetadata("BFProbeDataA", "X-BF-Data")` before rewrite | |
-| same after rewriting the TOC mid-session | |
-| Value truncated or preserved | |
+| `GetAddOnMetadata("BFProbeDataA", "X-BF-Data")` before rewrite | `META123` |
+| same after rewriting the TOC to `META789` mid-session | `META123` — cached at load/startup |
+| Value truncated or preserved | preserved |
 
 ## Decision
 
-Pick one:
-
-- [x] ~~**Bindings mailbox works.**~~ **Rejected in phase 0:** `LoadBindings`
-      does not re-read `bindings-cache.wtf` mid-session; only `/reload`/login
-      picks up changes.
-- [ ] **Ring works.** Use N LoadOnDemand slots for full/delta snapshots.
-      Test: write slot A while the game runs, then `/bfprobe ring A` without
-      reload.
-- [ ] **Neither works.** Central data at login/`/reload` only; keep live AH
-      targeted queries and search-result capture for real-time prices.
+- [x] ~~**Bindings mailbox works.**~~ **Rejected:** `LoadBindings` does not
+      re-read `bindings-cache.wtf` mid-session; only `/reload`/login picks up
+      changes.
+- [x] **Ring works.** A pre-created LoadOnDemand slot written after startup
+      loads its current file content. New folders are not discovered at runtime
+      (`MISSING`), so the ring must be pre-created and fixed-size.
+- [ ] **Time-slot ring** to be implemented: N pre-created slots, one per
+      5-minute window, producer writes the current window, consumer loads the
+      completed window. No metadata/readiness signal is available (TOC metadata
+      is cached).
+- [ ] **Neither** not applicable; the ring is the live channel.
 
 Chunk size / key count chosen for the mailbox:
 
 ```
+not applicable; bindings mailbox rejected
+```
+
+Ring design chosen:
+
+```
+N = 64 slots, 5-minute windows, 64 * 5 min = 5 h 20 min per session.
+Slot index = floor(unix_time / 300) mod 64.
+Companion: write current window's slot with the cumulative delta since base.
+Addon: at each window boundary, load the previous window's slot if not loaded.
+After a full wrap, prompt /reload (all slots unload and can be reused).
 ```
 
 Anything else learned about the client:

@@ -14,7 +14,7 @@ COMMAND ?= ACTIONBUTTON1
 ACCOUNT ?=
 ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 
-PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB
+PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB BFProbeDataC BFProbeDataD
 
 .PHONY: help probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 

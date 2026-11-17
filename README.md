@@ -93,9 +93,10 @@ only touch lines with the `BFD1` prefix. `/bfprobe reset` removes test bindings;
 - Linux companion first; Windows is a port behind `internal/platform`, not a
   rewrite.
 - Server: Go + Postgres 17, EU markets only at launch.
-- Live data: the addon cannot make HTTP requests. Scans and central data move
-  through the game's files; the probe verifies which file-read primitive works
-  mid-session (`LoadBindings`, LoadOnDemand ring, or reload only).
+- Live data: the addon cannot make HTTP requests. Phase 0 confirmed a
+  **LoadOnDemand ring**: pre-created data slots written by the companion while
+  the game runs are loaded mid-session. The bindings-mailbox idea was rejected.
+  See [`docs/protocol.md`](docs/protocol.md).
 - Auctionator integration: read-only display bridge. We never write its
   database or SavedVariables.
 

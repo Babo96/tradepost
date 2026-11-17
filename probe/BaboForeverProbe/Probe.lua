@@ -355,8 +355,9 @@ local function cmdReset()
 end
 
 local function slotName(slot)
-  if slot and slot:upper() == "B" then
-    return "BFProbeDataB"
+  slot = string.upper(slot or "A")
+  if slot == "A" or slot == "B" or slot == "C" or slot == "D" then
+    return "BFProbeData" .. slot
   end
   return "BFProbeDataA"
 end
@@ -606,8 +607,8 @@ local function cmdHelp()
   out("  /bfprobe bindread             -- LoadBindings + read reserved keys")
   out("  /bfprobe bindlen [n]          -- write a long CLICK action")
   out("  /bfprobe keys                 -- list reserved keys and actions")
-  out("  /bfprobe ring [A|B]           -- LoadAddOn a probe data slot")
-  out("  /bfprobe meta [A|B]           -- read X-BF-Data from the TOC")
+  out("  /bfprobe ring [A|B|C|D]       -- LoadAddOn a probe data slot")
+  out("  /bfprobe meta [A|B|C|D]       -- read X-BF-Data from the TOC")
   out("  /bfprobe reset                -- remove probe bindings")
   out("  /bfprobe report               -- print recorded results")
   out("  /bfprobe clear                -- clear recorded results")

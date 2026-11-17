@@ -10,9 +10,13 @@ preceded by a timestamped backup of `bindings-cache.wtf`.
 
 ### Phase 0 status
 
-The first run rejected the bindings mailbox: changing a valid binding in the
-file was not visible until `/reload`. **Section 5 (LoadOnDemand ring) is now the
-key test.** Sections 2–4 are kept for re-testing and for the uplink idea.
+- Bindings mailbox: **rejected** (only `/reload` re-reads the file).
+- LoadOnDemand ring: **confirmed** (`RINGA123` loaded mid-session).
+- New addon folders at runtime: **not discovered** (`MISSING`).
+- TOC metadata: **cached** at load/startup.
+- Remaining: `/bfprobe bench` on the 280k auction list.
+
+Sections 2–4 are kept for re-testing; section 5 is the confirmed channel.
 
 If anything looks wrong:
 

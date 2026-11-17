@@ -15,7 +15,7 @@ import common
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wow", help="WoW install root")
-    parser.add_argument("--slot", choices=("A", "B"), default="A")
+    parser.add_argument("--slot", choices=("A", "B", "C", "D"), default="A")
     parser.add_argument("--payload", required=True, help="payload value written into Data.lua")
     parser.add_argument("--stamp", type=int, default=None, help="numeric stamp (default: current epoch)")
     parser.add_argument("--write", action="store_true", help="actually write the file (default: dry run)")
