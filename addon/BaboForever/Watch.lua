@@ -130,8 +130,18 @@ function BF:SyncAuctionatorWatchList(announce)
     return false
   end
 
+  local listName = "Babo Forever Watchlist"
+  if #keys == 0 then
+    -- Do not create an empty list on a fresh login. If a list exists, recreate
+    -- it empty to clear the last unwatched item.
+    local exists = pcall(Auctionator.API.v1.GetShoppingListItems, "BaboForever", listName)
+    if not exists then
+      return true
+    end
+  end
+
   local ok, err = pcall(Auctionator.API.v1.CreateShoppingList,
-    "BaboForever", "Babo Forever Watchlist", names)
+    "BaboForever", listName, names)
   if not ok then
     self:Debug("auctionator watchlist: " .. tostring(err))
     if announce then
