@@ -20,15 +20,30 @@ local function ageColor(seconds)
   return "ff9ca3af"
 end
 
+local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:12:12:0:0|t"
+local SILVER_ICON = "|TInterface\\MoneyFrame\\UI-SilverIcon:12:12:0:0|t"
+local COPPER_ICON = "|TInterface\\MoneyFrame\\UI-CopperIcon:12:12:0:0|t"
+
 local function moneyText(copper)
   copper = math.max(0, math.floor(copper or 0))
-  if GetCoinTextureString then
-    return GetCoinTextureString(copper)
-  end
   local gold = math.floor(copper / 10000)
   local silver = math.floor((copper % 10000) / 100)
   local rest = copper % 100
-  return string.format("%dg %ds %dc", gold, silver, rest)
+
+  local result = tostring(rest) .. " " .. COPPER_ICON
+  if gold ~= 0 or silver ~= 0 then
+    if rest < 10 then
+      result = "0" .. result
+    end
+    result = tostring(silver) .. " " .. SILVER_ICON .. " " .. result
+  end
+  if gold ~= 0 then
+    if silver < 10 then
+      result = "0" .. result
+    end
+    result = tostring(gold) .. " " .. GOLD_ICON .. " " .. result
+  end
+  return result
 end
 
 function BF:GetPrice(keys)
@@ -69,7 +84,13 @@ function BF:AddPriceLines(tooltip, link)
   end
 
   local age = math.max(0, time() - (entry.t or 0))
-  local text = moneyText(entry.p)
+  local price = moneyText(entry.p)
+  if WHITE_FONT_COLOR then
+    price = WHITE_FONT_COLOR:WrapTextInColorCode(price)
+  else
+    price = "|cffffffff" .. price .. "|r"
+  end
+  local text = price
 
   if self.config.showAge then
     text = text .. "  |c" .. ageColor(age) .. "(" .. ageString(age) .. ")|r"
