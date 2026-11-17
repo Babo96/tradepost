@@ -233,6 +233,11 @@ local function qualityColor(quality)
   return 1, 1, 1
 end
 
+local function itemLink(itemID)
+  local _, link = C_Item.GetItemInfo(itemID)
+  return link or ("item:" .. itemID)
+end
+
 local function sortLabel(mode)
   if mode == "price" then
     return "Sort: price"
@@ -461,12 +466,7 @@ function BF:CreateBrowser()
         return
       end
       GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-      local link = C_Item.GetItemLink(button.itemID)
-      if link then
-        GameTooltip:SetHyperlink(link)
-      else
-        GameTooltip:SetHyperlink("item:" .. button.itemID)
-      end
+      GameTooltip:SetHyperlink(itemLink(button.itemID))
       GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function()
@@ -476,9 +476,8 @@ function BF:CreateBrowser()
       if not button.itemID or not IsShiftKeyDown() then
         return
       end
-      local link = C_Item.GetItemLink(button.itemID) or ("item:" .. button.itemID)
       if ChatEdit_InsertLink then
-        ChatEdit_InsertLink(link)
+        ChatEdit_InsertLink(itemLink(button.itemID))
       end
     end)
     rows[index] = row
