@@ -363,14 +363,16 @@ function BF:CreateBrowser()
   search:SetSize(390, 26)
   search:SetPoint("TOPLEFT", 20, -48)
   search:SetAutoFocus(false)
-  search:SetScript("OnTextChanged", function(edit)
+  -- Hook instead of SetScript so SearchBoxTemplate keeps its own placeholder
+  -- handling and hides the "Search" hint while typing.
+  search:HookScript("OnTextChanged", function(edit)
     self.browser.query = edit:GetText() or ""
     self:FilterBrowser()
   end)
-  search:SetScript("OnEscapePressed", function(edit)
+  search:HookScript("OnEscapePressed", function(edit)
     edit:ClearFocus()
   end)
-  search:SetScript("OnEnterPressed", function(edit)
+  search:HookScript("OnEnterPressed", function(edit)
     edit:ClearFocus()
   end)
   frame.search = search
