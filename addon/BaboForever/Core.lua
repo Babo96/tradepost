@@ -13,6 +13,22 @@ function BF:Debug(...)
   end
 end
 
+function BF:ReportError(area, err)
+  local message = tostring(err)
+  if self.lastError == message then
+    return
+  end
+  self.lastError = message
+  if BABOFOREVER_DB then
+    BABOFOREVER_DB.lastError = {
+      area = area,
+      err = message,
+      at = time(),
+    }
+  end
+  self:Print("|cffff5555" .. tostring(area) .. " error:|r " .. message)
+end
+
 function BF:OnLoad()
   self:InitConfig()
 
@@ -93,13 +109,7 @@ function BF:CountLocal()
   return count
 end
 
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_LOGIN")
-frame:RegisterEvent("AUCTION_HOUSE_SHOW")
-frame:RegisterEvent("AUCTION_HOUSE_CLOSED")
-frame:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
-frame:SetScript("OnEvent", function(_, event, arg1)
+function BF:DispatchEvent(event, arg1)
   if event == "ADDON_LOADED" then
     if arg1 == ADDON then
       BF:OnLoad()
@@ -114,5 +124,18 @@ frame:SetScript("OnEvent", function(_, event, arg1)
     BF:OnAuctionHouseClosed()
   elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
     BF:OnReplicateUpdate()
+  end
+end
+
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("ADDON_LOADED")
+frame:RegisterEvent("PLAYER_LOGIN")
+frame:RegisterEvent("AUCTION_HOUSE_SHOW")
+frame:RegisterEvent("AUCTION_HOUSE_CLOSED")
+frame:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
+frame:SetScript("OnEvent", function(_, event, arg1)
+  local ok, err = pcall(BF.DispatchEvent, BF, event, arg1)
+  if not ok then
+    BF:ReportError(event, err)
   end
 end)

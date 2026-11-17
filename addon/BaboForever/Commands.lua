@@ -57,6 +57,7 @@ function BF:PrintHelp()
   self:Print("  /bf supply on|off    show total supply")
   self:Print("  /bf clear            clear local prices for this market")
   self:Print("  /bf debug            toggle debug output")
+  self:Print("  /bf lasterror        show the last caught error")
 end
 
 SLASH_BABOFOREVER1 = "/bf"
@@ -98,6 +99,14 @@ SlashCmdList["BABOFOREVER"] = function(msg)
   elseif command == "debug" then
     BF:SetConfig("debug", not BF.config.debug)
     BF:Print("debug: " .. tostring(BF.config.debug))
+  elseif command == "lasterror" then
+    local lastError = BABOFOREVER_DB and BABOFOREVER_DB.lastError
+    if lastError then
+      BF:Print(string.format("%s: %s (%s)",
+        tostring(lastError.area), tostring(lastError.err), date("%H:%M:%S", lastError.at)))
+    else
+      BF:Print("no error recorded")
+    end
   elseif command == "help" or command == "" then
     BF:PrintHelp()
   else

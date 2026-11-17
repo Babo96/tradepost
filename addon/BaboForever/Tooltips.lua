@@ -107,10 +107,21 @@ function BF:AddPriceLines(tooltip, link)
   tooltip:AddDoubleLine(left, price)
 end
 
-if TooltipDataProcessor and Enum and Enum.TooltipDataType then
-  TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip)
+local function safeTooltip(tooltip)
+  local ok, err = pcall(function()
     local _, link = tooltip:GetItem()
     BF:AddPriceLines(tooltip, link)
+  end)
+  if not ok then
+    BF:ReportError("tooltip", err)
+    BF:SetConfig("tooltips", false)
+    BF:Print("tooltips disabled after an error; /bf tooltips on to retry")
+  end
+end
+
+if TooltipDataProcessor and Enum and Enum.TooltipDataType then
+  TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip)
+    safeTooltip(tooltip)
   end)
 else
   local function hook(tooltip)
@@ -118,8 +129,7 @@ else
       return
     end
     tooltip:HookScript("OnTooltipSetItem", function(frame)
-      local _, link = frame:GetItem()
-      BF:AddPriceLines(frame, link)
+      safeTooltip(frame)
     end)
   end
 

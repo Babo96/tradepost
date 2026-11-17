@@ -110,7 +110,10 @@ function BF:ScheduleQuietCheck(count)
     if current > (self.scan.quietCount or 0) then
       self:ScheduleQuietCheck(current)
     else
-      self:StartProcessing(current)
+      local ok, err = pcall(self.StartProcessing, self, current)
+      if not ok then
+        self:ReportError("scan-start", err)
+      end
     end
   end)
 end
@@ -138,34 +141,46 @@ function BF:StartProcessing(total)
     local index = self.scan.index
     local stop = math.min(index + CHUNK, total)
 
-    for i = index, stop - 1 do
-      local info = { C_AuctionHouse.GetReplicateItemInfo(i) }
-      local quantity = info[3]
-      local buyout = info[10]
-      local itemID = info[17]
-      local allInfo = info[18]
+    local ok, err = pcall(function()
+      for i = index, stop - 1 do
+        local info = { C_AuctionHouse.GetReplicateItemInfo(i) }
+        local quantity = info[3]
+        local buyout = info[10]
+        local itemID = info[17]
+        local allInfo = info[18]
 
-      if not allInfo then
-        self.scan.missing = self.scan.missing + 1
-      end
+        if not allInfo then
+          self.scan.missing = self.scan.missing + 1
+        end
 
-      if itemID and quantity and quantity > 0 and buyout and buyout > 0 then
-        local key = self:KeyFromAuction(i, info)
-        if key then
-          local unitPrice = buyout / quantity
-          local entry = self.scan.acc[key]
-          if not entry then
-            entry = { p = unitPrice, q = 0, n = 0 }
-            self.scan.acc[key] = entry
+        if itemID and quantity and quantity > 0 and buyout and buyout > 0 then
+          local key = self:KeyFromAuction(i, info)
+          if key then
+            local unitPrice = buyout / quantity
+            local entry = self.scan.acc[key]
+            if not entry then
+              entry = { p = unitPrice, q = 0, n = 0 }
+              self.scan.acc[key] = entry
+            end
+            if unitPrice < entry.p then
+              entry.p = unitPrice
+            end
+            entry.q = entry.q + quantity
+            entry.n = entry.n + 1
+            self.scan.auctions = self.scan.auctions + 1
           end
-          if unitPrice < entry.p then
-            entry.p = unitPrice
-          end
-          entry.q = entry.q + quantity
-          entry.n = entry.n + 1
-          self.scan.auctions = self.scan.auctions + 1
         end
       end
+    end)
+
+    if not ok then
+      if self.scan.ticker then
+        self.scan.ticker:Cancel()
+      end
+      self.scan.running = false
+      self.scan.acc = nil
+      self:ReportError("scan", err)
+      return
     end
 
     self.scan.index = stop
@@ -175,7 +190,12 @@ function BF:StartProcessing(total)
 
     if stop >= total then
       self.scan.ticker:Cancel()
-      self:FinishScan()
+      local ok, err = pcall(self.FinishScan, self)
+      if not ok then
+        self.scan.running = false
+        self.scan.acc = nil
+        self:ReportError("scan-finish", err)
+      end
     end
   end)
 end
