@@ -51,16 +51,37 @@ function BF:OnReplicateUpdate()
   if self.scan and self.scan.running then
     return
   end
-  local count = C_AuctionHouse and C_AuctionHouse.GetNumReplicateItems() or 0
-  if count and count > 0 then
-    if BABOFOREVER_DB then
-      BABOFOREVER_DB.lastReplicate = time()
-    end
-    if self.scan then
-      self.scan.waiting = false
-    end
-    self:ScheduleQuietCheck(count)
+  if self.scan and self.scan.suppressUntil and time() < self.scan.suppressUntil then
+    return
   end
+
+  local count = C_AuctionHouse and C_AuctionHouse.GetNumReplicateItems() or 0
+  if not count or count <= 0 then
+    return
+  end
+
+  if self.scan and self.scan.lastEventCount == count and not self.scan.waiting then
+    return
+  end
+
+  local db = self:LocalDB()
+  local marketKey = self:MarketKey()
+  if db.lastScanMarket and db.lastScanMarket ~= marketKey then
+    return
+  end
+  local lastScan = db.lastScan or 0
+  if not self.scan.waiting and lastScan > 0 and (time() - lastScan) < 300 then
+    return
+  end
+
+  if BABOFOREVER_DB then
+    BABOFOREVER_DB.lastReplicate = time()
+  end
+  if self.scan then
+    self.scan.waiting = false
+    self.scan.lastEventCount = count
+  end
+  self:ScheduleQuietCheck(count)
 end
 
 function BF:CountLocal()

@@ -42,31 +42,41 @@ function BF:TryScan(force)
     -- are standing at and harvest it. Later scans record the exact market.
     sameMarket = true
   end
-  local recent = db.lastScan and db.lastScan > 0 and (now - db.lastScan) < THROTTLE
+  local lastReplicate = (BABOFOREVER_DB and BABOFOREVER_DB.lastReplicate) or 0
+  local replicateAge = now - lastReplicate
+  local lastScanAge = (db.lastScan and db.lastScan > 0) and (now - db.lastScan) or math.huge
+  local recentScan = lastScanAge < 60
 
-  if count and count > 0 and sameMarket then
-    if not force and recent then
-      self:Print("recent scan in this market; next scan in " ..
-        remaining(THROTTLE - (now - db.lastScan)) .. " (/bf scan force to reprocess the cached list)")
+  -- Harvest a fresh list for this market that we have not processed yet (first
+  -- run, or another addon refreshed it). Do not reprocess our own recent scan.
+  if not force and count and count > 0 and sameMarket and replicateAge < THROTTLE then
+    if recentScan then
+      self:Print("recent scan; next scan in " .. remaining(THROTTLE - lastScanAge) ..
+        " (/bf status)")
       return
     end
     self:StartProcessing(count)
     return
   end
 
-  -- A populated list from another market/house must not be stored under this
-  -- market. Request a fresh replicate instead.
-  if not force and self:NextReplicateSeconds() > 0 then
+  -- The list is stale or from another market. Do not store it under this
+  -- market; request a fresh replicate if the throttle allows.
+  if not force and replicateAge < THROTTLE then
     if count and count > 0 and not sameMarket then
       self:Print("cached auction list is from another market; client throttle: " ..
-        remaining(self:NextReplicateSeconds()))
+        remaining(THROTTLE - replicateAge))
+    elseif count and count > 0 then
+      self:Print("cached auction list is stale; client throttle: " ..
+        remaining(THROTTLE - replicateAge))
     else
       self:Print("client throttle active; next replicate in " ..
-        remaining(self:NextReplicateSeconds()))
+        remaining(THROTTLE - replicateAge))
     end
     return
   end
 
+  self.scan.lastEventCount = nil
+  self.scan.suppressUntil = nil
   local ok, err = pcall(C_AuctionHouse.ReplicateItems)
   if not ok then
     self:Print("could not request a scan: " .. tostring(err))
@@ -119,6 +129,8 @@ function BF:StartProcessing(total)
   self.scan.missing = 0
   self.scan.started = debugprofilestop()
   self.scan.marketKey = self:MarketKey()
+  self.scan.lastEventCount = total
+  self.scan.suppressUntil = nil
 
   self:Print("scanning " .. total .. " auctions...")
 
@@ -192,6 +204,8 @@ function BF:FinishScan()
 
   self.scan.running = false
   self.scan.acc = nil
+  self.scan.suppressUntil = time() + 60
+  self.scan.lastEventCount = (C_AuctionHouse and C_AuctionHouse.GetNumReplicateItems()) or self.scan.total
 
   self:Print(string.format(
     "scanned %d auctions, %d items in %.1f s (%d missing item info)",
