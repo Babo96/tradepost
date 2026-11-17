@@ -32,9 +32,12 @@ local function ourEntry(dbKey)
   if #keys == 0 then
     return nil
   end
-  local entry = BF:GetPrice(keys)
+  local entry, source = BF:GetPrice(keys)
   if entry and entry.p then
-    return entry
+    if BF.bridge then
+      BF.bridge.lastSource = source
+    end
+    return entry, source
   end
   return nil
 end
@@ -79,6 +82,9 @@ function BF:InitBridge()
     if entry then
       return entry.p
     end
+    if BF.bridge then
+      BF.bridge.lastSource = "auctionator"
+    end
     return originals.GetPrice(db, dbKey)
   end
 
@@ -89,6 +95,9 @@ function BF:InitBridge()
         return entry.p
       end
     end
+    if BF.bridge then
+      BF.bridge.lastSource = "auctionator"
+    end
     return originals.GetFirstPrice(db, dbKeys)
   end
 
@@ -96,6 +105,9 @@ function BF:InitBridge()
     local entry = ourEntry(dbKey)
     if entry and entry.t then
       return math.max(0, (time() - entry.t) / 86400)
+    end
+    if BF.bridge then
+      BF.bridge.lastSource = "auctionator"
     end
     if originals.GetPriceAge then
       return originals.GetPriceAge(db, dbKey)
@@ -120,6 +132,18 @@ function BF:InitBridge()
           text = string.format("%dd", math.floor(seconds / 86400))
         end
         local label = AUCTIONATOR_L_AUCTION_AGE or "Age"
+        local source = BF.bridge and BF.bridge.lastSource
+        local marker = nil
+        if source == "live" then
+          marker = "|cff60a5faR|r"
+        elseif source == "central" then
+          marker = "|cff60a5faC|r"
+        elseif source == "local" then
+          marker = "|cff33ff99L|r"
+        end
+        if marker then
+          label = label .. " " .. marker
+        end
         local white = WHITE_FONT_COLOR and WHITE_FONT_COLOR:WrapTextInColorCode(text) or text
         frame:AddDoubleLine(label, white)
         return
@@ -180,7 +204,7 @@ function BF:BridgeTest(itemID)
 
   local dbKey = tostring(itemID)
   local keys = keysFor(dbKey)
-  local our = ourEntry(dbKey)
+  local our, ourSource = ourEntry(dbKey)
   local originals = self.bridge and self.bridge.originals
   local originalPrice = originals and originals.GetPrice and originals.GetPrice(db, dbKey) or nil
   local originalAge = originals and originals.GetPriceAge and originals.GetPriceAge(db, dbKey) or nil
@@ -189,6 +213,7 @@ function BF:BridgeTest(itemID)
 
   self:Print("bridgetest item=" .. itemID .. " keys=" .. table.concat(keys, ","))
   self:Print("  our=" .. tostring(our and our.p) ..
+    "  source=" .. tostring(ourSource) ..
     "  ageSec=" .. tostring(our and our.t and (time() - our.t)))
   self:Print("  original=" .. tostring(originalPrice) ..
     "  ageDays=" .. tostring(originalAge))
