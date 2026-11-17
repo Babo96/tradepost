@@ -3,6 +3,7 @@ local ADDON, BF = ...
 local AUTH_SLOTS = 16
 local AUTH_POLL_SECONDS = 2
 local AUTH_POLL_TRIES = 20
+local AUTH_RING_TRIES = 8
 
 function BF:CharacterKey()
   local name = UnitName("player") or "Unknown"
@@ -222,13 +223,34 @@ function BF:ReadAuthReply(seq, attempt)
   return false
 end
 
+function BF:ReadAuthReplyFromRing(seq, attempt)
+  if not self.config or not self.config.ring then
+    return false
+  end
+  if (attempt or 0) >= AUTH_RING_TRIES then
+    return false
+  end
+  local window = tonumber(self.config.ringWindow) or 300
+  local base = math.floor((time() - 1) / window)
+  local target = base + 1 + (attempt or 0)
+  self:LoadRingWindow(target, true)
+  local live = self.live and self.live[self:MarketKey()]
+  local auth = live and live.auth
+  if auth and auth.seq == seq and auth.code then
+    self:PrintLoginCode(auth)
+    return true
+  end
+  return false
+end
+
 function BF:PollAuth(seq, tries)
   if tries >= AUTH_POLL_TRIES then
-    self:Print("no login code yet. Is the companion running? Try /bf login again.")
+    self:Print("no login code yet. Is the companion running? If this is the first")
+    self:Print("run after an update, restart the game once and try /bf login again.")
     return
   end
   C_Timer.After(AUTH_POLL_SECONDS, function()
-    if self:ReadAuthReply(seq, tries) then
+    if self:ReadAuthReply(seq, tries) or self:ReadAuthReplyFromRing(seq, tries) then
       return
     end
     self:PollAuth(seq, tries + 1)

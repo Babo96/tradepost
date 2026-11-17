@@ -268,6 +268,13 @@ func (s *Service) syncAuth(ctx context.Context, data export.Data) {
 		log.Printf("auth reply: %v", err)
 		return
 	}
+	market := request.Market
+	if market == "" {
+		market = s.cfg.Market
+	}
+	if err := addon.WriteAuthRingSlots(s.cfg.WowDir, market, request.Seq, response.Code, response.Character, response.ExpiresAt, s.cfg.RingSlots); err != nil {
+		log.Printf("auth ring reply: %v", err)
+	}
 	s.authSeq = request.Seq
 	if err := saveAuthSeq(s.cfg.Server, s.cfg.ClientID, s.authSeq); err != nil {
 		log.Printf("auth state: %v", err)

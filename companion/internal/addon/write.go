@@ -32,6 +32,44 @@ func WriteDataAddon(wowDir string, snapshots []api.Snapshot) error {
 	return wow.WriteAtomic(wow.DataAddonPath(wowDir), []byte(b.String()))
 }
 
+// WriteAuthRingSlots publishes a small auth-only payload into upcoming ring
+// slots. It lets an already-running client receive /bf login codes without a
+// restart, even though newly added sync addons are not discovered until then.
+func WriteAuthRingSlots(wowDir, market string, seq int64, code, character string, expires int64, ringSlots int) error {
+	if ringSlots < 1 {
+		ringSlots = 64
+	}
+	baseWindow := time.Now().Unix() / 300
+	for offset := int64(1); offset <= 6; offset++ {
+		window := baseWindow + offset
+		slot := int(window % int64(ringSlots))
+		var b strings.Builder
+		b.WriteString("-- Generated login code ring payload. The companion rewrites this file.\n")
+		b.WriteString("BABOFOREVER_RING = {\n")
+		b.WriteString("  schema = 1,\n")
+		fmt.Fprintf(&b, "  market = %q,\n", market)
+		fmt.Fprintf(&b, "  window = %d,\n", window)
+		fmt.Fprintf(&b, "  generated = %d,\n", time.Now().Unix())
+		b.WriteString("  base = 0,\n")
+		b.WriteString("  seq = 1,\n")
+		b.WriteString("  items = {},\n")
+		b.WriteString("  removed = {},\n")
+		b.WriteString("  pins = {},\n")
+		b.WriteString("  pins_updated = 0,\n")
+		b.WriteString("  auth = {\n")
+		fmt.Fprintf(&b, "    seq = %d,\n", seq)
+		fmt.Fprintf(&b, "    code = %q,\n", code)
+		fmt.Fprintf(&b, "    character = %q,\n", character)
+		fmt.Fprintf(&b, "    expires = %d,\n", expires)
+		b.WriteString("  },\n")
+		b.WriteString("}\n")
+		if err := wow.WriteAtomic(wow.SlotPath(wowDir, slot), []byte(b.String())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func WriteRingSlot(wowDir, market string, snapshot api.Snapshot, ringSlots int, window int64, pins []string, pinsUpdated int64) (string, error) {
 	if ringSlots < 1 {
 		ringSlots = 64

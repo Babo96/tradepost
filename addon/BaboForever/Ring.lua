@@ -54,6 +54,11 @@ function BF:ApplyRing(data, targetWindow)
   end
 
   local live = self:LiveFor(data.market)
+  -- Login codes can arrive in a tiny auth-only ring payload. Store it before
+  -- the sequence check so a future slot with no new price data still works.
+  if data.auth then
+    live.auth = data.auth
+  end
   if data.seq <= live.seq then
     return false
   end
