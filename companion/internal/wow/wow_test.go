@@ -26,16 +26,23 @@ func TestInstall(t *testing.T) {
 	source := t.TempDir()
 	addon := filepath.Join(source, "addon", "BaboForever")
 	dataAddon := filepath.Join(source, "data-addon", "BaboForever_Data")
+	liveAddon := filepath.Join(source, "data-addon", "BaboForever_LiveData")
 	if err := os.MkdirAll(addon, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(dataAddon, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(liveAddon, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(addon, "BaboForever.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(dataAddon, "BaboForever_Data.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(liveAddon, "BaboForever_LiveData.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -47,7 +54,7 @@ func TestInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, name := range []string{"BaboForever", "BaboForever_Data", "BaboForever_Data_00", "BaboForever_Data_02"} {
+	for _, name := range []string{"BaboForever", "BaboForever_Data", "BaboForever_LiveData", "BaboForever_Data_00", "BaboForever_Data_02"} {
 		if _, err := os.Stat(filepath.Join(AddonsDir(wowDir), name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}

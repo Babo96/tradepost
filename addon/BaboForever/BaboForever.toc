@@ -1,5 +1,6 @@
 ## Interface: 16001
 ## Title: Babo Forever
+## Category: Babo Forever
 ## Notes: Auction house prices for WoW Forever. Market-aware tooltips and crowd-sourced data.
 ## Author: babo
 ## Version: 0.1.0

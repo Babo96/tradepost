@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: Live Data
+## Category: Babo Forever
+## Notes: Section for the generated Babo Forever live price ring slots.
+## Author: babo
+## Version: 0.1.0
+## X-Category: Auction/Economy
+
+LiveData.lua

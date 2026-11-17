@@ -61,9 +61,10 @@ help:
 addon-install:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
 	@mkdir -p "$(ADDONS)"
-	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data"
+	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data" "$(ADDONS)/BaboForever_LiveData"
 	@cp -R addon/BaboForever "$(ADDONS)/BaboForever"
 	@cp -R data-addon/BaboForever_Data "$(ADDONS)/BaboForever_Data"
+	@cp -R data-addon/BaboForever_LiveData "$(ADDONS)/BaboForever_LiveData"
 	@echo "Installed BaboForever into $(ADDONS)"
 	@echo "Restart WoW, then /reload and /bf status."
 
@@ -115,12 +116,13 @@ go-lint:
 
 addon-update:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
-	@rm -rf "$(ADDONS)/BaboForever"
+	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_LiveData"
 	@cp -R addon/BaboForever "$(ADDONS)/BaboForever"
-	@echo "Updated $(ADDONS)/BaboForever (data addon untouched)"
+	@cp -R data-addon/BaboForever_LiveData "$(ADDONS)/BaboForever_LiveData"
+	@echo "Updated $(ADDONS)/BaboForever and BaboForever_LiveData (data addon untouched)"
 
 addon-uninstall:
-	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data"
+	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data" "$(ADDONS)/BaboForever_LiveData"
 	@echo "Removed BaboForever"
 
 probe-install:
