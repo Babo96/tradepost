@@ -30,6 +30,9 @@ type Status struct {
 	Rejected       int    `json:"rejected"`
 	Meta           int    `json:"meta"`
 	Watch          int    `json:"watch"`
+	LoginCode      string `json:"login_code,omitempty"`
+	LoginCharacter string `json:"login_character,omitempty"`
+	LoginExpires   int64  `json:"login_expires,omitempty"`
 	RingSlot       string `json:"ring_slot"`
 	Error          string `json:"error"`
 	Account        string `json:"account"`
@@ -70,6 +73,7 @@ func New(cfg config.Config) (*Service, error) {
 		return nil, fmt.Errorf("no WoW account found")
 	}
 
+	loginCode, loginCharacter, loginExpires := loadLogin(cfg.Server, cfg.ClientID)
 	service := &Service{
 		cfg:      cfg,
 		client:   api.New(cfg.Server, cfg.Token),
@@ -81,6 +85,9 @@ func New(cfg config.Config) (*Service, error) {
 			Account:        account,
 			Market:         cfg.Market,
 			LastUpload:     loadLastUpload(cfg.Server, cfg.ClientID),
+			LoginCode:      loginCode,
+			LoginCharacter: loginCharacter,
+			LoginExpires:   loginExpires,
 			SavedVariables: wow.SavedVariablesFile(cfg.WowDir, account),
 		},
 	}
@@ -284,6 +291,15 @@ func (s *Service) syncAuth(ctx context.Context, data export.Data) {
 	if err := saveAuthSeq(s.cfg.Server, s.cfg.ClientID, s.authSeq); err != nil {
 		log.Printf("auth state: %v", err)
 	}
+	if err := saveLogin(s.cfg.Server, s.cfg.ClientID, response.Code, response.Character, response.ExpiresAt); err != nil {
+		log.Printf("login state: %v", err)
+	}
+	log.Printf("login code for %s: %s (expires %d)", response.Character, response.Code, response.ExpiresAt)
+	s.mu.Lock()
+	s.status.LoginCode = response.Code
+	s.status.LoginCharacter = response.Character
+	s.status.LoginExpires = response.ExpiresAt
+	s.mu.Unlock()
 }
 
 func (s *Service) syncWatch(ctx context.Context, data export.Data) {

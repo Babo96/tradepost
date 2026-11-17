@@ -8,12 +8,15 @@ import (
 )
 
 type stateFile struct {
-	Server     string            `json:"server"`
-	ClientID   string            `json:"client_id"`
-	Uploaded   []string          `json:"uploaded,omitempty"`
-	Items      map[string]string `json:"items,omitempty"`
-	AuthSeq    int64             `json:"auth_seq,omitempty"`
-	LastUpload int64             `json:"last_upload,omitempty"`
+	Server         string            `json:"server"`
+	ClientID       string            `json:"client_id"`
+	Uploaded       []string          `json:"uploaded,omitempty"`
+	Items          map[string]string `json:"items,omitempty"`
+	AuthSeq        int64             `json:"auth_seq,omitempty"`
+	LastUpload     int64             `json:"last_upload,omitempty"`
+	LoginCode      string            `json:"login_code,omitempty"`
+	LoginCharacter string            `json:"login_character,omitempty"`
+	LoginExpires   int64             `json:"login_expires,omitempty"`
 }
 
 func statePath() string {
@@ -85,6 +88,19 @@ func loadLastUpload(server, clientID string) int64 {
 func saveLastUpload(server, clientID string, at int64) error {
 	state := stateFor(server, clientID)
 	state.LastUpload = at
+	return writeState(state)
+}
+
+func loadLogin(server, clientID string) (string, string, int64) {
+	state := stateFor(server, clientID)
+	return state.LoginCode, state.LoginCharacter, state.LoginExpires
+}
+
+func saveLogin(server, clientID, code, character string, expires int64) error {
+	state := stateFor(server, clientID)
+	state.LoginCode = code
+	state.LoginCharacter = character
+	state.LoginExpires = expires
 	return writeState(state)
 }
 

@@ -1,9 +1,10 @@
 local ADDON, BF = ...
 
 local AUTH_SLOTS = 16
+local AUTH_FIRST_DELAY = 8
 local AUTH_POLL_SECONDS = 2
-local AUTH_POLL_TRIES = 20
-local AUTH_RING_TRIES = 8
+local AUTH_POLL_TRIES = 10
+local AUTH_RING_TRIES = 6
 
 function BF:CharacterKey()
   local name = UnitName("player") or "Unknown"
@@ -249,7 +250,8 @@ function BF:PollAuth(seq, tries)
     self:Print("run after an update, restart the game once and try /bf login again.")
     return
   end
-  C_Timer.After(AUTH_POLL_SECONDS, function()
+  local delay = tries == 0 and AUTH_FIRST_DELAY or AUTH_POLL_SECONDS
+  C_Timer.After(delay, function()
     if self:ReadAuthReply(seq, tries) or self:ReadAuthReplyFromRing(seq, tries) then
       return
     end

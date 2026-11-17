@@ -125,6 +125,11 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
     <div class="card"><div class="label">Snapshot</div><div class="value" id="snapshot">–</div></div>
     <div class="card"><div class="label">Last upload</div><div class="value" id="lastUpload">–</div></div>
     <div class="card"><div class="label">Last download</div><div class="value" id="lastDownload">–</div></div>
+    <div class="card" id="loginCard" style="display:none">
+      <div class="label">Login code</div>
+      <div class="value" id="loginCode" style="font-family: ui-monospace, monospace; letter-spacing: 2px; user-select: all;">–</div>
+      <div class="sub" id="loginMeta"></div>
+    </div>
   </div>
 
   <p>
@@ -148,6 +153,15 @@ async function refresh() {
   document.getElementById('snapshot').textContent = s.version ? ('v' + s.version + ' · ' + (s.items || 0) + ' items') : '–';
   document.getElementById('lastUpload').textContent = fmt(s.last_upload);
   document.getElementById('lastDownload').textContent = fmt(s.last_download);
+  const loginCard = document.getElementById('loginCard');
+  if (s.login_code && (!s.login_expires || s.login_expires * 1000 > Date.now())) {
+    loginCard.style.display = '';
+    document.getElementById('loginCode').textContent = s.login_code;
+    document.getElementById('loginMeta').textContent =
+      (s.login_character || '') + (s.login_expires ? ' · expires ' + fmt(s.login_expires) : '');
+  } else {
+    loginCard.style.display = 'none';
+  }
   const msg = document.getElementById('message');
   msg.textContent = s.error ? s.error : (s.running ? 'syncing…' : '');
   msg.className = s.error ? 'bad' : 'sub';
