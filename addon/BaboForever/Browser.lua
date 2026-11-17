@@ -299,8 +299,8 @@ function BF:RefreshBrowser()
   end
 
   browser.status:SetText(string.format(
-    "%d items  ·  %s  ·  %s",
-    #filtered, self:MarketKey(), self:CentralLabel()
+    "%d / %d items  ·  %s  ·  %s",
+    #filtered, #(browser.all or {}), self:MarketKey(), self:CentralLabel()
   ))
 end
 
@@ -368,6 +368,19 @@ function BF:CreateBrowser()
   search:HookScript("OnTextChanged", function(edit)
     self.browser.query = edit:GetText() or ""
     self:FilterBrowser()
+  end)
+  local syncElapsed = 0
+  search:HookScript("OnUpdate", function(edit, elapsed)
+    syncElapsed = syncElapsed + elapsed
+    if syncElapsed < 0.2 then
+      return
+    end
+    syncElapsed = 0
+    local text = edit:GetText() or ""
+    if text ~= self.browser.query then
+      self.browser.query = text
+      self:FilterBrowser()
+    end
   end)
   search:HookScript("OnEscapePressed", function(edit)
     edit:ClearFocus()
