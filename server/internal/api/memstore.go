@@ -494,7 +494,7 @@ func matchesFilters(meta store.ItemMeta, item store.SnapshotItem, query store.Se
 }
 
 func matchesStats(meta store.ItemMeta, query store.SearchQuery) bool {
-	if query.StatKey == "" && !query.HasStats {
+	if len(query.Stats) == 0 && !query.HasStats {
 		return true
 	}
 	var stats map[string]any
@@ -504,22 +504,21 @@ func matchesStats(meta store.ItemMeta, query store.SearchQuery) bool {
 	if query.HasStats && len(stats) == 0 {
 		return false
 	}
-	if query.StatKey == "" {
-		return true
-	}
-	value, ok := stats[query.StatKey]
-	if !ok {
-		return false
-	}
-	number, ok := value.(float64)
-	if !ok {
-		return false
-	}
-	if query.MinStat != nil && number < *query.MinStat {
-		return false
-	}
-	if query.MaxStat != nil && number > *query.MaxStat {
-		return false
+	for _, filter := range query.Stats {
+		value, ok := stats[filter.Key]
+		if !ok {
+			return false
+		}
+		number, ok := value.(float64)
+		if !ok {
+			return false
+		}
+		if filter.Min != nil && number < *filter.Min {
+			return false
+		}
+		if filter.Max != nil && number > *filter.Max {
+			return false
+		}
 	}
 	return true
 }

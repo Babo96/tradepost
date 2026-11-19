@@ -116,6 +116,13 @@ type ItemMeta struct {
 	DetailsUpdated int64           `json:"details_updated,omitempty"`
 }
 
+// StatFilter constrains the numeric value of a single item stat.
+type StatFilter struct {
+	Key string
+	Min *float64
+	Max *float64
+}
+
 // SearchQuery is the filter set used by the website item browser.
 type SearchQuery struct {
 	Query         string
@@ -130,9 +137,7 @@ type SearchQuery struct {
 	MinPrice      *int64
 	MaxPrice      *int64
 	InStock       bool
-	StatKey       string
-	MinStat       *float64
-	MaxStat       *float64
+	Stats         []StatFilter
 	HasStats      bool
 	Sort          string
 	Page          int

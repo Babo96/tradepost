@@ -424,6 +424,11 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	stats, ok := parseStatFilters(query.Get("stats"))
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid stat filter")
+		return
+	}
 	statKey := strings.TrimSpace(query.Get("stat"))
 	if statKey != "" && !statRE.MatchString(statKey) {
 		writeError(w, http.StatusBadRequest, "invalid stat")
@@ -439,6 +444,9 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid stat range")
 		return
 	}
+	if statKey != "" {
+		stats = append(stats, store.StatFilter{Key: statKey, Min: minStat, Max: maxStat})
+	}
 
 	filters := store.SearchQuery{
 		Query:         search,
@@ -453,9 +461,7 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		MinPrice:      parseInt64Ptr(query.Get("min_price")),
 		MaxPrice:      parseInt64Ptr(query.Get("max_price")),
 		InStock:       query.Get("in_stock") == "1",
-		StatKey:       statKey,
-		MinStat:       minStat,
-		MaxStat:       maxStat,
+		Stats:         stats,
 		HasStats:      query.Get("has_stats") == "1",
 		Sort:          query.Get("sort"),
 		Page:          parsePositive(query.Get("page"), 1),
@@ -646,6 +652,44 @@ func parseFloatPtr(raw string) (*float64, bool) {
 		return nil, false
 	}
 	return &value, true
+}
+
+// parseStatFilters parses a comma-separated list of stat filter segments of
+// the form KEY, KEY:MIN, KEY::MAX, or KEY:MIN:MAX.
+func parseStatFilters(raw string) ([]store.StatFilter, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, true
+	}
+	segments := strings.Split(raw, ",")
+	filters := make([]store.StatFilter, 0, len(segments))
+	for _, segment := range segments {
+		parts := strings.Split(strings.TrimSpace(segment), ":")
+		if len(parts) == 0 || len(parts) > 3 {
+			return nil, false
+		}
+		key := strings.TrimSpace(parts[0])
+		if !statRE.MatchString(key) {
+			return nil, false
+		}
+		filter := store.StatFilter{Key: key}
+		if len(parts) >= 2 {
+			min, ok := parseFloatPtr(parts[1])
+			if !ok {
+				return nil, false
+			}
+			filter.Min = min
+		}
+		if len(parts) == 3 {
+			max, ok := parseFloatPtr(parts[2])
+			if !ok {
+				return nil, false
+			}
+			filter.Max = max
+		}
+		filters = append(filters, filter)
+	}
+	return filters, true
 }
 
 func parseCSVInts(raw string) []int {

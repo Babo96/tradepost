@@ -203,15 +203,15 @@ func searchWhere(market string, q SearchQuery) (string, []any) {
 	if q.InStock {
 		clauses = append(clauses, "p.quantity > 0")
 	}
-	if q.StatKey != "" {
-		key := next(q.StatKey)
+	for _, filter := range q.Stats {
+		key := next(filter.Key)
 		clauses = append(clauses, "i.stats ? "+key)
 		clauses = append(clauses, "jsonb_typeof(i.stats->"+key+") = 'number'")
-		if q.MinStat != nil {
-			clauses = append(clauses, "(i.stats->>"+key+")::numeric >= "+next(*q.MinStat))
+		if filter.Min != nil {
+			clauses = append(clauses, "(i.stats->>"+key+")::numeric >= "+next(*filter.Min))
 		}
-		if q.MaxStat != nil {
-			clauses = append(clauses, "(i.stats->>"+key+")::numeric <= "+next(*q.MaxStat))
+		if filter.Max != nil {
+			clauses = append(clauses, "(i.stats->>"+key+")::numeric <= "+next(*filter.Max))
 		}
 	}
 	if q.HasStats {
