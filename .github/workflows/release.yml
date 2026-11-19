@@ -18,14 +18,15 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.27"
+          go-version-file: companion/go.mod
           cache-dependency-path: companion/go.sum
 
       - name: Build binaries
         run: |
           mkdir -p dist
-          (cd companion && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/tradepost ./cmd/tradepost)
-          (cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/tradepost.exe ./cmd/tradepost)
+          VERSION="${GITHUB_REF_NAME#v}"
+          (cd companion && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o ../dist/tradepost ./cmd/tradepost)
+          (cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o ../dist/tradepost.exe ./cmd/tradepost)
 
       - name: Package Windows
         run: python3 tools/release/package_windows.py --version "${GITHUB_REF_NAME#v}" --binary dist/tradepost.exe
