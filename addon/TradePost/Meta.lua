@@ -13,7 +13,7 @@ local ADDON, TP = ...
 local BATCH_SIZE = 500
 local TICK_INTERVAL = 0.1 -- seconds
 local PER_TICK = 2        -- 20 items/sec
-local ACK_POLL_SECONDS = 10
+local ACK_POLL_SECONDS = 20
 local ACK_TIMEOUT_SECONDS = 300
 local ACK_SLOTS = 16
 local DEFAULT_ICON = 134400 -- inv_misc_questionmark
@@ -539,9 +539,10 @@ function TP:MetaAckTick()
     and (now - meta.ackStarted) >= ACK_TIMEOUT_SECONDS then
     meta.ackTimedOut = true
     meta.paused = true
+    self:MetaStopAckTicker()
     self:Print("metadata batch " .. tostring(meta.batchSeq) ..
       " was not acknowledged after " .. ACK_TIMEOUT_SECONDS ..
-      "s; paused and kept the batch. /tradepost meta status")
+      "s; paused and kept the batch. /reload or /tradepost meta start to retry")
     if self.settings and self.settings.refresh then
       self.settings.refresh()
     end
@@ -604,7 +605,7 @@ function TP:MetaStart(force)
       or #(TRADEPOST_META_BATCH.items or {})
     meta.ackStarted = time()
     meta.ackTimedOut = false
-    meta.lastAckPoll = nil
+    meta.lastAckPoll = time()
     self:MetaEnsureAckTicker()
     self:Print("resuming metadata batch " .. tostring(meta.batchSeq) ..
       "; waiting for the companion")
