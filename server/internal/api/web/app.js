@@ -303,7 +303,8 @@ function detailEntries(details) {
 
   for (const entry of list || []) {
     if (typeof entry === "string") {
-      if (entry.trim()) lines.push({ text: entry });
+      const text = entry.trim();
+      if (text && !/retrieving item information/i.test(text)) lines.push({ text });
       continue;
     }
     if (typeof entry === "number" || typeof entry === "boolean") {
@@ -311,6 +312,9 @@ function detailEntries(details) {
       continue;
     }
     if (!entry || typeof entry !== "object") continue;
+    if (Number(entry.type) === 41) continue;
+    if (typeof entry.left === "string" && /retrieving item information/i.test(entry.left)) continue;
+    if (typeof entry.text === "string" && /retrieving item information/i.test(entry.text)) continue;
     if (typeof entry.text === "string" || typeof entry.color === "string") {
       const label = entry.label ?? entry.left ?? entry.name;
       const value = entry.value ?? entry.right ?? entry.amount;

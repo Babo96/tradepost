@@ -158,6 +158,26 @@ local function readDetailLines(id)
   return { lines = lines }
 end
 
+-- The client renders this while an item is not cached yet. Such a line is not
+-- real tooltip data; defer the item and retry after the client loads it.
+local function isPlaceholderLines(lines)
+  if #lines == 0 then
+    return true
+  end
+  if #lines == 1 then
+    local line = lines[1]
+    if line.type == 41 then
+      return true
+    end
+    local text = line.left or line.right or ""
+    local localized = _G.ITEM_RETRIEVING_INFO or "Retrieving item information"
+    if text == localized or text:find("Retrieving item information", 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
 local function readSetID(id, link)
   if not C_Item then
     return nil
@@ -285,6 +305,15 @@ function TP:MetaCollect(id)
   end
 
   local detailLines = readDetailLines(id)
+  if isPlaceholderLines(detailLines.lines) then
+    -- Ask the client to load the item and retry it in a later pass. Keep any
+    -- real details already stored from a previous run.
+    if C_Item and type(C_Item.GetItemInfo) == "function" then
+      pcall(C_Item.GetItemInfo, id)
+    end
+    self:MetaDefer(id)
+    return nil
+  end
   local stats = readStats(link)
 
   local armor = numberOrNil(stats["ITEM_MOD_ARMOR"])
@@ -321,6 +350,8 @@ function TP:MetaQueueBuild(force)
   queue.total = #ids
   queue.completed = false
   queue.force = force and true or false
+  queue.deferred = {}
+  queue.deferPass = 0
   queue.nextSeq = queue.nextSeq or 1
   if force then
     queue.synced = 0
@@ -574,12 +605,59 @@ function TP:MetaProcessTick()
   end
   meta.pending = pending
 
-  if #pending >= BATCH_SIZE or (queue.index or 1) > #ids then
+  if #pending >= BATCH_SIZE then
+    self:MetaFinalizeBatch()
+  elseif (queue.index or 1) > #ids then
     if #pending > 0 then
       self:MetaFinalizeBatch()
-    else
-      self:MetaFinish("complete")
     end
+    self:MetaDeferredPass()
+  end
+end
+
+function TP:MetaDefer(id)
+  local queue = TRADEPOST_META_QUEUE
+  queue.deferred = queue.deferred or {}
+  queue.deferred[id] = true
+end
+
+-- Items whose tooltip was still "Retrieving item information" get up to three
+-- retry passes, one minute apart, so GetItemInfo can populate the client cache.
+function TP:MetaDeferredPass()
+  local queue = TRADEPOST_META_QUEUE
+  local deferred = queue.deferred or {}
+  local ids = {}
+  for id in pairs(deferred) do
+    local number = tonumber(id)
+    if validID(number) then
+      ids[#ids + 1] = number
+    end
+  end
+  table.sort(ids)
+  queue.deferred = {}
+  local pass = tonumber(queue.deferPass) or 0
+  if #ids == 0 or pass >= 3 then
+    self:MetaFinish("complete")
+    return
+  end
+  queue.deferPass = pass + 1
+  queue.ids = ids
+  queue.index = 1
+  queue.total = #ids
+  queue.completed = false
+  queue.lastRunDay = queue.lastRunDay or date("%Y-%m-%d")
+  self.meta.pending = self.meta.pending or {}
+  self:MetaStopProcessTicker()
+  self:Print("metadata: " .. #ids .. " item(s) not cached yet; retry pass " ..
+    queue.deferPass .. " in 60s")
+  if C_Timer then
+    C_Timer.After(60, function()
+      if self.meta.running and self.config and self.config.adminFullSync then
+        self:MetaEnsureProcessTicker()
+      end
+    end)
+  else
+    self:MetaFinish("complete")
   end
 end
 

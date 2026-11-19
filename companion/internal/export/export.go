@@ -283,7 +283,30 @@ func readDetailMeta(fields *lua.LTable) (Meta, bool) {
 	if meta.Name == "" {
 		return Meta{}, false
 	}
+	// An uncached item renders as a single "Retrieving item information"
+	// line; do not upload that as tooltip data.
+	if detailsIsPlaceholder(meta.Details) {
+		meta.Details = nil
+	}
 	return meta, true
+}
+
+func detailsIsPlaceholder(d *Details) bool {
+	if d == nil || len(d.Lines) == 0 {
+		return true
+	}
+	if len(d.Lines) != 1 {
+		return false
+	}
+	line := d.Lines[0]
+	if line.Type == 41 {
+		return true
+	}
+	text := strings.ToLower(strings.TrimSpace(line.Left))
+	if text == "" {
+		text = strings.ToLower(strings.TrimSpace(line.Right))
+	}
+	return strings.Contains(text, "retrieving item information")
 }
 
 func readStats(value lua.LValue) map[string]float64 {
