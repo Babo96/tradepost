@@ -391,6 +391,8 @@ function TP:MetaFinalizeBatch()
   -- the acknowledgement; the first poll happens ACK_POLL_SECONDS later.
   self.meta.lastAckPoll = time()
   self.meta.ackIndex = 0
+  self.meta.ackTried = {}
+  TRADEPOST_META_QUEUE.ackTried = 0
   self:MetaStopProcessTicker()
   self:SaveExport()
   -- The Forever client defers/throttles SavedVariables writes. Retry the
@@ -472,8 +474,15 @@ local function isAddonLoaded(name)
 end
 
 local function loadAddon(name)
-  if C_AddOns and type(C_AddOns.LoadAddOn) == "function" then
-    return C_AddOns.LoadAddOn(name)
+  if C_AddOns then
+    -- A slot installed after the client's addon list was saved can still be
+    -- disabled for this character; enable it before asking to load it.
+    if type(C_AddOns.EnableAddOn) == "function" then
+      pcall(C_AddOns.EnableAddOn, name)
+    end
+    if type(C_AddOns.LoadAddOn) == "function" then
+      return C_AddOns.LoadAddOn(name)
+    end
   end
   if type(LoadAddOn) == "function" then
     return LoadAddOn(name)
@@ -481,26 +490,34 @@ local function loadAddon(name)
   return false
 end
 
--- Find one ack slot that this client has not loaded yet. Loading a slot makes
--- its Data.lua run and defines TRADEPOST_META_ACK. The companion publishes the
--- acknowledgement into every slot, so any unloaded slot works; we prefer the
--- batch-specific slot so a stale slot is never consumed needlessly.
+-- Pick one ack slot to load for this batch. The Forever client's
+-- IsAddOnLoaded is ambiguous (Ring.lua reads it as loading,loaded), so we do
+-- not trust it here: each slot is attempted at most once per batch. Loading an
+-- already-loaded slot is a harmless no-op; the next poll moves on.
 function TP:MetaNextAckSlot()
   local meta = self.meta
-  if meta.batchSeq then
-    local index = meta.batchSeq % ACK_SLOTS
-    local name = string.format("TradePost_Ack_%02d", index)
-    if not isAddonLoaded(name) then
-      meta.ackIndex = (index + 1) % ACK_SLOTS
-      return name
-    end
+  meta.ackTried = meta.ackTried or {}
+  local preferred = meta.batchSeq and (meta.batchSeq % ACK_SLOTS) or nil
+  local order = {}
+  if preferred then
+    order[#order + 1] = preferred
   end
   for offset = 0, ACK_SLOTS - 1 do
     local index = ((meta.ackIndex or 0) + offset) % ACK_SLOTS
-    local name = string.format("TradePost_Ack_%02d", index)
-    if not isAddonLoaded(name) then
+    if index ~= preferred then
+      order[#order + 1] = index
+    end
+  end
+  for _, index in ipairs(order) do
+    if not meta.ackTried[index] then
+      meta.ackTried[index] = true
       meta.ackIndex = (index + 1) % ACK_SLOTS
-      return name
+      local tried = 0
+      for _ in pairs(meta.ackTried) do
+        tried = tried + 1
+      end
+      TRADEPOST_META_QUEUE.ackTried = tried
+      return string.format("TradePost_Ack_%02d", index)
     end
   end
   return nil
@@ -525,7 +542,11 @@ function TP:MetaAckTick()
       local ok, err = pcall(loadAddon, name)
       if not ok then
         self:Debug("ack slot " .. name .. ": " .. tostring(err))
+      else
+        self:Debug("ack poll: loaded " .. name .. " -> " .. tostring(err))
       end
+    else
+      self:Debug("ack poll: no untried slots left for batch " .. tostring(meta.batchSeq))
     end
   end
 
@@ -606,6 +627,9 @@ function TP:MetaStart(force)
     meta.ackStarted = time()
     meta.ackTimedOut = false
     meta.lastAckPoll = time()
+    meta.ackIndex = 0
+    meta.ackTried = {}
+    TRADEPOST_META_QUEUE.ackTried = 0
     self:MetaEnsureAckTicker()
     self:Print("resuming metadata batch " .. tostring(meta.batchSeq) ..
       "; waiting for the companion")
