@@ -266,6 +266,7 @@ type Store interface {
 
 	CreateLoginCode(ctx context.Context, codeHash []byte, clientID, character string, expires time.Time) error
 	RedeemLoginCode(ctx context.Context, codeHash []byte, now time.Time) (LoginGrant, error)
+	CountLiveClients(ctx context.Context, since time.Time) (int, error)
 	CreateWebSession(ctx context.Context, tokenHash []byte, clientID, character string, expires time.Time) error
 	WebSession(ctx context.Context, tokenHash []byte, now time.Time) (WebSession, error)
 	DeleteWebSession(ctx context.Context, tokenHash []byte) error

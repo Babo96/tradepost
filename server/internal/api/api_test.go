@@ -374,6 +374,40 @@ func TestWebIndex(t *testing.T) {
 	}
 }
 
+func TestLiveClients(t *testing.T) {
+	srv, _ := newTestServer(t)
+	first := enroll(t, srv)
+	second := enroll(t, srv)
+
+	for _, client := range []testClient{first, second} {
+		body := []byte(`{"character":"Live-Test"}`)
+		req := httptest.NewRequest(http.MethodPost, "/v1/auth/code", bytes.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+client.Token)
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("code status %d: %s", rec.Code, rec.Body.String())
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/live", nil)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("live status %d: %s", rec.Code, rec.Body.String())
+	}
+	var payload struct {
+		LiveClients   int `json:"live_clients"`
+		WindowSeconds int `json:"window_seconds"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.LiveClients != 2 || payload.WindowSeconds != 600 {
+		t.Fatalf("unexpected live payload: %+v", payload)
+	}
+}
+
 func TestLoginCodeAndWatchSync(t *testing.T) {
 	srv, _ := newTestServer(t)
 	client := enroll(t, srv)

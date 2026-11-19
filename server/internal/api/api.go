@@ -52,6 +52,7 @@ func New(st store.Store) *Server {
 	s.mux.HandleFunc("POST /v1/enroll", s.handleEnroll)
 	s.mux.HandleFunc("POST /v1/ingest", s.handleIngest)
 	s.mux.HandleFunc("GET /v1/meta", s.handleMeta)
+	s.mux.HandleFunc("GET /v1/live", s.handleLive)
 	s.mux.HandleFunc("GET /v1/snapshot/{market}", s.handleSnapshot)
 	s.mux.HandleFunc("GET /v1/snapshot/{market}/data-addon.zip", s.handleDataAddon)
 	s.mux.HandleFunc("GET /v1/items", s.handleItems)
@@ -364,6 +365,22 @@ func normalizeJSON(raw json.RawMessage) json.RawMessage {
 		return nil
 	}
 	return raw
+}
+
+const liveWindow = 10 * time.Minute
+
+// handleLive reports how many companions requested a login code recently.
+// The companion refreshes a code every 8 minutes, so this is a cheap heartbeat.
+func (s *Server) handleLive(w http.ResponseWriter, r *http.Request) {
+	count, err := s.store.CountLiveClients(r.Context(), time.Now().Add(-liveWindow))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "live count failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"live_clients":   count,
+		"window_seconds": int(liveWindow.Seconds()),
+	})
 }
 
 func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {

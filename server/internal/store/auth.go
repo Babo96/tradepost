@@ -8,6 +8,18 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// CountLiveClients counts distinct clients that requested a login code since
+// the given time. The companion refreshes a code every 8 minutes, so this is a
+// heartbeat for active contributors.
+func (p *Postgres) CountLiveClients(ctx context.Context, since time.Time) (int, error) {
+	var count int
+	err := p.pool.QueryRow(ctx,
+		`SELECT count(DISTINCT client_id) FROM login_codes WHERE created_at >= $1`,
+		since,
+	).Scan(&count)
+	return count, err
+}
+
 func (p *Postgres) CreateLoginCode(ctx context.Context, codeHash []byte, clientID, character string, expires time.Time) error {
 	_, _ = p.pool.Exec(ctx, `DELETE FROM login_codes WHERE expires_at < now()`)
 	_, err := p.pool.Exec(ctx,

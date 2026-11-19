@@ -32,6 +32,7 @@ type MemStore struct {
 	quarter   map[string]map[string]map[int64]store.HistoryPoint
 	minute    map[string]map[string]map[int64]store.HistoryPoint
 	codes     map[string]store.LoginGrant
+	codeSeen  map[string]time.Time
 	used      map[string]bool
 	sessions  map[string]store.WebSession
 	watches   map[string]store.WatchList
@@ -51,6 +52,7 @@ func NewMemStore() *MemStore {
 		quarter:   map[string]map[string]map[int64]store.HistoryPoint{},
 		minute:    map[string]map[string]map[int64]store.HistoryPoint{},
 		codes:     map[string]store.LoginGrant{},
+		codeSeen:  map[string]time.Time{},
 		used:      map[string]bool{},
 		sessions:  map[string]store.WebSession{},
 		watches:   map[string]store.WatchList{},
@@ -719,7 +721,20 @@ func (m *MemStore) CreateLoginCode(_ context.Context, codeHash []byte, clientID,
 	m.codes[hex.EncodeToString(codeHash)] = store.LoginGrant{
 		ClientID: clientID, Character: character, ExpiresAt: expires,
 	}
+	m.codeSeen[clientID] = time.Now()
 	return nil
+}
+
+func (m *MemStore) CountLiveClients(_ context.Context, since time.Time) (int, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	seen := map[string]bool{}
+	for clientID, at := range m.codeSeen {
+		if !at.Before(since) {
+			seen[clientID] = true
+		}
+	}
+	return len(seen), nil
 }
 
 func (m *MemStore) RedeemLoginCode(_ context.Context, codeHash []byte, now time.Time) (store.LoginGrant, error) {
