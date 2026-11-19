@@ -417,6 +417,7 @@ function TP:MetaFinish(reason)
   self.meta.ackTimedOut = false
   self.meta.lastAckPoll = nil
   local queue = TRADEPOST_META_QUEUE
+  queue.lastRunDay = queue.lastRunDay or date("%Y-%m-%d")
   if (queue.index or 1) > (queue.total or 0) then
     queue.completed = true
   end
@@ -583,7 +584,7 @@ function TP:MetaProcessTick()
 end
 
 -- Start/resume the backfill. Force starts a fresh pass over every known item.
-function TP:MetaStart(force)
+function TP:MetaStart(force, manual)
   if not (self.config and self.config.adminFullSync) then
     self:Print("admin full metadata sync is disabled. Enable it in " ..
       "/tradepost settings under Advanced / Admin first.")
@@ -591,6 +592,17 @@ function TP:MetaStart(force)
   end
 
   local meta = self.meta
+  local queue = TRADEPOST_META_QUEUE
+  local today = date("%Y-%m-%d")
+  local inProgress = queue.ids and #queue.ids > 0
+    and (queue.index or 1) <= (queue.total or #queue.ids)
+  -- Enabled admin sync runs at most once per day. Manual start/force always
+  -- run, and an interrupted pass resumes on the next login.
+  if not force and not manual and queue.lastRunDay == today and not inProgress then
+    self:Print("metadata sync already ran today (" .. today ..
+      "); use /tradepost meta force to refresh now")
+    return
+  end
   if force then
     -- Explicit admin action: discard the pending batch and start over.
     TRADEPOST_META_BATCH = nil
@@ -624,8 +636,9 @@ function TP:MetaStart(force)
   meta.ackStarted = nil
   meta.lastAckPoll = nil
   meta.pending = meta.pending or {}
-  TRADEPOST_META_QUEUE.completed = false
-  TRADEPOST_META_QUEUE.nextSeq = TRADEPOST_META_QUEUE.nextSeq or 1
+  queue.completed = false
+  queue.nextSeq = queue.nextSeq or 1
+  queue.lastRunDay = today
   self:MetaEnsureProcessTicker()
   self:Print("metadata sync started: " .. tostring(TRADEPOST_META_QUEUE.total or 0) ..
     " queued, batch size " .. BATCH_SIZE)
@@ -660,7 +673,7 @@ function TP:MetaResume()
   end
   local batch = TRADEPOST_META_BATCH
   if batch and batch.seq then
-    self:MetaStart(false)
+    self:MetaStart(false, true)
     return
   end
   local queue = TRADEPOST_META_QUEUE
@@ -703,6 +716,9 @@ function TP:MetaStatusText()
 
   local text = string.format("Admin full sync: %s   Queued %d/%d   Synced %d   Details %d",
     state, done, total, queue.synced or 0, self:MetaDetailCount())
+  if queue.lastRunDay then
+    text = text .. "   Last run " .. tostring(queue.lastRunDay)
+  end
   if batch and batch.seq then
     text = text .. string.format("   Batch %d (%d items)",
       batch.seq, batch.count or #(batch.items or {}))

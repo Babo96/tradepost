@@ -315,9 +315,9 @@ local function createPanel()
   settings.adminStatus:SetText("Admin full sync: off")
 
   y = y - 24
-  createButton(panel, 20, y, 130, "Meta start", "Start or resume the metadata backfill.",
+  createButton(panel, 20, y, 130, "Meta start", "Start the metadata backfill now, even if it already ran today.",
     function()
-      TP:MetaStart(false)
+      TP:MetaStart(false, true)
     end)
   createButton(panel, 158, y, 130, "Meta stop", "Stop the metadata backfill. The pending " ..
     "batch and queue are kept.",

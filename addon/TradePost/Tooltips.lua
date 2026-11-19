@@ -51,7 +51,7 @@ function TP:AddPriceLines(tooltip, link)
 
   -- Extra information stays on the left; the price goes in the right column so
   -- it lines up with Vendor/Auction and the other right-aligned values.
-  local left = "|cff33ff99BF|r"
+  local left = "|cff33ff99TP|r"
   if self.config.showAge then
     left = left .. "  |c" .. TP:AgeColor(age) .. "(" .. TP:AgeString(age) .. ")|r"
   end

@@ -199,7 +199,7 @@ SlashCmdList["TRADEPOST"] = function(msg)
   elseif command == "meta" then
     local sub = string.match(rest or "", "^(%S*)")
     if sub == "start" then
-      TP:MetaStart(false)
+      TP:MetaStart(false, true)
     elseif sub == "stop" then
       TP:MetaStop()
     elseif sub == "force" then
