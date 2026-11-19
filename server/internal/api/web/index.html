@@ -25,12 +25,93 @@
         <input id="query" type="search" placeholder="Search item name or item ID…">
         <button type="submit">Search</button>
       </form>
+
+      <details id="filters" class="filters" open>
+        <summary>
+          <span class="filter-title">Filters</span>
+          <span id="filter-count" class="filter-count" hidden></span>
+          <span class="filter-caret" aria-hidden="true"></span>
+        </summary>
+        <div class="filter-body">
+          <div class="filter-qualities">
+            <span class="field-label">Quality</span>
+            <div id="quality-list" class="quality-list" role="group" aria-label="Item quality"></div>
+          </div>
+
+          <div class="filter-grid">
+            <label class="field">
+              <span>Class</span>
+              <select id="class-id"></select>
+            </label>
+            <label class="field" id="subclass-select-field" hidden>
+              <span>Subclass</span>
+              <select id="subclass-select"></select>
+            </label>
+            <label class="field" id="subclass-input-field">
+              <span>Subclass ID</span>
+              <input id="subclass-id" type="number" min="0" step="1" inputmode="numeric" placeholder="Any">
+            </label>
+            <label class="field">
+              <span>Sort</span>
+              <select id="sort">
+                <option value="price">Cheapest first</option>
+                <option value="name">Name A–Z</option>
+                <option value="ilvl">Item level</option>
+                <option value="quality">Quality</option>
+                <option value="scanned">Recently scanned</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Item level</span>
+              <span class="pair-inputs">
+                <input id="min-ilvl" type="number" min="0" step="1" inputmode="numeric" placeholder="Min">
+                <span aria-hidden="true">–</span>
+                <input id="max-ilvl" type="number" min="0" step="1" inputmode="numeric" placeholder="Max">
+              </span>
+            </label>
+            <label class="field">
+              <span>Required level</span>
+              <span class="pair-inputs">
+                <input id="min-req-level" type="number" min="0" step="1" inputmode="numeric" placeholder="Min">
+                <span aria-hidden="true">–</span>
+                <input id="max-req-level" type="number" min="0" step="1" inputmode="numeric" placeholder="Max">
+              </span>
+            </label>
+            <label class="field">
+              <span>Price (gold)</span>
+              <span class="pair-inputs">
+                <input id="min-price-gold" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Min">
+                <span aria-hidden="true">–</span>
+                <input id="max-price-gold" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Max">
+              </span>
+            </label>
+            <div class="field">
+              <span>Availability</span>
+              <label class="inline-check">
+                <input id="in-stock" type="checkbox"> In stock only
+              </label>
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <button type="button" id="filters-reset" class="ghost">Reset filters</button>
+            <span class="filter-hint">Filters apply to search results and carry across pages.</span>
+          </div>
+        </div>
+      </details>
+
       <div class="toolbar">
         <label class="watch-toggle">
           <input id="watch-only" type="checkbox"> Watchlist only
         </label>
         <span id="sync-state" class="sync-state"></span>
         <span id="status" class="status"></span>
+      </div>
+      <div id="pager" class="pager" hidden>
+        <button type="button" id="prev-page" class="ghost">Prev</button>
+        <span id="page-label" class="page-label"></span>
+        <span id="page-of" class="page-of"></span>
+        <button type="button" id="next-page" class="ghost">Next</button>
       </div>
       <div id="results" class="results">
         <p class="empty">Loading…</p>
@@ -41,6 +122,8 @@
       <p class="empty">Select an item to see price history and the market comparison.</p>
     </aside>
   </main>
+
+  <div id="item-card" class="item-card" role="tooltip" hidden></div>
 
   <dialog id="auth-dialog">
     <form id="auth-form" method="dialog">
