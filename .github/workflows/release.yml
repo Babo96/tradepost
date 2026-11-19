@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build release archives
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache-dependency-path: companion/go.sum
+
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          (cd companion && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/tradepost ./cmd/tradepost)
+          (cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/tradepost.exe ./cmd/tradepost)
+
+      - name: Package Windows
+        run: python3 tools/release/package_windows.py --version "${GITHUB_REF_NAME#v}" --binary dist/tradepost.exe
+
+      - name: Package Linux
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          STAGE="dist/linux-stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE"
+          cp dist/tradepost "$STAGE/"
+          mkdir -p "$STAGE/addon"
+          cp -R addon/TradePost "$STAGE/addon/TradePost"
+          mkdir -p "$STAGE/data-addon"
+          cp -R data-addon/TradePost_Data "$STAGE/data-addon/TradePost_Data"
+          cp -R data-addon/TradePost_LiveData "$STAGE/data-addon/TradePost_LiveData"
+          cat > "$STAGE/README.txt" <<'TXT'
+          TradePost Companion (Linux x64)
+
+          Run ./tradepost and open http://127.0.0.1:8787/setup.
+          Select the WoW folder, server and market in the wizard.
+
+          The addon folders are in addon/ and data-addon/; the companion installs
+          them automatically from this directory.
+          TXT
+          tar -czf "dist/tradepost-${VERSION}-linux-amd64.tar.gz" -C "$STAGE" .
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*windows-amd64.zip
+            dist/*linux-amd64.tar.gz
+          generate_release_notes: true

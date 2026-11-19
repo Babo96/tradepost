@@ -8,11 +8,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/babo96/tradepost/companion/internal/api"
+	apppkg "github.com/babo96/tradepost/companion/internal/app"
+	"github.com/babo96/tradepost/companion/internal/browser"
 	"github.com/babo96/tradepost/companion/internal/config"
 	"github.com/babo96/tradepost/companion/internal/dashboard"
 	syncsvc "github.com/babo96/tradepost/companion/internal/sync"
@@ -58,7 +59,7 @@ func usage() {
   tradepost enroll  --server URL [--wow DIR] [--market eu:pve:horde]
   tradepost install [--source DIR] [--wow DIR] [--count 64]
   tradepost sync    [--config PATH]
-  tradepost run     [--config PATH]
+  tradepost run     [--config PATH] [--no-browser]
   tradepost status  [--config PATH]
 
 Config: %s
@@ -132,7 +133,7 @@ func cmdInstall(args []string) error {
 		cfg.RingSlots = *count
 	}
 	if cfg.AddonSource == "" {
-		cfg.AddonSource = defaultAddonSource()
+		cfg.AddonSource = apppkg.DefaultAddonSource()
 	}
 	found, err := wow.Find(cfg.WowDir)
 	if err != nil {
@@ -176,28 +177,28 @@ func cmdSync(args []string) error {
 func cmdRun(args []string) error {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	cfgPath := fs.String("config", config.DefaultPath(), "config path")
+	noBrowser := fs.Bool("no-browser", false, "do not open the setup dashboard in a browser")
 	_ = fs.Parse(args)
 
-	cfg, err := config.Load(*cfgPath)
-	if err != nil {
+	application := apppkg.New(*cfgPath)
+	if err := application.Load(); err != nil {
 		return err
 	}
-	found, err := wow.Find(cfg.WowDir)
-	if err != nil {
-		return err
-	}
-	cfg.WowDir = found
-	service, err := syncsvc.New(cfg)
-	if err != nil {
-		return err
-	}
+	defer application.Shutdown()
 
-	dash := dashboard.New(service, cfg)
+	cfg := application.Config()
+	dash := dashboard.New(application)
 	server := dash.Start(cfg.DashboardAddr)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go service.Run(ctx, time.Duration(cfg.IntervalSeconds)*time.Second)
+	if application.SetupRequired() {
+		setupURL := dashboard.SetupURL(cfg.DashboardAddr)
+		log.Printf("setup required: %s", setupURL)
+		if !*noBrowser {
+			if err := browser.Open(setupURL); err != nil {
+				log.Printf("could not open browser: %v (open %s manually)", err, setupURL)
+			}
+		}
+	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
@@ -235,24 +236,6 @@ func cmdStatus(args []string) error {
 	}
 	fmt.Println("status:")
 	return printJSON(service.Status())
-}
-
-// defaultAddonSource prefers the current directory when it looks like a
-// repository checkout, otherwise the directory containing tradepost. That makes a
-// packaged Windows build work when started from a shortcut or another CWD.
-func defaultAddonSource() string {
-	if _, err := os.Stat(filepath.Join("addon", "TradePost")); err == nil {
-		return "."
-	}
-	if exe, err := os.Executable(); err == nil {
-		dir := filepath.Dir(exe)
-		for _, candidate := range []string{dir, filepath.Dir(dir)} {
-			if _, err := os.Stat(filepath.Join(candidate, "addon", "TradePost")); err == nil {
-				return candidate
-			}
-		}
-	}
-	return "."
 }
 
 func printJSON(value any) error {

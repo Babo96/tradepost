@@ -19,18 +19,17 @@ README = """TradePost Companion {version} (Windows x64)
 
 1. Extract this zip somewhere permanent, for example C:\\TradePost.
 2. Close World of Warcraft while the addon is installed.
-3. Double-click setup.cmd, or run the commands below in this folder.
+3. Run tradepost.exe (or setup.cmd).
 
-Manual setup:
+The companion opens a local setup wizard at http://127.0.0.1:8787/setup.
+Select the WoW folder, server URL, market and ring slots there. No command-line
+setup is required.
+
+If you prefer the command line:
 
   tradepost.exe enroll --server https://tradepost.b4b0.de --market eu:pve:horde --count 64
   tradepost.exe install --count 64
   tradepost.exe run
-
-`enroll` finds the WoW install automatically. If it cannot, pass the game
-folder explicitly:
-
-  tradepost.exe enroll --wow "C:\\Program Files (x86)\\World of Warcraft" ...
 
 The install step writes:
 
@@ -53,27 +52,13 @@ SETUP = """@echo off
 setlocal
 cd /d "%~dp0"
 
-echo TradePost Companion setup
+echo TradePost Companion
 echo.
-
-tradepost.exe enroll --server https://tradepost.b4b0.de --market eu:pve:horde --count 64
-if errorlevel 1 goto error
-
-tradepost.exe install --source "%~dp0" --count 64
-if errorlevel 1 goto error
-
-echo.
-echo Installed. Starting the companion. Close this window or press Ctrl+C to stop.
-echo Dashboard: http://127.0.0.1:8787
+echo Starting the setup wizard in your browser.
+echo Close this window or press Ctrl+C to stop the companion.
 echo.
 tradepost.exe run
-exit /b 0
-
-:error
-echo.
-echo Setup failed. Fix the error above and run setup.cmd again.
-pause
-exit /b 1
+exit /b %errorlevel%
 """
 
 
@@ -86,7 +71,7 @@ def copy_tree(src: Path, dst: Path) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", default="0.1.0")
-    parser.add_argument("--binary", default="dist/tradepostc.exe")
+    parser.add_argument("--binary", default="dist/tradepost.exe")
     parser.add_argument("--root", default=".")
     parser.add_argument("--out", default="dist")
     args = parser.parse_args(argv)

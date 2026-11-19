@@ -166,10 +166,13 @@ function TP:LoadRingWindow(window, force)
     return false
   end
   if data.window ~= window then
-    self:Debug(string.format(
-      "ring slot %s stale window %s (wanted %s)",
-      name, tostring(data.window), tostring(window)
-    ))
+    if self.ring.staleWindow ~= window then
+      self.ring.staleWindow = window
+      self:Debug(string.format(
+        "ring slot %s stale window %s (wanted %s)",
+        name, tostring(data.window), tostring(window)
+      ))
+    end
     return false
   end
 

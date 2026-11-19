@@ -19,10 +19,29 @@ The Windows zip contains `tradepost.exe`, `setup.cmd`, and the addon sources in 
 tradepost enroll  --server https://tradepost.b4b0.de --market eu:pve:horde --count 64
 tradepost install --count 64
 tradepost sync
-tradepost run
+tradepost run [--no-browser]
 tradepost status
 tradepost version
 ```
+
+`tradepost run` starts the local dashboard at `http://127.0.0.1:8787`. If the
+config is missing or incomplete (no token, no game folder, or an invalid game
+folder), it enters first-run setup mode, opens the wizard at `/setup` in the
+browser, and keeps the dashboard running instead of exiting. Use `--no-browser`
+to suppress the automatic browser launch. Completing the wizard enrolls the
+machine, installs the addon and slots, saves the config atomically, and starts
+the sync service without a restart.
+
+The dashboard has:
+
+- `/` — status, “Sync now”, login code, raw JSON
+- `/setup` — three-step setup wizard (game folder, server/market, install)
+- `/settings` — change the game folder, server, market, ring slots, interval,
+  and re-run the addon install
+
+The dashboard always binds `127.0.0.1`. POST endpoints require a per-process
+token embedded in the served page, so another website cannot trigger setup or
+settings changes.
 
 `enroll` and `install` auto-detect the game root and save the resolved path to
 the config, so later `sync`/`run` calls do not depend on the working directory.
@@ -43,7 +62,8 @@ Upload state lives next to it as `state.json` (per server/client ID).
 
 1. Extract the release zip to a permanent folder, for example `C:\TradePost`.
 2. Close World of Warcraft.
-3. Run `setup.cmd` (or the commands above in a terminal).
+3. Double-click `tradepost.exe` (or run `tradepost.exe run`) and complete the
+   setup wizard, or run `setup.cmd` for the command-line flow.
 4. Start the game, `/reload`, then hover items and use `/tradepost browse`.
 5. Keep `tradepost run` open for uploads and live data; dashboard:
    `http://127.0.0.1:8787`.

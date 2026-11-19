@@ -50,6 +50,7 @@ end
 
 function TP:PrintHelp()
   self:Print("commands:")
+  self:Print("  /tradepost                  open the settings panel")
   self:Print("  /tradepost scan [force]     scan the auction house")
   self:Print("  /tradepost status           local data and throttle state")
   self:Print("  /tradepost market           market detection details")
@@ -135,6 +136,8 @@ SlashCmdList["TRADEPOST"] = function(msg)
     end
   elseif command == "bridgetest" then
     TP:BridgeTest(rest)
+  elseif command == "settings" or command == "options" then
+    TP:OpenSettings()
   elseif command == "browse" or command == "browser" then
     TP:ToggleBrowser()
   elseif command == "watch" then
@@ -203,8 +206,10 @@ SlashCmdList["TRADEPOST"] = function(msg)
     else
       TP:Print("no error recorded")
     end
-  elseif command == "help" or command == "" then
+  elseif command == "help" then
     TP:PrintHelp()
+  elseif command == "" then
+    TP:OpenSettings()
   else
     TP:PrintHelp()
   end

@@ -23,4 +23,5 @@ Tooltips.lua
 Browser.lua
 Watch.lua
 Bridge.lua
+Settings.lua
 Commands.lua

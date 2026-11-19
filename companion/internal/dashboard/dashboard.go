@@ -2,43 +2,127 @@ package dashboard
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
-	"html/template"
+	"errors"
+	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/babo96/tradepost/companion/internal/config"
+	"github.com/babo96/tradepost/companion/internal/picker"
 	syncsvc "github.com/babo96/tradepost/companion/internal/sync"
+	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
-type Server struct {
-	service *syncsvc.Service
-	cfg     config.Config
+// Backend is the runtime the dashboard drives. It is implemented by internal/app.
+type Backend interface {
+	Config() config.Config
+	ConfigPath() string
+	SetupRequired() bool
+	SetupReason() string
+	Status() syncsvc.Status
+	Detect() []string
+	Candidates() []string
+	ValidateWow(dir string) (wow.InstallInfo, error)
+	PickFolder(title string) (string, error)
+	CompleteSetup(context.Context, config.SetupRequest) (config.Config, error)
+	UpdateSettings(context.Context, config.SetupRequest) (config.Config, error)
+	Reinstall(context.Context) error
+	Sync(context.Context) error
 }
 
-func New(service *syncsvc.Service, cfg config.Config) *Server {
-	return &Server{service: service, cfg: cfg}
+type Server struct {
+	backend Backend
+	token   string
+}
+
+func New(backend Backend) *Server {
+	return &Server{backend: backend, token: newToken()}
+}
+
+func newToken() string {
+	buf := make([]byte, 24)
+	if _, err := rand.Read(buf); err != nil {
+		return "tradepost-local-dashboard"
+	}
+	return hex.EncodeToString(buf)
+}
+
+// ListenAddr forces the dashboard onto loopback regardless of the configured
+// host, so setup and settings are never exposed on the network.
+func ListenAddr(addr string) string {
+	_, port, err := net.SplitHostPort(strings.TrimSpace(addr))
+	if err != nil || port == "" {
+		return config.DefaultAddr
+	}
+	return net.JoinHostPort("127.0.0.1", port)
+}
+
+// SetupURL returns the loopback URL the browser should open.
+func SetupURL(addr string) string {
+	_, port, err := net.SplitHostPort(ListenAddr(addr))
+	if err != nil || port == "" {
+		port = "8787"
+	}
+	return "http://127.0.0.1:" + port + "/setup"
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", s.handlePage)
+	mux.HandleFunc("GET /setup", s.handleSetup)
+	mux.HandleFunc("GET /settings", s.handleSettings)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
+	mux.HandleFunc("GET /api/detect", s.handleDetect)
+	mux.HandleFunc("POST /api/wow/validate", s.handleValidateWow)
+	mux.HandleFunc("POST /api/wow/pick", s.handlePickFolder)
+	mux.HandleFunc("POST /api/setup", s.handleSetupSubmit)
+	mux.HandleFunc("POST /api/settings", s.handleSettingsSubmit)
+	mux.HandleFunc("POST /api/settings/install", s.handleReinstall)
 	mux.HandleFunc("POST /api/sync", s.handleSync)
-	return mux
+	return s.secure(mux)
+}
+
+func (s *Server) secure(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Cache-Control", "no-store")
+		if r.Method == http.MethodPost {
+			// Require the per-process token embedded in the served page. A
+			// cross-origin form cannot read it, which prevents CSRF.
+			if r.Header.Get("X-TradePost-Token") != s.token {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			if origin := r.Header.Get("Origin"); origin != "" {
+				parsed, err := url.Parse(origin)
+				if err != nil || parsed.Host != r.Host {
+					http.Error(w, "forbidden", http.StatusForbidden)
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) Start(addr string) *http.Server {
 	server := &http.Server{
-		Addr:              addr,
+		Addr:              ListenAddr(addr),
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      180 * time.Second,
 	}
 	go func() {
-		log.Printf("dashboard: http://%s", addr)
+		log.Printf("dashboard: http://%s", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("dashboard: %v", err)
 		}
@@ -46,136 +130,194 @@ func (s *Server) Start(addr string) *http.Server {
 	return server
 }
 
+type pageData struct {
+	Token      string
+	Config     config.Config
+	ConfigPath string
+	Setup      bool
+	Reason     string
+}
+
+func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	if s.backend.SetupRequired() {
+		http.Redirect(w, r, "/setup", http.StatusFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = pageTemplate.Execute(w, pageData{Token: s.token, Config: s.backend.Config(), ConfigPath: s.backend.ConfigPath()})
+}
+
+func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = setupTemplate.Execute(w, pageData{
+		Token:      s.token,
+		Config:     s.backend.Config(),
+		ConfigPath: s.backend.ConfigPath(),
+		Setup:      s.backend.SetupRequired(),
+		Reason:     s.backend.SetupReason(),
+	})
+}
+
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = settingsTemplate.Execute(w, pageData{
+		Token:      s.token,
+		Config:     s.backend.Config(),
+		ConfigPath: s.backend.ConfigPath(),
+		Setup:      s.backend.SetupRequired(),
+		Reason:     s.backend.SetupReason(),
+	})
+}
+
 type statusResponse struct {
 	Config map[string]any `json:"config"`
-	Status any            `json:"status"`
+	Status syncsvc.Status `json:"status"`
+	Setup  bool           `json:"setup_required"`
+	Reason string         `json:"setup_reason,omitempty"`
 }
 
 func (s *Server) statusPayload() statusResponse {
-	cfg := map[string]any{
-		"server":     s.cfg.Server,
-		"wow_dir":    s.cfg.WowDir,
-		"market":     s.cfg.Market,
-		"ring_slots": s.cfg.RingSlots,
-		"dashboard":  s.cfg.DashboardAddr,
-		"client_id":  s.cfg.ClientID,
-		"has_token":  s.cfg.Token != "",
+	cfg := s.backend.Config()
+	return statusResponse{
+		Config: map[string]any{
+			"server":           cfg.Server,
+			"wow_dir":          cfg.WowDir,
+			"market":           cfg.Market,
+			"ring_slots":       cfg.RingSlots,
+			"interval_seconds": cfg.IntervalSeconds,
+			"dashboard":        cfg.DashboardAddr,
+			"client_id":        cfg.ClientID,
+			"has_token":        cfg.Token != "",
+			"config_path":      s.backend.ConfigPath(),
+			"missing":          cfg.Missing(),
+		},
+		Status: s.backend.Status(),
+		Setup:  s.backend.SetupRequired(),
+		Reason: s.backend.SetupReason(),
 	}
-	return statusResponse{Config: cfg, Status: s.service.Status()}
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s.statusPayload())
+	writeJSON(w, http.StatusOK, s.statusPayload())
+}
+
+func (s *Server) handleDetect(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"candidates": s.backend.Candidates(),
+		"detected":   s.backend.Detect(),
+		"current":    s.backend.Config().WowDir,
+	})
+}
+
+func (s *Server) handleValidateWow(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Path string `json:"path"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"valid": false, "error": err.Error()})
+		return
+	}
+	info, err := s.backend.ValidateWow(body.Path)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"valid": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"valid": true, "info": info})
+}
+
+func (s *Server) handlePickFolder(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Title string `json:"title"`
+	}
+	_ = decodeJSON(r, &body)
+	if body.Title == "" {
+		body.Title = "Select the World of Warcraft folder"
+	}
+	path, err := s.backend.PickFolder(body.Title)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":          false,
+			"error":       err.Error(),
+			"unavailable": errors.Is(err, picker.ErrUnavailable),
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "path": path})
+}
+
+func (s *Server) handleSetupSubmit(w http.ResponseWriter, r *http.Request) {
+	var req config.SetupRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 150*time.Second)
+	defer cancel()
+	cfg, err := s.backend.CompleteSetup(ctx, req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":        true,
+		"wow_dir":   cfg.WowDir,
+		"client_id": cfg.ClientID,
+		"server":    cfg.Server,
+	})
+}
+
+func (s *Server) handleSettingsSubmit(w http.ResponseWriter, r *http.Request) {
+	var req config.SetupRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	cfg, err := s.backend.UpdateSettings(ctx, req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "config": cfg})
+}
+
+func (s *Server) handleReinstall(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	if err := s.backend.Reinstall(ctx); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
-	err := s.service.Sync(ctx)
-	w.Header().Set("Content-Type", "application/json")
+	err := s.backend.Sync(ctx)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		writeJSON(w, http.StatusInternalServerError, map[string]any{
 			"error":  err.Error(),
-			"status": s.service.Status(),
+			"status": s.backend.Status(),
 		})
 		return
 	}
-	_ = json.NewEncoder(w).Encode(map[string]any{"status": s.service.Status()})
+	writeJSON(w, http.StatusOK, map[string]any{"status": s.backend.Status()})
 }
 
-func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = pageTemplate.Execute(w, nil)
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
 }
 
-var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TradePost Companion</title>
-<style>
-  :root { color-scheme: dark; }
-  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: #111827; color: #e5e7eb; }
-  main { max-width: 860px; margin: 40px auto; padding: 0 20px; }
-  h1 { font-size: 22px; margin: 0 0 4px; color: #86efac; }
-  .sub { color: #9ca3af; margin-bottom: 24px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-  .card { background: #1f2937; border: 1px solid #374151; border-radius: 10px; padding: 14px 16px; }
-  .label { color: #9ca3af; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
-  .value { font-size: 18px; margin-top: 4px; word-break: break-word; }
-  .ok { color: #86efac; } .bad { color: #fca5a5; } .warn { color: #fcd34d; }
-  button { background: #16a34a; color: white; border: 0; border-radius: 8px; padding: 10px 18px; font-weight: 600; cursor: pointer; }
-  button:disabled { opacity: .5; cursor: default; }
-  pre { background: #0b1220; border: 1px solid #374151; border-radius: 8px; padding: 12px; overflow: auto; }
-  footer { color: #6b7280; margin-top: 28px; font-size: 12px; }
-</style>
-</head>
-<body>
-<main>
-  <h1>TradePost Companion</h1>
-  <div class="sub">Crowd-sourced auction data for WoW Forever</div>
-
-  <div class="grid">
-    <div class="card"><div class="label">Server</div><div class="value" id="server">–</div></div>
-    <div class="card"><div class="label">Market</div><div class="value" id="market">–</div></div>
-    <div class="card"><div class="label">Last sync</div><div class="value" id="lastSync">–</div></div>
-    <div class="card"><div class="label">Snapshot</div><div class="value" id="snapshot">–</div></div>
-    <div class="card"><div class="label">Last upload</div><div class="value" id="lastUpload">–</div></div>
-    <div class="card"><div class="label">Last download</div><div class="value" id="lastDownload">–</div></div>
-    <div class="card" id="loginCard" style="display:none">
-      <div class="label">Login code</div>
-      <div class="value" id="loginCode" style="font-family: ui-monospace, monospace; letter-spacing: 2px; user-select: all;">–</div>
-      <div class="sub" id="loginMeta"></div>
-    </div>
-  </div>
-
-  <p>
-    <button id="sync">Sync now</button>
-    <span id="message" class="sub"></span>
-  </p>
-
-  <pre id="json">loading…</pre>
-  <footer>Local dashboard. No data leaves this machine except scans sent to your server.</footer>
-</main>
-<script>
-const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString() : 'never';
-async function refresh() {
-  const res = await fetch('/api/status');
-  const data = await res.json();
-  const c = data.config || {};
-  const s = data.status || {};
-  document.getElementById('server').textContent = c.server || '–';
-  document.getElementById('market').textContent = c.market || '–';
-  document.getElementById('lastSync').textContent = fmt(s.last_sync);
-  document.getElementById('snapshot').textContent = s.version ? ('v' + s.version + ' · ' + (s.items || 0) + ' items') : '–';
-  document.getElementById('lastUpload').textContent = fmt(s.last_upload);
-  document.getElementById('lastDownload').textContent = fmt(s.last_download);
-  const loginCard = document.getElementById('loginCard');
-  if (s.login_code && (!s.login_expires || s.login_expires * 1000 > Date.now())) {
-    loginCard.style.display = '';
-    document.getElementById('loginCode').textContent = s.login_code;
-    document.getElementById('loginMeta').textContent =
-      (s.login_character || '') + (s.login_expires ? ' · expires ' + fmt(s.login_expires) : '');
-  } else {
-    loginCard.style.display = 'none';
-  }
-  const msg = document.getElementById('message');
-  msg.textContent = s.error ? s.error : (s.running ? 'syncing…' : '');
-  msg.className = s.error ? 'bad' : 'sub';
-  document.getElementById('json').textContent = JSON.stringify(data, null, 2);
+func decodeJSON(r *http.Request, value any) error {
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 64*1024))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(value)
 }
-document.getElementById('sync').addEventListener('click', async (e) => {
-  e.target.disabled = true;
-  await fetch('/api/sync', {method: 'POST'});
-  e.target.disabled = false;
-  refresh();
-});
-refresh();
-setInterval(refresh, 5000);
-</script>
-</body>
-</html>
-`))

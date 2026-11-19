@@ -582,13 +582,19 @@ function TP:CreateMinimapButton()
   if icon then
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   end
-  button:SetScript("OnClick", function()
-    TP:ToggleBrowser()
+  button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  button:SetScript("OnClick", function(_, mouseButton)
+    if mouseButton == "RightButton" then
+      TP:OpenSettings()
+    else
+      TP:ToggleBrowser()
+    end
   end)
   button:SetScript("OnEnter", function(btn)
     GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
     GameTooltip:AddLine("TradePost")
-    GameTooltip:AddLine("Browse auction prices", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("Left click: browse auction prices", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("Right click: open settings", 0.8, 0.8, 0.8)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()

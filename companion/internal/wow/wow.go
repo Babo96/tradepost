@@ -12,7 +12,10 @@ import (
 
 const foreverDir = "_forever_"
 
-func Find(explicit string) (string, error) {
+// Candidates returns every path discovery would try, in priority order. It
+// includes paths that do not exist so the setup wizard can show what was
+// checked.
+func Candidates(explicit string) []string {
 	candidates := []string{}
 	if explicit != "" {
 		candidates = append(candidates, explicit)
@@ -22,7 +25,7 @@ func Find(explicit string) (string, error) {
 	}
 	candidates = append(candidates, defaultCandidates()...)
 
-	tried := []string{}
+	unique := make([]string, 0, len(candidates))
 	seen := map[string]bool{}
 	for _, raw := range candidates {
 		candidate := normalizeRoot(raw)
@@ -30,7 +33,25 @@ func Find(explicit string) (string, error) {
 			continue
 		}
 		seen[candidate] = true
-		tried = append(tried, candidate)
+		unique = append(unique, candidate)
+	}
+	return unique
+}
+
+// Detect returns the candidates that contain a _forever_ install.
+func Detect(explicit string) []string {
+	found := []string{}
+	for _, candidate := range Candidates(explicit) {
+		if info, err := os.Stat(filepath.Join(candidate, foreverDir)); err == nil && info.IsDir() {
+			found = append(found, candidate)
+		}
+	}
+	return found
+}
+
+func Find(explicit string) (string, error) {
+	tried := Candidates(explicit)
+	for _, candidate := range tried {
 		if _, err := os.Stat(filepath.Join(candidate, foreverDir)); err == nil {
 			return candidate, nil
 		}
@@ -64,6 +85,55 @@ func normalizeRoot(path string) string {
 
 func AddonsDir(wow string) string {
 	return filepath.Join(wow, foreverDir, "Interface", "AddOns")
+}
+
+// InstallInfo describes a validated WoW Forever install.
+type InstallInfo struct {
+	Root      string   `json:"root"`
+	Forever   string   `json:"forever_dir"`
+	AddonsDir string   `json:"addons_dir"`
+	Accounts  []string `json:"accounts"`
+	Writable  bool     `json:"writable"`
+}
+
+// Validate checks that path points at a usable WoW Forever install: the
+// _forever_/Interface/AddOns layout exists, at least one account directory is
+// present, and the addon folder is writable. The returned Root is normalized,
+// so passing a path ending in _forever_ is accepted.
+func Validate(path string) (InstallInfo, error) {
+	root := normalizeRoot(path)
+	if root == "" {
+		return InstallInfo{}, errors.New("no game folder given")
+	}
+	forever := filepath.Join(root, foreverDir)
+	if info, err := os.Stat(forever); err != nil || !info.IsDir() {
+		return InstallInfo{Root: root}, fmt.Errorf("not a WoW Forever install: missing %s", forever)
+	}
+	addons := AddonsDir(root)
+	if info, err := os.Stat(addons); err != nil || !info.IsDir() {
+		return InstallInfo{Root: root}, fmt.Errorf("missing addon folder %s", addons)
+	}
+	accounts, err := AccountDirs(root)
+	if err != nil {
+		return InstallInfo{Root: root, Forever: forever, AddonsDir: addons}, fmt.Errorf("account folders: %w", err)
+	}
+	result := InstallInfo{
+		Root:      root,
+		Forever:   forever,
+		AddonsDir: addons,
+		Accounts:  accounts,
+	}
+	probe, err := os.CreateTemp(addons, ".tradepost-write-test-*")
+	if err != nil {
+		return result, fmt.Errorf("addon folder is not writable: %w", err)
+	}
+	probeName := probe.Name()
+	probe.Close()
+	if err := os.Remove(probeName); err != nil {
+		return result, fmt.Errorf("addon folder is not writable: %w", err)
+	}
+	result.Writable = true
+	return result, nil
 }
 
 func AccountDirs(wow string) ([]string, error) {

@@ -248,12 +248,21 @@ func (s *Service) sync(ctx context.Context) error {
 	s.mu.Unlock()
 
 	if selected != nil {
-		path, err := addon.WriteRingSlot(s.cfg.WowDir, selected.Market, *selected, s.cfg.RingSlots, 0, s.watch, s.watchAt)
-		if err != nil {
-			return fmt.Errorf("write ring slot: %w", err)
+		// Publish this window and the next one. The addon asks for the new
+		// window immediately at the boundary, before the next sync has run.
+		window := time.Now().Unix() / 300
+		var currentPath string
+		for offset := int64(0); offset < 2; offset++ {
+			path, err := addon.WriteRingSlot(s.cfg.WowDir, selected.Market, *selected, s.cfg.RingSlots, window+offset, s.watch, s.watchAt)
+			if err != nil {
+				return fmt.Errorf("write ring slot: %w", err)
+			}
+			if offset == 0 {
+				currentPath = path
+			}
 		}
 		s.mu.Lock()
-		s.status.RingSlot = path
+		s.status.RingSlot = currentPath
 		s.mu.Unlock()
 	}
 	return nil
@@ -352,12 +361,13 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 		case <-ticker.C:
 			info, err := os.Stat(s.savedVariablesPath())
 			changed := err == nil && !info.ModTime().Equal(lastMod)
-			if changed {
-				lastMod = info.ModTime()
-			}
 			if changed || time.Since(lastFull) >= interval {
-				_ = s.Sync(ctx)
-				if changed {
+				// Keep lastMod unchanged on failure so a partially written or
+				// temporarily unreadable SavedVariables file is retried.
+				if syncErr := s.Sync(ctx); syncErr == nil {
+					if changed {
+						lastMod = info.ModTime()
+					}
 					lastFull = time.Now()
 				}
 			}
