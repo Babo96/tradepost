@@ -8,9 +8,9 @@ import (
 
 func TestLoad(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "BaboForever.lua")
-	data := `BABOFOREVER_DB = {}
-BABOFOREVER_EXPORT = {
+	path := filepath.Join(dir, "TradePost.lua")
+	data := `TRADEPOST_DB = {}
+TRADEPOST_EXPORT = {
   version = 1,
   scans = {
     "eu:pve:horde|1794947776|i:2589,1234,50,2;i:2318,4567,100,3",
@@ -64,14 +64,14 @@ func TestParseMalformed(t *testing.T) {
 
 func TestLoadDataItems(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "BaboForever.lua")
-	data := `BABOFOREVER_EXPORT = {
+	path := filepath.Join(dir, "TradePost.lua")
+	data := `TRADEPOST_EXPORT = {
   version = 1,
   scans = {
     "eu:pve:horde|1794947776|i:2589,1234,50,2",
   },
 }
-BABOFOREVER_ITEMS = {
+TRADEPOST_ITEMS = {
   [2589] = { n = "Linen Cloth", q = 1, c = 7, s = 5, i = 132889 },
   [12345] = { n = "Test Blade", q = 3, c = 2, s = 7, i = 135274 },
 }
@@ -102,8 +102,8 @@ BABOFOREVER_ITEMS = {
 
 func TestLoadDataAuthWatch(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "BaboForever.lua")
-	data := `BABOFOREVER_AUTH = {
+	path := filepath.Join(dir, "TradePost.lua")
+	data := `TRADEPOST_AUTH = {
   seq = 3,
   request = {
     action = "login",
@@ -112,7 +112,7 @@ func TestLoadDataAuthWatch(t *testing.T) {
     at = 1794947776,
   },
 }
-BABOFOREVER_WATCH = {
+TRADEPOST_WATCH = {
   ["Schmoo-Boo"] = {
     updated = 1794947800,
     items = {
@@ -121,7 +121,7 @@ BABOFOREVER_WATCH = {
     },
   },
 }
-BABOFOREVER_ACTIVE = { character = "Schmoo-Boo", seen = 1794947801 }
+TRADEPOST_ACTIVE = { character = "Schmoo-Boo", seen = 1794947801 }
 `
 	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
 		t.Fatal(err)

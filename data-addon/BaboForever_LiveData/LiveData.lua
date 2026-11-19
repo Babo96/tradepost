@@ -1,3 +1,0 @@
--- Section addon for the generated Babo Forever live ring slots.
--- It has no code of its own; the slots are separate LoadOnDemand addons
--- grouped underneath this one via "## Group: BaboForever_LiveData".

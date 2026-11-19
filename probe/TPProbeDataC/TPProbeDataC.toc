@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: TP Probe Data C
+## Notes: LoadOnDemand probe payload for TradePost. Not part of the addon.
+## Author: babo
+## Version: 0.1.0
+## LoadOnDemand: 1
+## X-TP-Data: INITIAL_META_C
+## X-Category: Utility
+
+Data.lua

@@ -3,7 +3,7 @@
 The web UI is served by the same Go API at `/`:
 
 ```
-https://babo-forever.b4b0.de/
+https://tradepost.b4b0.de/
 ```
 
 It is embedded in the server binary (`server/internal/api/web`), so there is no
@@ -21,14 +21,14 @@ Node build or separate static host.
   - `All` hourly min/max buckets (`prices_hourly`, retained indefinitely)
 - market comparison across alliance/horde/neutral and rulesets
 - watchlist stored in `localStorage` when logged out, or per character on the
-  server after `/bf login`; see [`watch.md`](watch.md)
+  server after `/tradepost login`; see [`watch.md`](watch.md)
 - money formatting in gold/silver/copper
 
 ## Data flow
 
 1. The addon caches `name/quality/class/subclass/icon` per item ID in
-   `BABOFOREVER_ITEMS` (browser and scanner both populate it).
-2. `bfc` parses `BABOFOREVER_ITEMS` from SavedVariables, hashes each entry, and
+   `TRADEPOST_ITEMS` (browser and scanner both populate it).
+2. `tradepost` parses `TRADEPOST_ITEMS` from SavedVariables, hashes each entry, and
    uploads only new/changed metadata with the next ingest.
 3. The server upserts `items` and joins prices to names in search results.
 4. Price scans continue to populate `prices_latest` and `prices_hourly`.

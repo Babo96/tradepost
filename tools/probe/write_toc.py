@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rewrite the X-BF-Data field of a probe addon TOC."""
+"""Rewrite the X-TradePost-Data field of a probe addon TOC."""
 
 from __future__ import annotations
 
@@ -12,18 +12,18 @@ import common
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--wow", help="WoW install root")
-    parser.add_argument("--addon", default="BFProbeDataA", help="probe addon folder name")
-    parser.add_argument("--payload", required=True, help="new X-BF-Data value")
+    parser.add_argument("--addon", default="TPProbeDataA", help="probe addon folder name")
+    parser.add_argument("--payload", required=True, help="new X-TradePost-Data value")
     parser.add_argument("--write", action="store_true", help="actually write the file (default: dry run)")
     return parser
 
 
 def replace_metadata(text: str, payload: str) -> str:
     lines = text.splitlines()
-    replacement = f"## X-BF-Data: {payload}"
+    replacement = f"## X-TradePost-Data: {payload}"
     found = False
     for index, line in enumerate(lines):
-        if line.lower().startswith("## x-bf-data:"):
+        if line.lower().startswith("## x-tradepost-data:"):
             lines[index] = replacement
             found = True
             break

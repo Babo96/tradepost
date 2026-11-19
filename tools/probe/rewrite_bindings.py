@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Write or inspect the Babo Forever bindings mailbox.
+"""Write or inspect the TradePost bindings mailbox.
 
 The script is deliberately conservative:
 
-* it only removes lines whose command starts with ``BFD1:`` (or ``CLICK BFD1:``)
+* it only removes lines whose command starts with ``TPD1:`` (or ``CLICK TPD1:``)
 * it preserves every other line byte-for-byte
 * it makes a timestamped backup before writing
 * ``--write`` is required to change anything
@@ -102,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
             keys = available[: args.keys]
             chunks = common.chunk_payload(args.payload, args.chunk_size)
             new_lines = common.mailbox_lines(
-                chunks, keys, tag="BFD1", seq=args.seq, mode=args.mode
+                chunks, keys, tag="TPD1", seq=args.seq, mode=args.mode
             )
             kept = common.strip_mailbox(lines)
             result = kept + new_lines
@@ -124,9 +124,9 @@ def main(argv: list[str] | None = None) -> int:
         # Default: show mailbox lines.
         mailbox = [line for line in lines if line.is_bind and common.is_mailbox_command(line.command or "")]
         if not mailbox:
-            print("no BFD1 mailbox lines")
+            print("no TPD1 mailbox lines")
         else:
-            print(f"BFD1 mailbox lines: {len(mailbox)}")
+            print(f"TPD1 mailbox lines: {len(mailbox)}")
             for line in mailbox:
                 print(f"  {line.raw}")
         return 0

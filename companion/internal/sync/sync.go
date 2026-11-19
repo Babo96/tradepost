@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"babo-forever/companion/internal/addon"
-	"babo-forever/companion/internal/api"
-	"babo-forever/companion/internal/config"
-	"babo-forever/companion/internal/export"
-	"babo-forever/companion/internal/wow"
+	"github.com/babo96/tradepost/companion/internal/addon"
+	"github.com/babo96/tradepost/companion/internal/api"
+	"github.com/babo96/tradepost/companion/internal/config"
+	"github.com/babo96/tradepost/companion/internal/export"
+	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
 const clientVersion = "0.1.0"
@@ -62,7 +62,7 @@ func New(cfg config.Config) (*Service, error) {
 		return nil, err
 	}
 	account := accounts[0]
-	// Prefer an account that already has Babo Forever data.
+	// Prefer an account that already has TradePost data.
 	for _, candidate := range accounts {
 		if fileExists(wow.SavedVariablesFile(cfg.WowDir, candidate)) {
 			account = candidate
@@ -129,7 +129,7 @@ func (s *Service) Sync(ctx context.Context) error {
 
 func (s *Service) sync(ctx context.Context) error {
 	if s.cfg.Token == "" {
-		return fmt.Errorf("no token; run bfc enroll first")
+		return fmt.Errorf("no token; run tradepost enroll first")
 	}
 
 	data, err := export.LoadData(s.status.SavedVariables)

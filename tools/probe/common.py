@@ -1,7 +1,7 @@
 """Shared helpers for the phase 0 probe scripts.
 
 Only the Python standard library is used. Every write is atomic and backed up;
-the scripts never touch a line that is not part of the Babo Forever mailbox.
+the scripts never touch a line that is not part of the TradePost mailbox.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ WTF_DIR = Path("WTF")
 BINDINGS_FILE = "bindings-cache.wtf"
 SAVED_VARIABLES_DIR = "SavedVariables"
 
-# A binding line looks like: bind CTRL-ALT-SHIFT-F1 CLICK BFD1:...:LeftButton
+# A binding line looks like: bind CTRL-ALT-SHIFT-F1 CLICK TPD1:...:LeftButton
 BIND_RE = re.compile(r"^bind\s+(\S+)\s+(.+)$")
 SAFE_PAYLOAD_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
@@ -178,14 +178,14 @@ def render_bindings(lines: list[BindingLine]) -> str:
     return body
 
 
-def is_mailbox_command(command: str, tag: str = "BFD1") -> bool:
+def is_mailbox_command(command: str, tag: str = "TPD1") -> bool:
     command = command.strip()
     if command.startswith(tag + ":"):
         return True
     return any(command.startswith(f"{prefix} {tag}:") for prefix in ("CLICK", "SPELL", "ITEM", "MACRO"))
 
 
-def strip_mailbox(lines: list[BindingLine], tag: str = "BFD1") -> list[BindingLine]:
+def strip_mailbox(lines: list[BindingLine], tag: str = "TPD1") -> list[BindingLine]:
     return [
         line
         for line in lines
@@ -202,7 +202,7 @@ def chunk_payload(payload: str, chunk_size: int) -> list[str]:
 def mailbox_lines(
     chunks: list[str],
     keys: list[str],
-    tag: str = "BFD1",
+    tag: str = "TPD1",
     seq: int = 1,
     mode: str = "click",
 ) -> list[BindingLine]:

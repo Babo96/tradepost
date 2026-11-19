@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         common.validate_payload(args.payload)
         wow = common.find_wow_dir(args.wow)
-        addon = f"BFProbeData{args.slot}"
+        addon = f"TPProbeData{args.slot}"
         path = common.addons_dir(wow) / addon / "Data.lua"
         if not path.is_file():
             print(f"probe addon not installed: {path}", file=sys.stderr)

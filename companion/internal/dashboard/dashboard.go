@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"babo-forever/companion/internal/config"
-	syncsvc "babo-forever/companion/internal/sync"
+	"github.com/babo96/tradepost/companion/internal/config"
+	syncsvc "github.com/babo96/tradepost/companion/internal/sync"
 )
 
 type Server struct {
@@ -95,7 +95,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Babo Forever Companion</title>
+<title>TradePost Companion</title>
 <style>
   :root { color-scheme: dark; }
   body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: #111827; color: #e5e7eb; }
@@ -115,7 +115,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 </head>
 <body>
 <main>
-  <h1>Babo Forever Companion</h1>
+  <h1>TradePost Companion</h1>
   <div class="sub">Crowd-sourced auction data for WoW Forever</div>
 
   <div class="grid">

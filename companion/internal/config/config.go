@@ -23,7 +23,7 @@ func DefaultPath() string {
 	if err != nil {
 		dir = "."
 	}
-	return filepath.Join(dir, "babo-forever", "config.json")
+	return filepath.Join(dir, "tradepost", "config.json")
 }
 
 func Defaults() Config {

@@ -1,4 +1,4 @@
-module babo-forever/server
+module github.com/babo96/tradepost/server
 
 go 1.27.3
 

@@ -8,16 +8,16 @@ const QUALITY = [
 ];
 
 const state = {
-  market: localStorage.getItem("bf-market") || "",
+  market: localStorage.getItem("tradepost-market") || "",
   results: [],
   selected: null,
   session: null,
-  range: localStorage.getItem("bf-range") || "all",
-  watch: new Set(JSON.parse(localStorage.getItem("bf-watch") || "[]")),
+  range: localStorage.getItem("tradepost-range") || "all",
+  watch: new Set(JSON.parse(localStorage.getItem("tradepost-watch") || "[]")),
 };
 
 function saveWatch() {
-  localStorage.setItem("bf-watch", JSON.stringify([...state.watch]));
+  localStorage.setItem("tradepost-watch", JSON.stringify([...state.watch]));
 }
 
 function money(copper) {
@@ -236,7 +236,7 @@ function renderDetail(item) {
     if (state.range === value) button.classList.add("active");
     button.addEventListener("click", () => {
       state.range = value;
-      localStorage.setItem("bf-range", value);
+      localStorage.setItem("tradepost-range", value);
       if (state.selected) renderDetail(state.selected);
     });
     ranges.append(button);
@@ -456,7 +456,7 @@ let watchTimer;
 function persistWatch() {
   if (!state.session) {
     saveWatch();
-    setSyncState("Local only — /bf login to sync");
+    setSyncState("Local only — /tradepost login to sync");
     return;
   }
   setSyncState("Saving…");
@@ -489,8 +489,8 @@ async function loadWatch() {
       setSyncState(error.message);
     }
   } else {
-    state.watch = new Set(JSON.parse(localStorage.getItem("bf-watch") || "[]"));
-    setSyncState("Local only — /bf login to sync");
+    state.watch = new Set(JSON.parse(localStorage.getItem("tradepost-watch") || "[]"));
+    setSyncState("Local only — /tradepost login to sync");
   }
   renderResults();
   if (state.selected) {
@@ -529,7 +529,7 @@ function openAuthDialog() {
 }
 
 async function mergeWatchAfterLogin() {
-  const local = new Set(JSON.parse(localStorage.getItem("bf-watch") || "[]"));
+  const local = new Set(JSON.parse(localStorage.getItem("tradepost-watch") || "[]"));
   const list = await api("/v1/watch");
   const merged = new Set([...local, ...(list.items || [])]);
   state.watch = merged;
@@ -601,7 +601,7 @@ $("#auth-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const code = $("#auth-code").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (code.length < 6) {
-    $("#auth-error").textContent = "Enter the code from /bf login.";
+    $("#auth-error").textContent = "Enter the code from /tradepost login.";
     return;
   }
   try {
@@ -620,7 +620,7 @@ $("#auth-form").addEventListener("submit", async (event) => {
 
 $("#market").addEventListener("change", (event) => {
   state.market = event.target.value;
-  localStorage.setItem("bf-market", state.market);
+  localStorage.setItem("tradepost-market", state.market);
   state.selected = null;
   loadMeta().then(search).catch((error) => {
     $("#status").textContent = error.message;

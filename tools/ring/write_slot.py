@@ -9,7 +9,7 @@ Example:
 
 The window defaults to the current 5-minute window and the slot to
 window % count. The addon loads the slot for the completed window at the next
-boundary, or immediately with `/bf ring now` (current window).
+boundary, or immediately with `/tradepost ring now` (current window).
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     content = f"""-- Generated live ring slot. The companion rewrites this file.
-BABOFOREVER_RING = {{
+TRADEPOST_RING = {{
   schema = 1,
   market = {json.dumps(args.market)},
   window = {window},

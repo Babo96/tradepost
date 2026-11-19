@@ -19,7 +19,7 @@ class ProbeHelpersTest(unittest.TestCase):
         self.bindings = self.account / "bindings-cache.wtf"
         self.bindings.write_text(
             "bind Q MULTIACTIONBAR1BUTTON1\n"
-            "bind CTRL-ALT-SHIFT-F1 CLICK BFD1:1:0:1:OLD:LeftButton\n"
+            "bind CTRL-ALT-SHIFT-F1 CLICK TPD1:1:0:1:OLD:LeftButton\n"
             "bind E MULTIACTIONBAR1BUTTON2\n",
             encoding="utf-8",
         )
@@ -45,7 +45,7 @@ class ProbeHelpersTest(unittest.TestCase):
         lines = common.parse_bindings(common.read_text(self.bindings))
         kept = common.strip_mailbox(lines)
         self.assertEqual(len(kept), 2)
-        self.assertNotIn("BFD1", common.render_bindings(kept))
+        self.assertNotIn("TPD1", common.render_bindings(kept))
 
     def test_mailbox_lines(self) -> None:
         chunks = common.chunk_payload("ABCDEFGH", 3)
@@ -53,7 +53,7 @@ class ProbeHelpersTest(unittest.TestCase):
         lines = common.mailbox_lines(chunks, ["K1", "K2", "K3"], seq=7)
         self.assertEqual(
             lines[1].raw,
-            "bind K2 CLICK BFD1:7:1:3:DEF:LeftButton",
+            "bind K2 CLICK TPD1:7:1:3:DEF:LeftButton",
         )
 
     def test_write_atomic_and_backup(self) -> None:
@@ -74,12 +74,12 @@ class ProbeHelpersTest(unittest.TestCase):
     def test_replace_toc_metadata(self) -> None:
         toc = "## Interface: 16001\n## Title: Probe\n\nData.lua\n"
         updated = write_toc.replace_metadata(toc, "NEW_VALUE")
-        self.assertIn("## X-BF-Data: NEW_VALUE", updated)
+        self.assertIn("## X-TP-Data: NEW_VALUE", updated)
         self.assertTrue(updated.endswith("Data.lua\n"))
 
         updated_again = write_toc.replace_metadata(updated, "OTHER")
-        self.assertIn("## X-BF-Data: OTHER", updated_again)
-        self.assertEqual(updated_again.count("## X-BF-Data: OTHER"), 1)
+        self.assertIn("## X-TP-Data: OTHER", updated_again)
+        self.assertEqual(updated_again.count("## X-TP-Data: OTHER"), 1)
 
 
 if __name__ == "__main__":

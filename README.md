@@ -1,4 +1,4 @@
-# babo-forever
+# tradepost
 
 Crowd-sourced auction house prices for **World of Warcraft: Forever**, with
 in-game tooltips, an Auctionator display bridge, and a self-hosted backend.
@@ -17,7 +17,7 @@ region × ruleset (suffix of GetRealmName) × house (alliance / horde / neutral)
 ```
 
 Existing price addons keep one database per realm and therefore mix faction and
-neutral-house prices. `babo-forever` keeps them separate and fills gaps with a
+neutral-house prices. `tradepost` keeps them separate and fills gaps with a
 central database fed by many players' scans.
 
 Each player still scans at most every 15 minutes (the client's account-wide
@@ -27,7 +27,7 @@ could.
 ## Repository
 
 ```
-addon/BaboForever/       Lua addon (scan, local DB, tooltips, ring, bridge)
+addon/TradePost/       Lua addon (scan, local DB, tooltips, ring, bridge)
 data-addon/              generated central snapshot addon
 ring/                    generated live slots (via tools/ring)
 tools/ring/              slot generator and test writer
@@ -47,14 +47,14 @@ make addon-install
 make ring-install COUNT=64
 ```
 
-Restart WoW. The 64 `BaboForever_Data_XX` slots are LoadOnDemand and must be
+Restart WoW. The 64 `TradePost_Data_XX` slots are LoadOnDemand and must be
 enabled in the AddOns list.
 
 In game:
 
 ```
-/bf status
-/bf market
+/tradepost status
+/tradepost market
 ```
 
 ### 2. Run the server
@@ -64,22 +64,22 @@ make db-up
 make server-run
 ```
 
-Server on `:8080`, Postgres on `localhost:5432` (`babo`/`babo`).
+Server on `:8080`, Postgres on `localhost:5432` (`tradepost`/`tradepost`).
 
 ### 3. Enroll and run the companion
 
 ```sh
 make companion-build
-dist/bfc enroll --server http://127.0.0.1:8080 --wow "/games/World of Warcraft"
-dist/bfc install --source "$PWD" --wow "/games/World of Warcraft" --count 64
-dist/bfc run
+dist/tradepostc enroll --server http://127.0.0.1:8080 --wow "/games/World of Warcraft"
+dist/tradepostc install --source "$PWD" --wow "/games/World of Warcraft" --count 64
+dist/tradepostc run
 ```
 
 Dashboard: `http://127.0.0.1:8787`
 
-The companion reads `BABOFOREVER_EXPORT` from SavedVariables (written on
+The companion reads `TRADEPOST_EXPORT` from SavedVariables (written on
 `/reload` or logout), uploads scans, downloads snapshots, rewrites
-`BaboForever_Data/Data.lua`, and writes the current ring slot.
+`TradePost_Data/Data.lua`, and writes the current ring slot.
 
 ### 4. Test
 
@@ -87,9 +87,9 @@ The companion reads `BABOFOREVER_EXPORT` from SavedVariables (written on
 make check
 ```
 
-In game, `/bf scan`, hover items, and `/bf status`. Auctionator shows our prices
-through the read-only bridge; `/bf bridge off` restores Auctionator and enables
-the BF tooltip line.
+In game, `/tradepost scan`, hover items, and `/tradepost status`. Auctionator shows our prices
+through the read-only bridge; `/tradepost bridge off` restores Auctionator and enables
+the TP tooltip line.
 
 ## Phase status
 
@@ -100,14 +100,14 @@ the BF tooltip line.
 - [x] Server: enroll, ingest, meta, snapshot, data-addon zip
 - [x] Linux companion: SavedVariables export, upload, snapshot/ring writer,
       local dashboard
-- [x] Deployment on `babo-forever.b4b0.de` (Argo app `babo-forever`)
+- [x] Deployment on `tradepost.b4b0.de` (Argo app `tradepost`)
 - [x] In-game price browser (icon + search window)
 - [x] Windows companion build + setup zip (cross-compiled; needs a real Windows
       client test)
 - [ ] v1 release packaging (signed/tagged Linux + Windows artifacts)
 - [x] Item metadata ingest (client item cache -> server)
 - [x] v2 web browser: search, hourly history, market comparison, watchlist
-- [x] Two-way watchlist sync with `/bf login` one-time codes
+- [x] Two-way watchlist sync with `/tradepost login` one-time codes
 - [ ] Server-side item metadata in the data addon (offline name search)
 
 ## Design decisions
@@ -126,11 +126,11 @@ the BF tooltip line.
 
 ## Deployed
 
-- API: `https://babo-forever.b4b0.de`
-- Image: `git.babocraft.de/babo/babo-forever-server`
-- Namespace: `babo-forever`
-- Manifests: `homelab-argo/babo-forever`
-- Argo app: `homelab-argo/argocd/apps/babo-forever.yaml`
+- API: `https://tradepost.b4b0.de`
+- Image: `ghcr.io/babo96/tradepost-server`
+- Namespace: `tradepost`
+- Manifests: `homelab-argo/tradepost`
+- Argo app: `homelab-argo/argocd/apps/tradepost.yaml`
 
 ## Documentation
 

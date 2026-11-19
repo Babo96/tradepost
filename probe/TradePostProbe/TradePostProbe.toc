@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: TradePost Probe
+## Notes: Phase 0 diagnostics for the TradePost auction data project.
+## Author: babo
+## Version: 0.1.0
+## SavedVariables: TRADEPOST_PROBE
+## X-Category: Utility
+## IconTexture: Interface\Icons\inv_misc_spyglass_02
+
+Probe.lua

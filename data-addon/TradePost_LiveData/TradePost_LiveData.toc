@@ -1,0 +1,9 @@
+## Interface: 16001
+## Title: Live Data
+## Category: TradePost
+## Notes: Section for the generated TradePost live price ring slots.
+## Author: babo
+## Version: 0.2.0
+## X-Category: Auction/Economy
+
+LiveData.lua

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"babo-forever/server/internal/store"
+	"github.com/babo96/tradepost/server/internal/store"
 )
 
 type testClient struct {
@@ -193,7 +193,7 @@ func TestDataAddon(t *testing.T) {
 	}
 	found := false
 	for _, file := range reader.File {
-		if file.Name != "BaboForever_Data/Data.lua" {
+		if file.Name != "TradePost_Data/Data.lua" {
 			continue
 		}
 		rc, err := file.Open()
@@ -332,7 +332,7 @@ func TestWebIndex(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("index status %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), "Babo Forever") {
+	if !strings.Contains(rec.Body.String(), "TradePost") {
 		t.Fatal("index does not contain the app title")
 	}
 }

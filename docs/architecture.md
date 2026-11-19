@@ -32,20 +32,20 @@ of the market key because the auction house is shared per ruleset.
 
 ```
 WoW client (_forever_)
-  BaboForever (Lua)
+  TradePost (Lua)
     scanner        C_AuctionHouse.ReplicateItems -> per-item min/qty
     local DB       own scans, instant tooltips
-    central DB     loaded from BaboForever_Data
+    central DB     loaded from TradePost_Data
     tooltips       TooltipDataProcessor + fallbacks
     live mailbox   LoadBindings deltas (phase 0 verifies)
     export buffer  SavedVariables + optional bindings uplink
 
-  BaboForever_Data (LoadOnDemand where possible)
+  TradePost_Data (LoadOnDemand where possible)
     full snapshot at login
 
-bfc companion (Go, Linux first)
+tradepost companion (Go, Linux first)
   reads SavedVariables, uploads scans
-  downloads snapshots, writes BaboForever_Data
+  downloads snapshots, writes TradePost_Data
   writes mailbox deltas while the game runs
   local web dashboard on 127.0.0.1:8787
 
@@ -66,7 +66,7 @@ server (Go + Postgres 17)
 3. The scan is written to the export buffer. The companion uploads it to
    `/v1/ingest` and the server merges it into the market.
 4. The snapshot builder publishes a compact per-market snapshot. The companion
-   downloads it, writes `BaboForever_Data/Data.lua`, and (if the live channel
+   downloads it, writes `TradePost_Data/Data.lua`, and (if the live channel
    works) feeds deltas into the bindings mailbox.
 5. The addon applies the delta without `/reload`; tooltips and the Auctionator
    display bridge update on the next hover.
@@ -94,7 +94,7 @@ targeted AH searches while the AH is open.
 
 Auctionator stays the display for the auction house UI. The addon installs a
 runtime read bridge around `Auctionator.Database.GetPrice`, `GetFirstPrice`,
-`GetMeanPrice` and `GetPriceAge`, maps keys, and returns Babo Forever data when
+`GetMeanPrice` and `GetPriceAge`, maps keys, and returns TradePost data when
 it is fresher. Auctionator's database and SavedVariables are never modified.
 
 ## Safety

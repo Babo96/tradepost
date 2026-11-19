@@ -1,4 +1,4 @@
-module babo-forever/companion
+module github.com/babo96/tradepost/companion
 
 go 1.27.3
 

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"babo-forever/server/internal/store"
+	"github.com/babo96/tradepost/server/internal/store"
 )
 
 // MemStore is an in-memory Store for handler tests and local smoke tests.

@@ -12,11 +12,11 @@ therefore be **pre-created, fixed-size, and time-indexed**.
 ## Slots
 
 ```
-Interface/AddOns/BaboForever_Data_00/
-  BaboForever_Data_00.toc   ## LoadOnDemand: 1
+Interface/AddOns/TradePost_Data_00/
+  TradePost_Data_00.toc   ## LoadOnDemand: 1
   Data.lua
 ...
-BaboForever_Data_63/
+TradePost_Data_63/
 ```
 
 64 slots = 64 windows of 5 minutes = **5 h 20 min** per session. After a full
@@ -50,7 +50,7 @@ the next 5-minute boundary.
 `Data.lua` defines one global and overwrites the previous one:
 
 ```lua
-BABOFOREVER_RING = {
+TRADEPOST_RING = {
   schema = 1,
   market = "eu:pve:horde",
   window = 12345,             -- floor(unix_time / 300)
@@ -86,7 +86,7 @@ BABOFOREVER_RING = {
 
 ## Consumer (addon)
 
-1. At login, load `BaboForever_Data` (full base).
+1. At login, load `TradePost_Data` (full base).
 2. `C_Timer.After(seconds_to_next_boundary, tick)`, then every 300 s.
 3. `tick`: compute the previous window, slot name; if not loaded, `LoadAddOn`.
 4. If the global matches the current market and `seq > last_seq`, apply:
@@ -101,10 +101,10 @@ BABOFOREVER_RING = {
 
 - **Bindings mailbox:** `LoadBindings` did not re-read the file mid-session;
   a valid `Y` binding change only appeared after `/reload`. The client also
-  dropped unknown `BFD1` actions on save/load.
+  dropped unknown `TPD1` actions on save/load.
 - **TOC metadata:** `GetAddOnMetadata` returned the old value after the TOC was
   rewritten, so it cannot be used as a “slot ready” flag.
-- **New folders at runtime:** `LoadAddOn("BFProbeDataC")` returned `MISSING`
+- **New folders at runtime:** `LoadAddOn("TPProbeDataC")` returned `MISSING`
   for a folder created after startup. The ring is fixed-size.
 - **Addon messages:** 255 bytes, server-relayed, spam-policy risk.
 
@@ -120,16 +120,16 @@ BABOFOREVER_RING = {
 ## Live upload (outbound)
 
 The inbound ring has an outbound counterpart: the addon calls
-`C_AddOns.SaveAddOns()` after a scan. That writes `BABOFOREVER_EXPORT` to
-`SavedVariables/BaboForever.lua` immediately, without `/reload`.
+`C_AddOns.SaveAddOns()` after a scan. That writes `TRADEPOST_EXPORT` to
+`SavedVariables/TradePost.lua` immediately, without `/reload`.
 
 The companion watches the SavedVariables mtime every 5 seconds, parses
-`BABOFOREVER_EXPORT`, uploads new scan hashes, and records them in
-`~/.config/babo-forever/state.json`.
+`TRADEPOST_EXPORT`, uploads new scan hashes, and records them in
+`~/.config/tradepost/state.json`.
 
 Fallbacks if `SaveAddOns` is unavailable or restricted:
 
-- `/bf export save` to force a flush (for testing)
+- `/tradepost export save` to force a flush (for testing)
 - normal `/reload` or logout
 
-`/bf export` shows the last flush time and the export size.
+`/tradepost export` shows the last flush time and the export size.

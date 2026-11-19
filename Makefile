@@ -13,7 +13,7 @@ COUNT ?= 64
 MARKET ?= eu:pve:horde
 ITEMS ?= i:2589,1234,50,2
 SERVER ?= http://127.0.0.1:8080
-DB_URL ?= postgres://babo:babo@localhost:5432/babo?sslmode=disable
+DB_URL ?= postgres://tradepost:tradepost@localhost:5432/tradepost?sslmode=disable
 KEY ?= CTRL-ALT-SHIFT-F1
 COMMAND ?= ACTIONBUTTON1
 ACCOUNT ?=
@@ -21,14 +21,14 @@ ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.1.0)
 COMPANION_LDFLAGS := -s -w -X main.version=$(VERSION)
 
-PROBE_ADDONS := BaboForeverProbe BFProbeDataA BFProbeDataB BFProbeDataC BFProbeDataD
+PROBE_ADDONS := TradePostProbe TPProbeDataA TPProbeDataB TPProbeDataC TPProbeDataD
 
 .PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-build-windows release-windows companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
-	@echo "Babo Forever"
+	@echo "TradePost"
 	@echo
-	@echo "  make addon-install          install BaboForever + BaboForever_Data"
+	@echo "  make addon-install          install TradePost + TradePost_Data"
 	@echo
 	@echo "  make addon-update           update the addon code only (keeps data)"
 	@echo "  make addon-uninstall        remove the real addon"
@@ -39,21 +39,21 @@ help:
 	@echo "  make db-up / db-down        local Postgres for the server"
 	@echo "  make server-run             run the API on :8080"
 	@echo "  make server-test            go test the API"
-	@echo "  make companion-build        build dist/bfc (host platform)"
-	@echo "  make companion-build-windows build dist/bfc.exe"
+	@echo "  make companion-build        build dist/tradepost (host platform)"
+	@echo "  make companion-build-windows build dist/tradepost.exe"
 	@echo "  make release-windows        package the Windows companion zip"
-	@echo "  make companion-install      install addon + COUNT slots via bfc"
+	@echo "  make companion-install      install addon + COUNT slots via tradepost"
 	@echo "  make companion-enroll       enroll this machine with SERVER"
-	@echo "  make companion-run          run bfc + dashboard :8787"
+	@echo "  make companion-run          run tradepost + dashboard :8787"
 	@echo
 	@echo "  make probe-install          copy the probe addons into $(ADDONS)"
 	@echo "  make probe-uninstall        remove the probe addons"
-	@echo "  make probe-show             show the current BFD1 mailbox lines"
+	@echo "  make probe-show             show the current TPD1 mailbox lines"
 	@echo "  make probe-bind             write PAYLOAD to the bindings mailbox"
 	@echo "  make probe-ring             rewrite LoadOnDemand slot SLOT with PAYLOAD"
-	@echo "  make probe-meta             rewrite X-BF-Data in slot SLOT with PAYLOAD"
+	@echo "  make probe-meta             rewrite X-TP-Data in slot SLOT with PAYLOAD"
 	@echo "  make probe-set              write a known-valid binding (KEY=COMMAND)"
-	@echo "  make probe-clear            remove BFD1 lines from the bindings file"
+	@echo "  make probe-clear            remove TPD1 lines from the bindings file"
 	@echo "  make probe-reset            remove all probe/reserved binding lines"
 	@echo "  make probe-restore          restore the newest bindings backup"
 	@echo "  make go-lint                gofmt + go vet"
@@ -65,12 +65,12 @@ help:
 addon-install:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
 	@mkdir -p "$(ADDONS)"
-	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data" "$(ADDONS)/BaboForever_LiveData"
-	@cp -R addon/BaboForever "$(ADDONS)/BaboForever"
-	@cp -R data-addon/BaboForever_Data "$(ADDONS)/BaboForever_Data"
-	@cp -R data-addon/BaboForever_LiveData "$(ADDONS)/BaboForever_LiveData"
-	@echo "Installed BaboForever into $(ADDONS)"
-	@echo "Restart WoW, then /reload and /bf status."
+	@rm -rf "$(ADDONS)/TradePost" "$(ADDONS)/TradePost_Data" "$(ADDONS)/TradePost_LiveData"
+	@cp -R addon/TradePost "$(ADDONS)/TradePost"
+	@cp -R data-addon/TradePost_Data "$(ADDONS)/TradePost_Data"
+	@cp -R data-addon/TradePost_LiveData "$(ADDONS)/TradePost_LiveData"
+	@echo "Installed TradePost into $(ADDONS)"
+	@echo "Restart WoW, then /reload and /tradepost status."
 
 ring-install:
 	@$(PYTHON) tools/ring/gen_slots.py --wow "$(WOW_DIR)" --count $(COUNT) --force
@@ -83,40 +83,40 @@ ring-write:
 
 db-up:
 	@docker compose -f server/docker-compose.yml up -d
-	@echo "Postgres on localhost:5432 (babo/babo)"
+	@echo "Postgres on localhost:5432 (tradepost/tradepost)"
 
 db-down:
 	@docker compose -f server/docker-compose.yml down
 
 server-build:
 	@mkdir -p dist
-	@cd server && go build -o ../dist/bfd ./cmd/bfd
+	@cd server && go build -o ../dist/tradepostd ./cmd/tradepostd
 
 server-run:
-	@cd server && BFD_DATABASE_URL="$(DB_URL)" BFD_ADDR=":8080" go run ./cmd/bfd
+	@cd server && TRADEPOST_DATABASE_URL="$(DB_URL)" TRADEPOST_ADDR=":8080" go run ./cmd/tradepostd
 
 server-test:
 	@cd server && go test ./...
 
 companion-build:
 	@mkdir -p dist
-	@cd companion && go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/bfc ./cmd/bfc
+	@cd companion && go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/tradepost ./cmd/tradepost
 
 companion-build-windows:
 	@mkdir -p dist
-	@cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/bfc.exe ./cmd/bfc
+	@cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/tradepost.exe ./cmd/tradepost
 
 release-windows: companion-build-windows
-	@$(PYTHON) tools/release/package_windows.py --version "$(VERSION)" --binary dist/bfc.exe
+	@$(PYTHON) tools/release/package_windows.py --version "$(VERSION)" --binary dist/tradepost.exe
 
 companion-install: companion-build
-	@dist/bfc install --source "$(CURDIR)" --wow "$(WOW_DIR)" --count $(COUNT)
+	@dist/tradepost install --source "$(CURDIR)" --wow "$(WOW_DIR)" --count $(COUNT)
 
 companion-enroll: companion-build
-	@dist/bfc enroll --server "$(SERVER)" --wow "$(WOW_DIR)" --market "$(MARKET)" --count $(COUNT)
+	@dist/tradepost enroll --server "$(SERVER)" --wow "$(WOW_DIR)" --market "$(MARKET)" --count $(COUNT)
 
 companion-run: companion-build
-	@dist/bfc run
+	@dist/tradepost run
 
 companion-test:
 	@cd companion && go test ./...
@@ -128,14 +128,14 @@ go-lint:
 
 addon-update:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
-	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_LiveData"
-	@cp -R addon/BaboForever "$(ADDONS)/BaboForever"
-	@cp -R data-addon/BaboForever_LiveData "$(ADDONS)/BaboForever_LiveData"
-	@echo "Updated $(ADDONS)/BaboForever and BaboForever_LiveData (data addon untouched)"
+	@rm -rf "$(ADDONS)/TradePost" "$(ADDONS)/TradePost_LiveData"
+	@cp -R addon/TradePost "$(ADDONS)/TradePost"
+	@cp -R data-addon/TradePost_LiveData "$(ADDONS)/TradePost_LiveData"
+	@echo "Updated $(ADDONS)/TradePost and TradePost_LiveData (data addon untouched)"
 
 addon-uninstall:
-	@rm -rf "$(ADDONS)/BaboForever" "$(ADDONS)/BaboForever_Data" "$(ADDONS)/BaboForever_LiveData"
-	@echo "Removed BaboForever"
+	@rm -rf "$(ADDONS)/TradePost" "$(ADDONS)/TradePost_Data" "$(ADDONS)/TradePost_LiveData"
+	@echo "Removed TradePost"
 
 probe-install:
 	@test -d "$(FOREVER)" || (echo "WoW Forever not found at $(FOREVER); set WOW_DIR" >&2; exit 1)
@@ -159,7 +159,7 @@ probe-ring:
 	@$(PYTHON) tools/probe/write_slot.py --wow "$(WOW_DIR)" --slot "$(SLOT)" --payload "$(PAYLOAD)" --write
 
 probe-meta:
-	@$(PYTHON) tools/probe/write_toc.py --wow "$(WOW_DIR)" --addon "BFProbeData$(SLOT)" --payload "$(PAYLOAD)" --write
+	@$(PYTHON) tools/probe/write_toc.py --wow "$(WOW_DIR)" --addon "TPProbeData$(SLOT)" --payload "$(PAYLOAD)" --write
 
 probe-set:
 	@$(PYTHON) tools/probe/set_binding.py --wow "$(WOW_DIR)" $(ACCOUNT_ARG) --key "$(KEY)" --command "$(COMMAND)" --write

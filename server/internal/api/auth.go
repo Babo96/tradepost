@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"babo-forever/server/internal/store"
+	"github.com/babo96/tradepost/server/internal/store"
 )
 
 const (

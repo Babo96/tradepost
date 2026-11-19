@@ -97,7 +97,7 @@ func LoadData(path string) (Data, error) {
 }
 
 func loadScans(L *lua.LState) []Scan {
-	value := L.GetGlobal("BABOFOREVER_EXPORT")
+	value := L.GetGlobal("TRADEPOST_EXPORT")
 	table, ok := value.(*lua.LTable)
 	if !ok {
 		return nil
@@ -124,7 +124,7 @@ func loadScans(L *lua.LState) []Scan {
 }
 
 func loadItems(L *lua.LState) []Meta {
-	value := L.GetGlobal("BABOFOREVER_ITEMS")
+	value := L.GetGlobal("TRADEPOST_ITEMS")
 	table, ok := value.(*lua.LTable)
 	if !ok {
 		return nil
@@ -153,7 +153,7 @@ func loadItems(L *lua.LState) []Meta {
 }
 
 func loadAuth(L *lua.LState) *AuthRequest {
-	table, ok := L.GetGlobal("BABOFOREVER_AUTH").(*lua.LTable)
+	table, ok := L.GetGlobal("TRADEPOST_AUTH").(*lua.LTable)
 	if !ok {
 		return nil
 	}
@@ -180,7 +180,7 @@ func loadAuth(L *lua.LState) *AuthRequest {
 }
 
 func loadWatch(L *lua.LState) map[string]WatchSet {
-	table, ok := L.GetGlobal("BABOFOREVER_WATCH").(*lua.LTable)
+	table, ok := L.GetGlobal("TRADEPOST_WATCH").(*lua.LTable)
 	if !ok {
 		return nil
 	}
@@ -210,7 +210,7 @@ func loadWatch(L *lua.LState) map[string]WatchSet {
 }
 
 func loadActive(L *lua.LState) string {
-	table, ok := L.GetGlobal("BABOFOREVER_ACTIVE").(*lua.LTable)
+	table, ok := L.GetGlobal("TRADEPOST_ACTIVE").(*lua.LTable)
 	if !ok {
 		return ""
 	}

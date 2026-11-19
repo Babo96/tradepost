@@ -4,19 +4,19 @@ The production deployment is managed from `~/git/homelab-argo`, following the
 same pattern as the other apps.
 
 ```
-homelab-argo/babo-forever/
+homelab-argo/tradepost/
   namespace.yaml
   postgres.yaml              # StatefulSet + Service (Postgres 18, rook-rbd 10Gi)
   api.yaml                   # Deployment + Service
-  ingress.yaml               # babo-forever.b4b0.de, cert-manager letsencrypt
+  ingress.yaml               # tradepost.b4b0.de, cert-manager letsencrypt
   sealedsecret-db.yaml       # DB password + DATABASE_URL
-  sealedsecret-registry.yaml # git.babocraft.de image pull secret
-homelab-argo/argocd/apps/babo-forever.yaml
+  sealedsecret-registry.yaml # ghcr.io image pull secret
+homelab-argo/argocd/apps/tradepost.yaml
 ```
 
-- API: `https://babo-forever.b4b0.de`
-- Namespace: `babo-forever`
-- Image: `git.babocraft.de/babo/babo-forever-server:sha-452af9f`
+- API: `https://tradepost.b4b0.de`
+- Namespace: `tradepost`
+- Image: `ghcr.io/babo96/tradepost-server:sha-452af9f`
 - ArgoCD destination server: `https://192.168.2.114:6443`
 - Project: `home-prod`
 - Sync: automated prune/selfHeal, `CreateNamespace`, `ServerSideApply`

@@ -6,18 +6,18 @@ the tooltips.
 
 ## Implemented (0.1.0)
 
-- Minimap coin button; left click toggles the window, `/bf browse` also works.
+- Minimap coin button; left click toggles the window, `/tradepost browse` also works.
 - Search by item name or item ID, live filtering while typing.
 - Columns: item (quality colored), price, age, quantity, and source marker
   (`R` live ring, `C` central snapshot, `L` local scan).
 - Sort cycle: name → price → age. The choice is stored as `browserSort`.
 - Mouse wheel and scrollbar over a fixed pool of 16 rows.
-- Hover shows the normal item tooltip (including the BF price line); shift
+- Hover shows the normal item tooltip (including the TP price line); shift
   click inserts the item link into chat.
 - Market is the current character market (`eu:<ruleset>:<house>`), refreshed
   whenever the window opens.
 - Item names/icons/quality come from the client item cache and are persisted
-  in `BABOFOREVER_ITEMS`; uncached items show `Item #<id>` and are resolved in
+  in `TRADEPOST_ITEMS`; uncached items show `Item #<id>` and are resolved in
   the background. No extra server round trip or data-addon size is needed.
 
 Known limits:
@@ -38,7 +38,7 @@ Two options, in order of preference:
 2. **Minimap button** fallback with saved position, for clients/addon managers
    where the compartment is not available.
 
-The icon opens `BaboForeverBrowser`; a second click or Escape closes it.
+The icon opens `TradePostBrowser`; a second click or Escape closes it.
 
 ## Window
 
@@ -49,7 +49,7 @@ Minimal, not a full AH replacement:
 - search box (item name or item ID)
 - list: icon, name, item level for gear, unit price, age, supply, source marker
 - sort by price/name/age; filter equipment/commodities
-- click a row to show the normal item tooltip with the BF/Auctionator price
+- click a row to show the normal item tooltip with the TP/Auctionator price
 - optional “watch” button (pins, phase 2 web UI)
 - status line: snapshot version, live seq, last update
 
@@ -63,7 +63,7 @@ The addon can already iterate the local/live/central price keys. To search by
 - upload metadata once (new `items` batch in the ingest payload or a separate
   `/v1/items` endpoint)
 - server stores `items` and includes metadata in the base snapshot (or the
-  companion writes a compact `BaboForever_Data/Items.lua`)
+  companion writes a compact `TradePost_Data/Items.lua`)
 - addon builds a search index on login from the snapshot; unknown items fall
   back to `C_Item.GetItemInfo` + `RequestLoadItemDataByID`
 

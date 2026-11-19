@@ -10,14 +10,14 @@ import (
 func TestSavedVariablesFile(t *testing.T) {
 	wowDir := "/games/World of Warcraft"
 	got := SavedVariablesFile(wowDir, "123#1")
-	want := filepath.Join(wowDir, "_forever_", "WTF", "Account", "123#1", "SavedVariables", "BaboForever.lua")
+	want := filepath.Join(wowDir, "_forever_", "WTF", "Account", "123#1", "SavedVariables", "TradePost.lua")
 	if got != want {
 		t.Fatalf("got %s want %s", got, want)
 	}
 
 	absolute := "/tmp/account"
 	got = SavedVariablesFile(wowDir, absolute)
-	want = filepath.Join(absolute, "SavedVariables", "BaboForever.lua")
+	want = filepath.Join(absolute, "SavedVariables", "TradePost.lua")
 	if got != want {
 		t.Fatalf("absolute: got %s want %s", got, want)
 	}
@@ -56,9 +56,9 @@ func TestFindAcceptsForeverDir(t *testing.T) {
 
 func TestInstall(t *testing.T) {
 	source := t.TempDir()
-	addon := filepath.Join(source, "addon", "BaboForever")
-	dataAddon := filepath.Join(source, "data-addon", "BaboForever_Data")
-	liveAddon := filepath.Join(source, "data-addon", "BaboForever_LiveData")
+	addon := filepath.Join(source, "addon", "TradePost")
+	dataAddon := filepath.Join(source, "data-addon", "TradePost_Data")
+	liveAddon := filepath.Join(source, "data-addon", "TradePost_LiveData")
 	if err := os.MkdirAll(addon, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -68,13 +68,13 @@ func TestInstall(t *testing.T) {
 	if err := os.MkdirAll(liveAddon, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(addon, "BaboForever.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(addon, "TradePost.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dataAddon, "BaboForever_Data.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dataAddon, "TradePost_Data.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(liveAddon, "BaboForever_LiveData.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(liveAddon, "TradePost_LiveData.toc"), []byte("## Interface: 16001\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,7 +86,7 @@ func TestInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, name := range []string{"BaboForever", "BaboForever_Data", "BaboForever_LiveData", "BaboForever_Data_00", "BaboForever_Data_02"} {
+	for _, name := range []string{"TradePost", "TradePost_Data", "TradePost_LiveData", "TradePost_Data_00", "TradePost_Data_02"} {
 		if _, err := os.Stat(filepath.Join(AddonsDir(wowDir), name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}

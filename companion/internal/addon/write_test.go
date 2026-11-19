@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"babo-forever/companion/internal/api"
-	"babo-forever/companion/internal/wow"
+	"github.com/babo96/tradepost/companion/internal/api"
+	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
 func setupWow(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	addons := filepath.Join(dir, "_forever_", "Interface", "AddOns")
-	for _, name := range []string{"BaboForever_Data", "BaboForever_Data_02"} {
+	for _, name := range []string{"TradePost_Data", "TradePost_Data_02"} {
 		if err := os.MkdirAll(filepath.Join(addons, name), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -58,7 +58,7 @@ func TestWriteRingSlot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(path, "BaboForever_Data_02/Data.lua") {
+	if !strings.HasSuffix(path, "TradePost_Data_02/Data.lua") {
 		t.Fatalf("unexpected slot path: %s", path)
 	}
 	data, err := os.ReadFile(path)
@@ -100,7 +100,7 @@ func TestPriceRingSkipsSyncSlots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(path, "BaboForever_Data_04/Data.lua") {
+	if !strings.HasSuffix(path, "TradePost_Data_04/Data.lua") {
 		t.Fatalf("price ring used a reserved sync slot: %s", path)
 	}
 }

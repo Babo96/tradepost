@@ -24,7 +24,7 @@ func statePath() string {
 	if err != nil {
 		dir = "."
 	}
-	return filepath.Join(dir, "babo-forever", "state.json")
+	return filepath.Join(dir, "tradepost", "state.json")
 }
 
 func readState() stateFile {

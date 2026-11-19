@@ -1,11 +1,11 @@
-# server — Babo Forever API
+# server — TradePost API
 
 Go + Postgres. Aggregates scans and serves per-market snapshots.
 
 ## Local
 
 ```sh
-make db-up          # Postgres 18 on localhost:5432 (babo/babo)
+make db-up          # Postgres 18 on localhost:5432 (tradepost/tradepost)
 make server-run     # API on :8080
 make server-test
 ```
@@ -13,8 +13,8 @@ make server-test
 Environment:
 
 ```
-BFD_DATABASE_URL  postgres://babo:babo@localhost:5432/babo?sslmode=disable
-BFD_ADDR          :8080
+TRADEPOST_DATABASE_URL  postgres://tradepost:tradepost@localhost:5432/tradepost?sslmode=disable
+TRADEPOST_ADDR          :8080
 ```
 
 ## Endpoints
@@ -87,4 +87,4 @@ shared with the addon are a later step.
 ## Deployment
 
 `deploy/k8s` will contain the ArgoCD manifests. Hostname:
-`babo-forever.b4b0.de`.
+`tradepost.b4b0.de`.

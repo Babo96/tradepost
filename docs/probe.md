@@ -5,7 +5,7 @@ on Linux now; the same steps apply on Windows later.
 
 ## 0. Safety
 
-The host scripts only touch lines that start with `BFD1`. Every write is
+The host scripts only touch lines that start with `TPD1`. Every write is
 preceded by a timestamped backup of `bindings-cache.wtf`.
 
 ### Phase 0 status
@@ -22,7 +22,7 @@ Phase 0 is complete. Sections 2–4 are kept for re-testing.
 If anything looks wrong:
 
 ```
-/bfprobe reset          # remove probe bindings from the client
+/tradepostprobe reset          # remove probe bindings from the client
 make probe-restore      # restore the newest bindings backup
 make probe-uninstall    # remove the probe addons
 ```
@@ -36,14 +36,14 @@ make probe-install
 Restart WoW completely (new addons are only discovered at startup). On the
 character select screen, open **AddOns** and confirm these are enabled:
 
-- `BaboForeverProbe`
-- `BFProbeDataA`
-- `BFProbeDataB`
+- `TradePostProbe`
+- `TPProbeDataA`
+- `TPProbeDataB`
 
 Then log in and run:
 
 ```
-/bfprobe dump
+/tradepostprobe dump
 ```
 
 ### Updating the probe
@@ -56,7 +56,7 @@ Record build, `GetRealmName()`, `GetCurrentRegion()`, faction, zone and subzone.
 Open the auction house and run:
 
 ```
-/bfprobe ah
+/tradepostprobe ah
 ```
 
 Record `GetNumReplicateItems()`, throttle readiness, and the commodity status
@@ -65,7 +65,7 @@ for linen cloth (2589) and a bag (4496).
 Once the count is stable, benchmark iterating the whole list:
 
 ```
-/bfprobe bench
+/tradepostprobe bench
 ```
 
 Record total auctions, unique item IDs, usable entries, missing item info,
@@ -77,9 +77,9 @@ scan is feasible or whether the addon must shard/target scans.
 In game, out of combat:
 
 ```
-/bfprobe bindwrite click TEST123
-/bfprobe bindread
-/bfprobe keys
+/tradepostprobe bindwrite click TEST123
+/tradepostprobe bindread
+/tradepostprobe keys
 ```
 
 On the host:
@@ -88,7 +88,7 @@ On the host:
 make probe-show
 ```
 
-Expected: one `BFD1` line is visible in the file and `bindread` prints the
+Expected: one `TPD1` line is visible in the file and `bindread` prints the
 action for `CTRL-ALT-SHIFT-F1`. Note the return value of `SetBinding` and the
 length of `GetBindingAction`.
 
@@ -103,10 +103,10 @@ make probe-bind PAYLOAD=MIDSESSION1 KEYS=4
 Then in game:
 
 ```
-/bfprobe bindread
+/tradepostprobe bindread
 ```
 
-- If it prints `CLICK BFD1:1:...MIDSESSION1...`, the bindings mailbox works
+- If it prints `CLICK TPD1:1:...MIDSESSION1...`, the bindings mailbox works
   without `/reload`.
 - If it still shows `TEST123`, `LoadBindings` is cached; the bindings channel
   is dead and we fall back to the ring or reload.
@@ -121,7 +121,7 @@ First confirm the host actually wrote the file:
 make probe-show
 ```
 
-If the `BFD1` line is there but the game shows nothing, test whether
+If the `TPD1` line is there but the game shows nothing, test whether
 `LoadBindings` re-reads the file at all with a **known-valid** command:
 
 ```sh
@@ -131,8 +131,8 @@ make probe-set KEY=CTRL-ALT-SHIFT-F1 COMMAND=ACTIONBUTTON1
 In game:
 
 ```
-/bfprobe bindread
-/bfprobe getkey CTRL-ALT-SHIFT-F1
+/tradepostprobe bindread
+/tradepostprobe getkey CTRL-ALT-SHIFT-F1
 ```
 
 - `ACTIONBUTTON1` appears: the file is re-read, but the client drops unknown
@@ -147,9 +147,9 @@ Restore the key afterwards with `make probe-clear` or `make probe-restore`.
 Outbound action length:
 
 ```
-/bfprobe bindlen 255
-/bfprobe bindlen 1024
-/bfprobe bindlen 4096
+/tradepostprobe bindlen 255
+/tradepostprobe bindlen 1024
+/tradepostprobe bindlen 4096
 ```
 
 Inbound chunk length (while the game runs):
@@ -157,7 +157,7 @@ Inbound chunk length (while the game runs):
 ```sh
 PAYLOAD=$(python3 -c 'print("A"*1024)')
 make probe-bind PAYLOAD="$PAYLOAD" KEYS=8 CHUNK_SIZE=200
-/bfprobe bindread
+/tradepostprobe bindread
 ```
 
 Record the largest action string the client preserves. This sets the mailbox
@@ -168,7 +168,7 @@ chunk size.
 In game:
 
 ```
-/bfprobe ring A
+/tradepostprobe ring A
 ```
 
 Expected: `INITIAL_A`. On the host, while the game runs:
@@ -180,7 +180,7 @@ make probe-ring SLOT=A PAYLOAD=RING123
 In game:
 
 ```
-/bfprobe ring A
+/tradepostprobe ring A
 ```
 
 - `INITIAL_A` means an already-loaded addon is not re-executed (expected).
@@ -191,7 +191,7 @@ make probe-ring SLOT=B PAYLOAD=RINGB123
 ```
 
 ```
-/bfprobe ring B
+/tradepostprobe ring B
 ```
 
 - `RINGB123` means a LoadOnDemand addon reads the current file content when it
@@ -201,7 +201,7 @@ make probe-ring SLOT=B PAYLOAD=RINGB123
 ## 6. TOC metadata
 
 ```
-/bfprobe meta A
+/tradepostprobe meta A
 ```
 
 Host:
@@ -211,7 +211,7 @@ make probe-meta SLOT=A PAYLOAD=META123
 ```
 
 ```
-/bfprobe meta A
+/tradepostprobe meta A
 ```
 
 `META123` means `GetAddOnMetadata` reads the TOC live; `INITIAL_META_A` means
@@ -230,17 +230,17 @@ Record anything unexpected in `docs/findings.md`.
 ## 8. Save the report
 
 ```
-/bfprobe report
+/tradepostprobe report
 ```
 
 Log out or `/reload` to write
-`WTF/Account/<account>/SavedVariables/BaboForeverProbe.lua`. Copy the relevant
+`WTF/Account/<account>/SavedVariables/TradePostProbe.lua`. Copy the relevant
 entries into `docs/findings.md` (do not commit the SavedVariables file).
 
 ## 9. Clean up
 
 ```
-/bfprobe reset
+/tradepostprobe reset
 make probe-clear
 make probe-uninstall
 ```

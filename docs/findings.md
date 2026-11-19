@@ -24,14 +24,14 @@ next design decision depends on it.
 | Field | Value |
 |---|---|
 | `GetNumReplicateItems()` when opened | 0 outside AH |
-| Same after `/bfprobe scan` | 105,472 → 280,707 → 285,012 |
+| Same after `/tradepostprobe scan` | 105,472 → 280,707 → 285,012 |
 | `IsThrottledMessageSystemReady()` | true, later false during Auctionator scan |
 | `GetItemCommodityStatus(2589)` | not captured yet |
 | `GetItemCommodityStatus(4496)` | not captured yet |
 | Scan wall-clock time | **4,817 ms** for 254,976 auctions (info-only pass) |
 | Memory before/after (`collectgarbage("count")`) | **-568 KB** after GC |
 
-`/bfprobe bench` on the full list:
+`/tradepostprobe bench` on the full list:
 
 ```
 total        = 254,976   (list later grew to 285,012)
@@ -70,12 +70,12 @@ Valanaar: not tested yet
 
 | Test | Result |
 |---|---|
-| `SetBinding` with `CLICK BF...:LeftButton` returns ok | not needed; inbound is dead |
+| `SetBinding` with `CLICK TP...:LeftButton` returns ok | not needed; inbound is dead |
 | `GetBindingAction` preserves the full action | not needed |
 | `SaveBindings` writes the line to `bindings-cache.wtf` | yes (line 49 observed) |
 | `LoadBindings` re-reads a file changed mid-session | **No.** `Y` was `ACTIONBUTTON11` before `/reload` and `ACTIONBUTTON5` after. The file is only re-read at login/reload. |
-| Raw `BFD1:...` action preserved | not needed |
-| `MACRO BF...` action preserved | not needed |
+| Raw `TPD1:...` action preserved | not needed |
+| `MACRO TP...` action preserved | not needed |
 | Longest preserved action (255 / 1024 / 4096) | not needed |
 | `SetBinding` accepts a data-carrying action for uplink | not needed |
 | `LoadBindings` resets unsaved keybinds | not observed |
@@ -107,16 +107,16 @@ Example action string after a successful write:
 
 | Test | Result |
 |---|---|
-| `LoadAddOn` on an unloaded slot reads current file content | **Yes.** `BFProbeDataA` written after startup loaded `RINGA123` mid-session, and `RINGA456` after `/reload`. |
+| `LoadAddOn` on an unloaded slot reads current file content | **Yes.** `TPProbeDataA` written after startup loaded `RINGA123` mid-session, and `RINGA456` after `/reload`. |
 | `LoadAddOn` on an already-loaded slot re-executes | No (expected; slot B stayed `INITIAL_B`). |
-| New slot folder created at runtime is discoverable | **No.** `BFProbeDataC`/`D` created while the game ran returned `MISSING`. |
+| New slot folder created at runtime is discoverable | **No.** `TPProbeDataC`/`D` created while the game ran returned `MISSING`. |
 | Slots visible/enabled in the AddOns list | Yes, when present at startup. |
 
 ## TOC metadata
 
 | Test | Result |
 |---|---|
-| `GetAddOnMetadata("BFProbeDataA", "X-BF-Data")` before rewrite | `META123` |
+| `GetAddOnMetadata("TPProbeDataA", "X-TP-Data")` before rewrite | `META123` |
 | same after rewriting the TOC to `META789` mid-session | `META123` — cached at load/startup |
 | Value truncated or preserved | preserved |
 
