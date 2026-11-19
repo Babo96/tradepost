@@ -24,12 +24,16 @@ local function ageText(timestamp)
   return string.format("%dd ago", math.floor(seconds / 86400))
 end
 
-local function addTooltip(frame, title, text)
+local function addTooltip(frame, title, text, command)
   frame:SetScript("OnEnter", function(owner)
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
     GameTooltip:AddLine(title or "", 1, 1, 1)
     if text then
       GameTooltip:AddLine(text, 0.8, 0.8, 0.8, true)
+    end
+    if command then
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("|cff33ff99Command:|r " .. command, 0.7, 0.9, 0.8, true)
     end
     GameTooltip:Show()
   end)
@@ -38,12 +42,12 @@ local function addTooltip(frame, title, text)
   end)
 end
 
-local function createCheckbox(parent, x, y, label, key, tooltip, onChange)
+local function createCheckbox(parent, x, y, label, key, tooltip, onChange, command)
   local checkbox = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
   checkbox:SetPoint("TOPLEFT", x, y)
   checkbox.Text:SetText(label)
   if tooltip then
-    addTooltip(checkbox, label, tooltip)
+    addTooltip(checkbox, label, tooltip, command)
   end
   checkbox:SetScript("OnClick", function(button)
     local value = button:GetChecked() and true or false
@@ -58,26 +62,26 @@ local function createCheckbox(parent, x, y, label, key, tooltip, onChange)
   return checkbox
 end
 
-local function createButton(parent, x, y, width, label, tooltip, onClick)
+local function createButton(parent, x, y, width, label, tooltip, onClick, command)
   local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
   button:SetSize(width, 24)
   button:SetPoint("TOPLEFT", x, y)
   button:SetText(label)
   button:SetScript("OnClick", onClick)
   if tooltip then
-    addTooltip(button, label, tooltip)
+    addTooltip(button, label, tooltip, command)
   end
   return button
 end
 
 -- Admin checkbox: enabling is destructive/large enough that it must be
 -- confirmed first. Unchecking turns the backfill off immediately.
-local function createAdminCheckbox(parent, x, y, label, tooltip, onEnable)
+local function createAdminCheckbox(parent, x, y, label, tooltip, onEnable, command)
   local checkbox = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
   checkbox:SetPoint("TOPLEFT", x, y)
   checkbox.Text:SetText(label)
   if tooltip then
-    addTooltip(checkbox, label, tooltip)
+    addTooltip(checkbox, label, tooltip, command)
   end
   checkbox:SetScript("OnClick", function(button)
     local value = button:GetChecked() and true or false
@@ -123,15 +127,15 @@ local function createPanel()
 
   local y = -16
   settings.controls.tooltips = createCheckbox(panel, 20, y, "Price tooltips", "tooltips",
-    "Show TradePost prices in item tooltips.")
+    "Show TradePost prices in item tooltips.", nil, "/tradepost tooltips on|off")
   settings.controls.showAge = createCheckbox(panel, 320, y, "Show price age", "showAge",
-    "Append how old the price data is.")
+    "Append how old the price data is.", nil, "/tradepost age on|off")
 
   y = y - 28
   settings.controls.showSupply = createCheckbox(panel, 20, y, "Show supply", "showSupply",
-    "Append the total quantity listed on the auction house.")
+    "Append the total quantity listed on the auction house.", nil, "/tradepost supply on|off")
   settings.controls.debug = createCheckbox(panel, 320, y, "Debug output", "debug",
-    "Print extra diagnostics to the chat frame.")
+    "Print extra diagnostics to the chat frame.", nil, "/tradepost debug (toggles)")
 
   y = y - 28
   settings.controls.ring = createCheckbox(panel, 20, y, "Live data ring", "ring",
@@ -140,7 +144,7 @@ local function createPanel()
       if value then
         TP:InitRing()
       end
-    end)
+    end, "/tradepost ring on|off")
   settings.controls.auctionatorBridge = createCheckbox(panel, 320, y, "Auctionator bridge", "auctionatorBridge",
     "Replace Auctionator's displayed prices with TradePost prices.",
     function(value)
@@ -149,7 +153,7 @@ local function createPanel()
       elseif TP.bridge then
         TP:BridgeOff()
       end
-    end)
+    end, "/tradepost bridge on|off")
 
   y = y - 28
   settings.controls.auctionatorFavourites = createCheckbox(panel, 20, y, "Auctionator favourites sync",
@@ -159,7 +163,7 @@ local function createPanel()
       if value then
         TP:SyncAuctionatorFavourites(true)
       end
-    end)
+    end, "/tradepost favourites on|off")
 
   y = y - 34
   local sliderLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -188,6 +192,9 @@ local function createPanel()
       TP.ring.lastSeq = 0
     end
   end)
+  addTooltip(slider, "Ring slots",
+    "Number of TradePost_Data ring slots. Changing it requires a /reload to reset loaded slots.",
+    "/tradepost ring count N")
   settings.slider = slider
 
   y = y - 42
@@ -216,7 +223,8 @@ local function createPanel()
       end
     end)
     addTooltip(button, HOUSE_LABELS[value],
-      "Force this auction house market instead of detecting it from your faction and zone.")
+      "Force this auction house market instead of detecting it from your faction and zone.",
+      "/tradepost house " .. value)
     settings.houseButtons[value] = button
   end
 
@@ -243,31 +251,31 @@ local function createPanel()
   createButton(panel, 20, y, 186, "Scan now", "Request an auction house scan now (the client throttle still applies).",
     function()
       TP:TryScan(true)
-    end)
+    end, "/tradepost scan")
   createButton(panel, 220, y, 186, "Browse", "Open the auction data browser.",
     function()
       TP:ToggleBrowser()
-    end)
+    end, "/tradepost browse")
   createButton(panel, 420, y, 186, "Auctionator list sync", "Rebuild the Auctionator shopping/wish list from the TradePost watchlist.",
     function()
       TP:SyncAuctionatorWatchList(true)
-    end)
+    end, "/tradepost watch sync")
 
   y = y - 30
   createButton(panel, 20, y, 186, "AH favorites sync", "Push the TradePost watchlist into the default Auction House favorites (requires the AH).",
     function()
       TP:SyncBlizzardFavorites(true)
-    end)
+    end, "/tradepost favorites sync")
   createButton(panel, 220, y, 186, "Login code", "Request a short login code for the TradePost companion site.",
     function()
       TP:RequestLogin()
-    end)
+    end, "/tradepost login")
   createButton(panel, 420, y, 186, "Export save", "Flush the export buffer to SavedVariables so the companion can pick it up.",
     function()
       if TP:SaveExport() then
         TP:Print("export saved to disk")
       end
-    end)
+    end, "/tradepost export save")
 
   y = y - 30
   createButton(panel, 20, y, 186, "Clear local data", "Delete all locally scanned prices for the current market.",
@@ -280,7 +288,7 @@ local function createPanel()
         return
       end
       StaticPopup_Show("TRADEPOST_CONFIRM_CLEAR", TP:MarketKey())
-    end)
+    end, "/tradepost clear")
 
   -- Advanced / Admin -------------------------------------------------------
   y = y - 44
@@ -305,7 +313,7 @@ local function createPanel()
     "tooltip details for every known item. Off by default because the payload is large.",
     function()
       TP:MetaStart(false)
-    end)
+    end, "/tradepost meta enable|disable")
 
   y = y - 28
   settings.adminStatus = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -318,12 +326,12 @@ local function createPanel()
   createButton(panel, 20, y, 130, "Meta start", "Start the metadata backfill now, even if it already ran today.",
     function()
       TP:MetaStart(false, true)
-    end)
+    end, "/tradepost meta start")
   createButton(panel, 158, y, 130, "Meta stop", "Stop the metadata backfill. The pending " ..
     "batch and queue are kept.",
     function()
       TP:MetaStop()
-    end)
+    end, "/tradepost meta stop")
   createButton(panel, 296, y, 160, "Force refresh all", "Discard the pending batch and " ..
     "requeue every known item for a full refresh.",
     function()
@@ -336,7 +344,7 @@ local function createPanel()
       else
         TP:MetaStart(true)
       end
-    end)
+    end, "/tradepost meta force")
 
   refresh = function()
     if not panel:IsShown() then
