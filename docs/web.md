@@ -15,7 +15,9 @@ Node build or separate static host.
 - search by item name, item ID, or exact key (`i:2589`, `g:1234:0`)
 - filters: quality (multi-select), class, subclass, inventory type,
   item level, required level, price (gold), in-stock, sort, and structured
-  **stats/resistances** (`stat`, `min_stat`, `max_stat`, `has_stats`)
+  **stats/resistances** (multiple stats, ANDed, each with optional min/max)
+- live contributor count: companions that requested a login code in the last
+  10 minutes (the companion refreshes one every 8 minutes)
 - 50 results per page with Prev/Next and `X–Y of N`
 - cheapest-first (or name/ilvl/quality/scanned) results with quality-colored
   names, item level, price, quantity, listings, and scan age
@@ -71,18 +73,26 @@ the useful subset:
 ```
 GET /v1/items?market=eu:pve:horde&q=linen&limit=50&page=1
 GET /v1/items?market=eu:pve:horde&quality=2,3&class_id=4&min_ilvl=30
-GET /v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT&min_stat=10
-GET /v1/items?market=eu:pve:horde&has_stats=1&in_stock=1&sort=price
+GET /v1/items?market=eu:pve:horde&stats=ITEM_MOD_STAMINA_SHORT:10
+GET /v1/items?market=eu:pve:horde&stats=ITEM_MOD_STAMINA_SHORT:10,ITEM_MOD_INTELLECT_SHORT:5
+GET /v1/items?market=eu:pve:horde&stats=RESISTANCE2_NAME::20&has_stats=1
+GET /v1/live
 GET /v1/item/detail?market=eu:pve:horde&key=i:2589
 GET /v1/items/missing-details?market=eu:pve:horde&limit=500&force=0
 GET /v1/item/history?market=eu:pve:horde&key=i:2589&range=12h
 GET /v1/item/markets?key=i:2589
 ```
 
-`/v1/items` returns `{items,total,page,limit,market,query}`. `stat` takes an
-exact `stats` key (`^[A-Za-z0-9_]{1,64}$`); `min_stat`/`max_stat` are optional
-numbers and apply only with `stat`; `has_stats=1` requires a non-empty stats
-object. Invalid `stat` or a non-numeric range returns HTTP 400.
+`/v1/items` returns `{items,total,page,limit,market,query}`. `stats` is a
+comma-separated list of `KEY`, `KEY:MIN`, `KEY::MAX`, or `KEY:MIN:MAX`
+segments; all segments are ANDed. Keys must match `^[A-Za-z0-9_]{1,64}$` and
+values must be JSON numbers. The legacy `stat`/`min_stat`/`max_stat` params
+still work and are ANDed with `stats`. `has_stats=1` requires a non-empty stats
+object. Invalid keys, malformed segments, or non-numeric bounds return HTTP 400.
+
+`/v1/live` returns `{live_clients,window_seconds}`. It counts distinct clients
+that requested a login code in the last 10 minutes; the companion refreshes a
+code every 8 minutes, so this is the "live contributors" heartbeat.
 
 History returns oldest-to-newest points with min/max/quantity/samples. The
 response includes `resolution` (`1m`, `15m`, `hour`) and `range`.
