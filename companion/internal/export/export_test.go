@@ -223,3 +223,19 @@ TRADEPOST_ACTIVE = { character = "Schmoo-Boo", seen = 1794947801 }
 		t.Fatalf("unexpected watch: %+v", watch)
 	}
 }
+
+func TestLoadRingRequest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TradePost.lua")
+	data := `TRADEPOST_EXPORT = { ringRequest = { market = "eu:pve:horde", at = 1794947776 } }`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := LoadData(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.RingRequest == nil || parsed.RingRequest.Market != "eu:pve:horde" || parsed.RingRequest.At != 1794947776 {
+		t.Fatalf("unexpected ring request: %+v", parsed.RingRequest)
+	}
+}

@@ -23,6 +23,14 @@ const clientVersion = "0.1.0"
 // Matches the server-side limit in server/internal/api/api.go.
 const maxMetaPerRequest = 20000
 
+// Ring full snapshots every N 5-minute windows, or earlier when the diff is
+// large. Between fulls each slot carries the cumulative change since the base,
+// so a missed window still recovers when the next delta arrives.
+const (
+	ringFullEveryWindows = 6
+	ringFullChangedLimit = 4000
+)
+
 type Status struct {
 	Running        bool   `json:"running"`
 	LastSync       int64  `json:"last_sync"`
@@ -45,19 +53,25 @@ type Status struct {
 }
 
 type Service struct {
-	mu              sync.Mutex
-	syncMu          sync.Mutex
-	cfg             config.Config
-	client          *api.Client
-	account         string
-	uploaded        map[string]bool
-	meta            map[string]string
-	authSeq         int64
-	activeCharacter string
-	lastLoginCodeAt time.Time
-	watch           []string
-	watchAt         int64
-	status          Status
+	mu                sync.Mutex
+	syncMu            sync.Mutex
+	cfg               config.Config
+	client            *api.Client
+	account           string
+	uploaded          map[string]bool
+	meta              map[string]string
+	authSeq           int64
+	activeCharacter   string
+	lastLoginCodeAt   time.Time
+	ringBase          map[string]api.SnapshotItem
+	ringBaseSeq       int64
+	ringFullWindow    int64
+	ringSeq           int64
+	ringMarket        string
+	lastRingRequestAt int64
+	watch             []string
+	watchAt           int64
+	status            Status
 }
 
 func New(cfg config.Config) (*Service, error) {
@@ -151,6 +165,7 @@ func (s *Service) sync(ctx context.Context) error {
 		s.activeCharacter = data.Active
 		s.mu.Unlock()
 	}
+	s.applyRingRequest(data.RingRequest)
 	s.syncAuth(ctx, data)
 	s.syncWatch(ctx, data)
 	newScans := make([]export.Scan, 0, len(data.Scans))
@@ -318,9 +333,13 @@ func (s *Service) sync(ctx context.Context) error {
 		// Publish this window and the next one. The addon asks for the new
 		// window immediately at the boundary, before the next sync has run.
 		window := time.Now().Unix() / 300
+		payload := s.buildRingPayload(selected, window)
 		var currentPath string
 		for offset := int64(0); offset < 2; offset++ {
-			path, err := addon.WriteRingSlot(s.cfg.WowDir, selected.Market, *selected, s.cfg.RingSlots, window+offset, s.watch, s.watchAt)
+			payload.Window = window + offset
+			payload.Pins = s.watch
+			payload.PinsUpdated = s.watchAt
+			path, err := addon.WriteRingPayload(s.cfg.WowDir, s.cfg.RingSlots, payload)
 			if err != nil {
 				return fmt.Errorf("write ring slot: %w", err)
 			}
@@ -333,6 +352,65 @@ func (s *Service) sync(ctx context.Context) error {
 		s.mu.Unlock()
 	}
 	return nil
+}
+
+// buildRingPayload returns a full snapshot when there is no base, the market
+// changed, the base is old, or the diff is large. Otherwise it returns the
+// cumulative delta since the last full base.
+func (s *Service) buildRingPayload(snapshot *api.Snapshot, window int64) addon.RingPayload {
+	full := s.ringBase == nil ||
+		s.ringMarket != snapshot.Market ||
+		window-s.ringFullWindow >= ringFullEveryWindows
+	var changed []api.SnapshotItem
+	var removed []string
+	if !full {
+		changed, removed = addon.RingDiff(s.ringBase, snapshot.Items)
+		if len(changed) > ringFullChangedLimit || len(changed)+len(removed) > ringFullChangedLimit+1000 {
+			full = true
+		}
+	}
+	if full {
+		seq := time.Now().UnixMilli()
+		if seq <= s.ringSeq {
+			seq = s.ringSeq + 1
+		}
+		base := make(map[string]api.SnapshotItem, len(snapshot.Items))
+		for _, item := range snapshot.Items {
+			base[item.Key] = item
+		}
+		s.ringBase = base
+		s.ringBaseSeq = seq
+		s.ringFullWindow = window
+		s.ringSeq = seq
+		s.ringMarket = snapshot.Market
+		return addon.RingPayload{
+			Market: snapshot.Market, Window: window, Generated: snapshot.Generated,
+			Base: seq, Seq: seq, Full: true, Items: snapshot.Items,
+		}
+	}
+	seq := time.Now().UnixMilli()
+	if seq <= s.ringSeq {
+		seq = s.ringSeq + 1
+	}
+	s.ringSeq = seq
+	return addon.RingPayload{
+		Market: snapshot.Market, Window: window, Generated: snapshot.Generated,
+		Base: s.ringBaseSeq, Seq: seq, Full: false, Items: changed, Removed: removed,
+	}
+}
+
+// applyRingRequest forces a full ring snapshot when the addon reports that it
+// missed a base (for example after a fresh login). The request travels through
+// SavedVariables, so it can take one flush to arrive.
+func (s *Service) applyRingRequest(request *export.RingRequest) {
+	if request == nil || request.At <= s.lastRingRequestAt {
+		return
+	}
+	s.lastRingRequestAt = request.At
+	if request.Market == "" || request.Market == s.cfg.Market {
+		s.ringBase = nil
+		s.ringMarket = ""
+	}
 }
 
 func (s *Service) syncAuth(ctx context.Context, data export.Data) {

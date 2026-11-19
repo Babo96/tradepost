@@ -96,14 +96,20 @@ type WatchSet struct {
 	Items   []string
 }
 
+type RingRequest struct {
+	Market string
+	At     int64
+}
+
 type Data struct {
-	Scans     []Scan
-	Items     []Meta
-	Details   []Meta
-	MetaBatch *MetaBatch
-	Auth      *AuthRequest
-	Watch     map[string]WatchSet
-	Active    string
+	Scans       []Scan
+	Items       []Meta
+	Details     []Meta
+	MetaBatch   *MetaBatch
+	Auth        *AuthRequest
+	RingRequest *RingRequest
+	Watch       map[string]WatchSet
+	Active      string
 }
 
 func Load(path string) ([]Scan, error) {
@@ -129,13 +135,14 @@ func LoadData(path string) (Data, error) {
 	}
 
 	data := Data{
-		Scans:     loadScans(L),
-		Items:     loadItems(L),
-		Details:   loadDetails(L),
-		MetaBatch: loadMetaBatch(L),
-		Auth:      loadAuth(L),
-		Watch:     loadWatch(L),
-		Active:    loadActive(L),
+		Scans:       loadScans(L),
+		Items:       loadItems(L),
+		Details:     loadDetails(L),
+		MetaBatch:   loadMetaBatch(L),
+		Auth:        loadAuth(L),
+		RingRequest: loadRingRequest(L),
+		Watch:       loadWatch(L),
+		Active:      loadActive(L),
 	}
 	sort.Slice(data.Items, func(i, j int) bool { return data.Items[i].ID < data.Items[j].ID })
 	sort.Slice(data.Details, func(i, j int) bool { return data.Details[i].ID < data.Details[j].ID })
@@ -430,6 +437,25 @@ func loadWatch(L *lua.LState) map[string]WatchSet {
 		}
 	})
 	return result
+}
+
+func loadRingRequest(L *lua.LState) *RingRequest {
+	exports, ok := L.GetGlobal("TRADEPOST_EXPORT").(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	table, ok := exports.RawGetString("ringRequest").(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	request := &RingRequest{
+		Market: lua.LVAsString(table.RawGetString("market")),
+		At:     int64(lua.LVAsNumber(table.RawGetString("at"))),
+	}
+	if request.At <= 0 {
+		return nil
+	}
+	return request
 }
 
 func loadActive(L *lua.LState) string {

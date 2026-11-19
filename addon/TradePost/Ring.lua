@@ -69,16 +69,36 @@ function TP:ApplyRing(data, targetWindow)
       self:ApplyRemoteWatch(data.pins, data.pins_updated)
     end
   end
-  if data.seq <= live.seq then
-    return false
+  -- Full payloads replace the lookup; deltas are cumulative changes since the
+  -- full snapshot identified by base. A missed window still recovers because
+  -- the next delta carries every change since that base.
+  local isFull = data.full
+  if isFull == nil then
+    isFull = true
   end
-
-  if data.base and live.base and data.base ~= live.base then
-    -- A new base snapshot: discard old cumulative deltas.
+  if isFull then
+    if data.seq <= live.seq and live.base == data.base then
+      return false
+    end
     live.lookup = {}
-  end
-  if data.base then
     live.base = data.base
+    live.needsFull = false
+    if TRADEPOST_EXPORT then
+      TRADEPOST_EXPORT.ringRequest = nil
+    end
+  else
+    if not live.base or data.base ~= live.base then
+      if not live.needsFull then
+        live.needsFull = true
+        self:Print("live price data is out of sync; requesting a full snapshot.")
+        self:RequestRingResync()
+      end
+      return false
+    end
+    if data.seq <= live.seq then
+      return false
+    end
+    live.needsFull = false
   end
 
   live.seq = data.seq
@@ -102,10 +122,28 @@ function TP:ApplyRing(data, targetWindow)
 
 
   self:Debug(string.format(
-    "ring applied window=%s seq=%s items=%d",
-    tostring(data.window), tostring(data.seq), #(data.items or {})
+    "ring applied window=%s seq=%s full=%s items=%d",
+    tostring(data.window), tostring(data.seq), tostring(isFull), #(data.items or {})
   ))
   return true
+end
+
+function TP:RequestRingResync()
+  if self.ringResyncAt and (time() - self.ringResyncAt) < 300 then
+    return
+  end
+  self.ringResyncAt = time()
+  TRADEPOST_EXPORT = TRADEPOST_EXPORT or {}
+  TRADEPOST_EXPORT.ringRequest = {
+    market = self:MarketKey(),
+    at = time(),
+  }
+  if self.SaveExport then
+    self:SaveExport()
+  end
+  if self.ScheduleExportRetry then
+    self:ScheduleExportRetry()
+  end
 end
 
 function TP:LoadRingWindow(window, force)

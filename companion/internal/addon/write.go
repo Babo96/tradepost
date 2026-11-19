@@ -2,6 +2,7 @@ package addon
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -73,47 +74,85 @@ func WriteAuthRingSlots(wowDir, market string, seq int64, code, character string
 	return nil
 }
 
+type RingPayload struct {
+	Market      string
+	Window      int64
+	Generated   int64
+	Base        int64
+	Seq         int64
+	Full        bool
+	Items       []api.SnapshotItem
+	Removed     []string
+	Pins        []string
+	PinsUpdated int64
+}
+
+// WriteRingSlot is the legacy full-snapshot entry point.
 func WriteRingSlot(wowDir, market string, snapshot api.Snapshot, ringSlots int, window int64, pins []string, pinsUpdated int64) (string, error) {
-	if ringSlots < 1 {
-		ringSlots = 64
-	}
 	if market == "" {
 		market = snapshot.Market
 	}
-	if window == 0 {
-		window = time.Now().Unix() / 300
+	return WriteRingPayload(wowDir, ringSlots, RingPayload{
+		Market:      market,
+		Window:      window,
+		Generated:   snapshot.Generated,
+		Base:        snapshot.Version,
+		Seq:         snapshot.Version,
+		Full:        true,
+		Items:       snapshot.Items,
+		Pins:        pins,
+		PinsUpdated: pinsUpdated,
+	})
+}
+
+// WriteRingPayload writes one live ring slot. A full payload replaces the
+// addon's lookup; a delta applies cumulative changes since Base.
+func WriteRingPayload(wowDir string, ringSlots int, payload RingPayload) (string, error) {
+	if ringSlots < 1 {
+		ringSlots = 64
+	}
+	if payload.Window == 0 {
+		payload.Window = time.Now().Unix() / 300
 	}
 	priceSlots := wow.PriceSlots(ringSlots)
 	if priceSlots < 1 {
 		priceSlots = ringSlots
 	}
-	slot := int(window % int64(priceSlots))
+	slot := int(payload.Window % int64(priceSlots))
 
 	var b strings.Builder
 	b.WriteString("-- Generated live ring slot. The companion rewrites this file.\n")
 	b.WriteString("TRADEPOST_RING = {\n")
 	b.WriteString("  schema = 1,\n")
-	fmt.Fprintf(&b, "  market = %q,\n", market)
-	fmt.Fprintf(&b, "  window = %d,\n", window)
-	fmt.Fprintf(&b, "  generated = %d,\n", snapshot.Generated)
-	b.WriteString("  base = 0,\n")
-	fmt.Fprintf(&b, "  seq = %d,\n", snapshot.Version)
+	fmt.Fprintf(&b, "  market = %q,\n", payload.Market)
+	fmt.Fprintf(&b, "  window = %d,\n", payload.Window)
+	fmt.Fprintf(&b, "  generated = %d,\n", payload.Generated)
+	fmt.Fprintf(&b, "  full = %t,\n", payload.Full)
+	fmt.Fprintf(&b, "  base = %d,\n", payload.Base)
+	fmt.Fprintf(&b, "  seq = %d,\n", payload.Seq)
 	b.WriteString("  items = {\n")
-	for _, item := range snapshot.Items {
+	for _, item := range payload.Items {
 		fmt.Fprintf(&b, "    { k = %q, p = %d, q = %d, n = %d, t = %d },\n",
 			item.Key, item.Price, item.Quantity, item.Listings, item.Scanned)
 	}
 	b.WriteString("  },\n")
-	b.WriteString("  removed = {},\n")
-	b.WriteString("  pins = {")
-	for index, key := range pins {
+	b.WriteString("  removed = {")
+	for index, key := range payload.Removed {
 		if index > 0 {
 			b.WriteString(", ")
 		}
 		fmt.Fprintf(&b, "%q", key)
 	}
 	b.WriteString("},\n")
-	fmt.Fprintf(&b, "  pins_updated = %d,\n", pinsUpdated)
+	b.WriteString("  pins = {")
+	for index, key := range payload.Pins {
+		if index > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%q", key)
+	}
+	b.WriteString("},\n")
+	fmt.Fprintf(&b, "  pins_updated = %d,\n", payload.PinsUpdated)
 	b.WriteString("}\n")
 
 	path := wow.SlotPath(wowDir, slot)
@@ -121,4 +160,26 @@ func WriteRingSlot(wowDir, market string, snapshot api.Snapshot, ringSlots int, 
 		return "", err
 	}
 	return path, nil
+}
+
+// RingDiff returns the items that changed since base and the keys that
+// disappeared. Scanned-only changes are ignored so a scan that refreshes the
+// timestamp without changing price/quantity/listings does not defeat deltas.
+func RingDiff(base map[string]api.SnapshotItem, items []api.SnapshotItem) (changed []api.SnapshotItem, removed []string) {
+	seen := make(map[string]bool, len(items))
+	for _, item := range items {
+		seen[item.Key] = true
+		old, ok := base[item.Key]
+		if !ok || old.Price != item.Price || old.Quantity != item.Quantity || old.Listings != item.Listings {
+			changed = append(changed, item)
+		}
+	}
+	for key := range base {
+		if !seen[key] {
+			removed = append(removed, key)
+		}
+	}
+	sort.Slice(changed, func(i, j int) bool { return changed[i].Key < changed[j].Key })
+	sort.Strings(removed)
+	return changed, removed
 }

@@ -104,3 +104,35 @@ func TestPriceRingSkipsSyncSlots(t *testing.T) {
 		t.Fatalf("price ring used a reserved sync slot: %s", path)
 	}
 }
+
+func TestWriteRingPayloadDelta(t *testing.T) {
+	wowDir := setupWow(t)
+	payload := RingPayload{
+		Market:      "eu:pve:horde",
+		Window:      11,
+		Generated:   1794947776,
+		Base:        100,
+		Seq:         101,
+		Full:        false,
+		Items:       []api.SnapshotItem{{Key: "i:2318", Price: 4567, Quantity: 100, Listings: 3, Scanned: 1794947776}},
+		Removed:     []string{"i:2589"},
+		Pins:        []string{"i:1251"},
+		PinsUpdated: 1794947800,
+	}
+	path, err := WriteRingPayload(wowDir, 8, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`full = false`, `base = 100`, `seq = 101`,
+		`removed = {"i:2589"}`, `k = "i:2318"`, `pins_updated = 1794947800`,
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Fatalf("ring delta missing %q:\n%s", want, data)
+		}
+	}
+}
