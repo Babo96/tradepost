@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
 	"strings"
@@ -21,10 +22,33 @@ type Client struct {
 }
 
 type Item struct {
-	Key      string
-	Price    int64
-	Quantity int64
-	Listings int32
+	Key      string `json:"k"`
+	Price    int64  `json:"p"`
+	Quantity int64  `json:"q"`
+	Listings int32  `json:"n"`
+}
+
+// ScanPayload is the compressed JSON body stored in an ingest job.
+type ScanPayload struct {
+	Market        string `json:"market"`
+	ScannedAt     int64  `json:"scanned_at"`
+	ClientVersion string `json:"client_version"`
+	Items         []Item `json:"items"`
+}
+
+// IngestJob is one queued scan. Payload is gzip-compressed ScanPayload JSON.
+type IngestJob struct {
+	ID        int64
+	ClientID  string
+	Market    string
+	ScannedAt time.Time
+	Checksum  []byte
+	Payload   []byte
+	Status    string
+	Attempts  int
+	Error     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Scan struct {
@@ -67,24 +91,88 @@ type Snapshot struct {
 // ItemMeta is client-known item information. It is keyed by item ID, not by
 // price key, so equipment variants share one name/icon.
 type ItemMeta struct {
-	ID         int64
-	Name       string
-	Quality    int
-	ClassID    int
-	SubclassID int
-	Icon       int64
+	ID             int64           `json:"id"`
+	Name           string          `json:"name"`
+	Quality        int             `json:"quality"`
+	ClassID        int             `json:"class_id"`
+	SubclassID     int             `json:"subclass_id"`
+	Icon           int64           `json:"icon"`
+	ItemLevel      *int            `json:"item_level,omitempty"`
+	RequiredLevel  *int            `json:"required_level,omitempty"`
+	BindType       *int            `json:"bind_type,omitempty"`
+	InventoryType  *int            `json:"inventory_type,omitempty"`
+	EquipLoc       *string         `json:"equip_loc,omitempty"`
+	Armor          *int            `json:"armor,omitempty"`
+	DamageMin      *int            `json:"damage_min,omitempty"`
+	DamageMax      *int            `json:"damage_max,omitempty"`
+	Delay          *int            `json:"delay,omitempty"`
+	VendorPrice    *int64          `json:"vendor_price,omitempty"`
+	MaxStack       *int            `json:"max_stack,omitempty"`
+	UniqueItem     *bool           `json:"unique_item,omitempty"`
+	SetID          *int            `json:"set_id,omitempty"`
+	Stats          json.RawMessage `json:"stats,omitempty"`
+	Details        json.RawMessage `json:"details,omitempty"`
+	DetailsVersion int             `json:"details_version,omitempty"`
+	DetailsUpdated int64           `json:"details_updated,omitempty"`
+}
+
+// SearchQuery is the filter set used by the website item browser.
+type SearchQuery struct {
+	Query         string
+	Qualities     []int
+	ClassID       *int
+	SubclassID    *int
+	InventoryType *int
+	MinIlvl       *int
+	MaxIlvl       *int
+	MinReqLevel   *int
+	MaxReqLevel   *int
+	MinPrice      *int64
+	MaxPrice      *int64
+	InStock       bool
+	Sort          string
+	Page          int
+	Limit         int
+}
+
+type SearchPage struct {
+	Items []SearchResult
+	Total int64
 }
 
 // SearchResult joins a latest price with optional item metadata.
 type SearchResult struct {
-	Key      string `json:"key"`
-	ItemID   int64  `json:"item_id"`
-	Name     string `json:"name"`
-	Quality  int    `json:"quality"`
-	Price    int64  `json:"price"`
-	Quantity int64  `json:"quantity"`
-	Listings int32  `json:"listings"`
-	Scanned  int64  `json:"scanned"`
+	Key           string `json:"key"`
+	ItemID        int64  `json:"item_id"`
+	Name          string `json:"name"`
+	Quality       int    `json:"quality"`
+	Price         int64  `json:"price"`
+	Quantity      int64  `json:"quantity"`
+	Listings      int32  `json:"listings"`
+	Scanned       int64  `json:"scanned"`
+	ItemLevel     *int   `json:"item_level,omitempty"`
+	RequiredLevel *int   `json:"required_level,omitempty"`
+	BindType      *int   `json:"bind_type,omitempty"`
+	InventoryType *int   `json:"inventory_type,omitempty"`
+	EquipLoc      string `json:"equip_loc,omitempty"`
+	Armor         *int   `json:"armor,omitempty"`
+	DamageMin     *int   `json:"damage_min,omitempty"`
+	DamageMax     *int   `json:"damage_max,omitempty"`
+	Delay         *int   `json:"delay,omitempty"`
+	VendorPrice   *int64 `json:"vendor_price,omitempty"`
+	MaxStack      *int   `json:"max_stack,omitempty"`
+	UniqueItem    *bool  `json:"unique_item,omitempty"`
+	SetID         *int   `json:"set_id,omitempty"`
+	HasDetails    bool   `json:"has_details"`
+}
+
+// ItemDetail is item metadata plus its latest price on one market.
+type ItemDetail struct {
+	ItemMeta
+	Price    int64 `json:"price"`
+	Quantity int64 `json:"quantity"`
+	Listings int32 `json:"listings"`
+	Scanned  int64 `json:"scanned"`
 }
 
 // HistoryPoint is one hourly min/max bucket.
@@ -150,12 +238,18 @@ type Store interface {
 	Ping(ctx context.Context) error
 	CreateClient(ctx context.Context, id string, tokenHash []byte) error
 	ClientByTokenHash(ctx context.Context, tokenHash []byte) (Client, error)
-	Ingest(ctx context.Context, clientID string, scan Scan) (IngestResult, error)
+	EnqueueIngest(ctx context.Context, clientID string, job IngestJob) (bool, error)
+	ClaimIngestJobs(ctx context.Context, limit int) ([]IngestJob, error)
+	ProcessIngestJob(ctx context.Context, job IngestJob) error
+	CompleteIngestJob(ctx context.Context, id int64) error
+	FailIngestJob(ctx context.Context, id int64, attempts int, errMsg string) error
 	Meta(ctx context.Context) ([]MarketMeta, error)
 	Snapshot(ctx context.Context, market string) (Snapshot, error)
 	Markets(ctx context.Context) ([]string, error)
 	UpsertItems(ctx context.Context, items []ItemMeta) error
-	SearchItems(ctx context.Context, market, query string, limit int) ([]SearchResult, error)
+	SearchItems(ctx context.Context, market string, query SearchQuery) (SearchPage, error)
+	MissingItemDetails(ctx context.Context, market string, force bool, limit int) ([]int64, error)
+	ItemDetail(ctx context.Context, market, key string) (ItemDetail, error)
 	ItemHistory(ctx context.Context, market, key string, limit int) (History, error)
 	HistoryPoints(ctx context.Context, market, key, resolution string, since time.Time, limit int) (History, error)
 	CleanupHistory(ctx context.Context) error

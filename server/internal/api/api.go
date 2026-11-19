@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/rand"
@@ -53,6 +54,8 @@ func New(st store.Store) *Server {
 	s.mux.HandleFunc("GET /v1/snapshot/{market}", s.handleSnapshot)
 	s.mux.HandleFunc("GET /v1/snapshot/{market}/data-addon.zip", s.handleDataAddon)
 	s.mux.HandleFunc("GET /v1/items", s.handleItems)
+	s.mux.HandleFunc("GET /v1/items/missing-details", s.handleMissingDetails)
+	s.mux.HandleFunc("GET /v1/item/detail", s.handleItemDetail)
 	s.mux.HandleFunc("GET /v1/item/history", s.handleItemHistory)
 	s.mux.HandleFunc("GET /v1/item/markets", s.handleItemMarkets)
 	s.mux.HandleFunc("POST /v1/auth/code", s.handleAuthCode)
@@ -108,12 +111,27 @@ type ingestRequest struct {
 }
 
 type ingestMeta struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	Quality    int    `json:"quality"`
-	ClassID    int    `json:"class_id"`
-	SubclassID int    `json:"subclass_id"`
-	Icon       int64  `json:"icon"`
+	ID            int64           `json:"id"`
+	Name          string          `json:"name"`
+	Quality       int             `json:"quality"`
+	ClassID       int             `json:"class_id"`
+	SubclassID    int             `json:"subclass_id"`
+	Icon          int64           `json:"icon"`
+	ItemLevel     *int            `json:"item_level"`
+	RequiredLevel *int            `json:"required_level"`
+	BindType      *int            `json:"bind_type"`
+	InventoryType *int            `json:"inventory_type"`
+	EquipLoc      *string         `json:"equip_loc"`
+	Armor         *int            `json:"armor"`
+	DamageMin     *int            `json:"damage_min"`
+	DamageMax     *int            `json:"damage_max"`
+	Delay         *int            `json:"delay"`
+	VendorPrice   *int64          `json:"vendor_price"`
+	MaxStack      *int            `json:"max_stack"`
+	UniqueItem    *bool           `json:"unique_item"`
+	SetID         *int            `json:"set_id"`
+	Stats         json.RawMessage `json:"stats"`
+	Details       json.RawMessage `json:"details"`
 }
 
 type ingestScan struct {
@@ -131,9 +149,8 @@ type ingestItem struct {
 }
 
 type ingestResponse struct {
-	Accepted int `json:"accepted"`
+	Queued   int `json:"queued"`
 	Rejected int `json:"rejected"`
-	Items    int `json:"items"`
 	Meta     int `json:"meta"`
 }
 
@@ -182,13 +199,38 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, "invalid item metadata values")
 			return
 		}
+		if !validOptionalInts(item.ItemLevel, item.RequiredLevel, item.BindType, item.InventoryType,
+			item.Armor, item.DamageMin, item.DamageMax, item.Delay, item.MaxStack, item.SetID) ||
+			(item.VendorPrice != nil && *item.VendorPrice < 0) {
+			writeError(w, http.StatusBadRequest, "invalid item metadata values")
+			return
+		}
+		if !validJSON(item.Stats) || !validJSON(item.Details) {
+			writeError(w, http.StatusBadRequest, "invalid item metadata json")
+			return
+		}
 		meta = append(meta, store.ItemMeta{
-			ID:         item.ID,
-			Name:       item.Name,
-			Quality:    item.Quality,
-			ClassID:    item.ClassID,
-			SubclassID: item.SubclassID,
-			Icon:       item.Icon,
+			ID:            item.ID,
+			Name:          item.Name,
+			Quality:       item.Quality,
+			ClassID:       item.ClassID,
+			SubclassID:    item.SubclassID,
+			Icon:          item.Icon,
+			ItemLevel:     item.ItemLevel,
+			RequiredLevel: item.RequiredLevel,
+			BindType:      item.BindType,
+			InventoryType: item.InventoryType,
+			EquipLoc:      item.EquipLoc,
+			Armor:         item.Armor,
+			DamageMin:     item.DamageMin,
+			DamageMax:     item.DamageMax,
+			Delay:         item.Delay,
+			VendorPrice:   item.VendorPrice,
+			MaxStack:      item.MaxStack,
+			UniqueItem:    item.UniqueItem,
+			SetID:         item.SetID,
+			Stats:         normalizeJSON(item.Stats),
+			Details:       normalizeJSON(item.Details),
 		})
 	}
 
@@ -257,16 +299,70 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 
 	result := ingestResponse{Meta: len(meta)}
 	for _, scan := range parsed {
-		ingested, err := s.store.Ingest(r.Context(), client.ID, scan)
+		payload, err := encodePayload(scan)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "ingest failed")
 			return
 		}
-		result.Accepted += ingested.Accepted
-		result.Rejected += ingested.Rejected
-		result.Items += ingested.Items
+		queued, err := s.store.EnqueueIngest(r.Context(), client.ID, store.IngestJob{
+			Market:    scan.Market,
+			ScannedAt: scan.ScannedAt,
+			Checksum:  scan.Checksum,
+			Payload:   payload,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "ingest failed")
+			return
+		}
+		if queued {
+			result.Queued++
+		} else {
+			result.Rejected++
+		}
 	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusAccepted, result)
+}
+
+func encodePayload(scan store.Scan) ([]byte, error) {
+	body, err := json.Marshal(store.ScanPayload{
+		Market:        scan.Market,
+		ScannedAt:     scan.ScannedAt.Unix(),
+		ClientVersion: scan.ClientVersion,
+		Items:         scan.Items,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(body); err != nil {
+		gz.Close()
+		return nil, err
+	}
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func validOptionalInts(values ...*int) bool {
+	for _, value := range values {
+		if value != nil && *value < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func validJSON(raw json.RawMessage) bool {
+	return len(raw) == 0 || json.Valid(raw)
+}
+
+func normalizeJSON(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	return raw
 }
 
 func (s *Server) handleMeta(w http.ResponseWriter, r *http.Request) {
@@ -326,18 +422,91 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "query too long")
 		return
 	}
-	limit := parseLimit(query.Get("limit"), 50, 200)
-	items, err := s.store.SearchItems(r.Context(), market, search, limit)
+
+	filters := store.SearchQuery{
+		Query:         search,
+		Qualities:     parseCSVInts(query.Get("quality")),
+		ClassID:       parseIntPtr(query.Get("class_id")),
+		SubclassID:    parseIntPtr(query.Get("subclass_id")),
+		InventoryType: parseIntPtr(query.Get("inventory_type")),
+		MinIlvl:       parseIntPtr(query.Get("min_ilvl")),
+		MaxIlvl:       parseIntPtr(query.Get("max_ilvl")),
+		MinReqLevel:   parseIntPtr(query.Get("min_req_level")),
+		MaxReqLevel:   parseIntPtr(query.Get("max_req_level")),
+		MinPrice:      parseInt64Ptr(query.Get("min_price")),
+		MaxPrice:      parseInt64Ptr(query.Get("max_price")),
+		InStock:       query.Get("in_stock") == "1",
+		Sort:          query.Get("sort"),
+		Page:          parsePositive(query.Get("page"), 1),
+		Limit:         parseLimit(query.Get("limit"), 50, 200),
+	}
+
+	page, err := s.store.SearchItems(r.Context(), market, filters)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "search failed")
 		return
+	}
+	items := page.Items
+	if items == nil {
+		items = []store.SearchResult{}
 	}
 	w.Header().Set("Cache-Control", "public, max-age=30")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"market": market,
 		"query":  search,
 		"items":  items,
+		"total":  page.Total,
+		"page":   filters.Page,
+		"limit":  filters.Limit,
 	})
+}
+
+func (s *Server) handleMissingDetails(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	market := query.Get("market")
+	if !marketRE.MatchString(market) {
+		writeError(w, http.StatusBadRequest, "invalid market")
+		return
+	}
+	limit := parseLimit(query.Get("limit"), 500, 2000)
+	force := query.Get("force") == "1"
+	ids, err := s.store.MissingItemDetails(r.Context(), market, force, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "missing details failed")
+		return
+	}
+	if ids == nil {
+		ids = []int64{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": ids,
+		"count": len(ids),
+	})
+}
+
+func (s *Server) handleItemDetail(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	market := query.Get("market")
+	key := query.Get("key")
+	if !marketRE.MatchString(market) {
+		writeError(w, http.StatusBadRequest, "invalid market")
+		return
+	}
+	if !itemRE.MatchString(key) {
+		writeError(w, http.StatusBadRequest, "invalid item key")
+		return
+	}
+	detail, err := s.store.ItemDetail(r.Context(), market, key)
+	if errors.Is(err, store.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "item not found")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "item detail failed")
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=30")
+	writeJSON(w, http.StatusOK, detail)
 }
 
 func (s *Server) handleItemHistory(w http.ResponseWriter, r *http.Request) {
@@ -361,7 +530,7 @@ func (s *Server) handleItemHistory(w http.ResponseWriter, r *http.Request) {
 	var limit int
 	switch rangeKey {
 	case "12h":
-		resolution = "raw"
+		resolution = "1m"
 		since = time.Now().Add(-12 * time.Hour)
 		limit = parseLimit(query.Get("limit"), 1000, 5000)
 	case "7d":
@@ -415,6 +584,50 @@ func parseLimit(raw string, fallback, max int) int {
 		return max
 	}
 	return value
+}
+
+func parsePositive(raw string, fallback int) int {
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 {
+		return fallback
+	}
+	return value
+}
+
+func parseIntPtr(raw string) *int {
+	if raw == "" {
+		return nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 {
+		return nil
+	}
+	return &value
+}
+
+func parseInt64Ptr(raw string) *int64 {
+	if raw == "" {
+		return nil
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value < 0 {
+		return nil
+	}
+	return &value
+}
+
+func parseCSVInts(raw string) []int {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var result []int
+	for _, part := range strings.Split(raw, ",") {
+		value, err := strconv.Atoi(strings.TrimSpace(part))
+		if err == nil && value >= 0 {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func (s *Server) authenticate(r *http.Request) (store.Client, error) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/babo96/tradepost/server/internal/api"
 	"github.com/babo96/tradepost/server/internal/store"
+	"github.com/babo96/tradepost/server/internal/worker"
 )
 
 func env(key, fallback string) string {
@@ -46,6 +47,12 @@ func main() {
 			}
 		}
 	}()
+
+	// The worker runs in-process by default. Set TRADEPOST_WORKER=0 to run a
+	// dedicated API-only replica; multiple worker replicas are safe.
+	if env("TRADEPOST_WORKER", "1") != "0" {
+		go worker.Run(ctx, st, time.Second)
+	}
 
 	addr := env("TRADEPOST_ADDR", ":8080")
 	server := &http.Server{

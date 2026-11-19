@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,6 +26,29 @@ func newTestServer(t *testing.T) (*Server, *MemStore) {
 	t.Helper()
 	st := NewMemStore()
 	return New(st), st
+}
+
+// processQueued drains the async ingest queue, mirroring the production worker.
+func processQueued(t *testing.T, st *MemStore) {
+	t.Helper()
+	ctx := context.Background()
+	for {
+		jobs, err := st.ClaimIngestJobs(ctx, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(jobs) == 0 {
+			return
+		}
+		for _, job := range jobs {
+			if err := st.ProcessIngestJob(ctx, job); err != nil {
+				t.Fatalf("process job %d: %v", job.ID, err)
+			}
+			if err := st.CompleteIngestJob(ctx, job.ID); err != nil {
+				t.Fatalf("complete job %d: %v", job.ID, err)
+			}
+		}
+	}
 }
 
 func enroll(t *testing.T, srv *Server) testClient {
@@ -61,23 +85,33 @@ func ingestBody() []byte {
 }
 
 func TestEnrollIngestSnapshot(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, st := newTestServer(t)
 	client := enroll(t, srv)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(ingestBody()))
 	req.Header.Set("Authorization", "Bearer "+client.Token)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("ingest status %d: %s", rec.Code, rec.Body.String())
 	}
 	var result ingestResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Accepted != 1 || result.Items != 2 {
+	if result.Queued != 1 || result.Rejected != 0 {
 		t.Fatalf("unexpected result: %+v", result)
 	}
+
+	// Ingest is async: no price rows exist until the worker drains the queue.
+	snapReq := httptest.NewRequest(http.MethodGet, "/v1/snapshot/eu:pve:horde", nil)
+	snapRec := httptest.NewRecorder()
+	srv.ServeHTTP(snapRec, snapReq)
+	if snapRec.Code != http.StatusNotFound {
+		t.Fatalf("expected snapshot 404 before worker, got %d", snapRec.Code)
+	}
+
+	processQueued(t, st)
 
 	metaReq := httptest.NewRequest(http.MethodGet, "/v1/meta", nil)
 	metaRec := httptest.NewRecorder()
@@ -86,8 +120,8 @@ func TestEnrollIngestSnapshot(t *testing.T) {
 		t.Fatalf("meta status %d", metaRec.Code)
 	}
 
-	snapReq := httptest.NewRequest(http.MethodGet, "/v1/snapshot/eu:pve:horde", nil)
-	snapRec := httptest.NewRecorder()
+	snapReq = httptest.NewRequest(http.MethodGet, "/v1/snapshot/eu:pve:horde", nil)
+	snapRec = httptest.NewRecorder()
 	srv.ServeHTTP(snapRec, snapReq)
 	if snapRec.Code != http.StatusOK {
 		t.Fatalf("snapshot status %d: %s", snapRec.Code, snapRec.Body.String())
@@ -119,7 +153,7 @@ func TestEnrollIngestSnapshot(t *testing.T) {
 }
 
 func TestDuplicateIngest(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, st := newTestServer(t)
 	client := enroll(t, srv)
 
 	body := ingestBody()
@@ -128,18 +162,19 @@ func TestDuplicateIngest(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+client.Token)
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
+		if rec.Code != http.StatusAccepted {
 			t.Fatalf("ingest status %d", rec.Code)
 		}
 		var result ingestResponse
 		_ = json.Unmarshal(rec.Body.Bytes(), &result)
-		if i == 0 && result.Accepted != 1 {
+		if i == 0 && result.Queued != 1 {
 			t.Fatalf("first ingest: %+v", result)
 		}
 		if i == 1 && result.Rejected != 1 {
 			t.Fatalf("second ingest: %+v", result)
 		}
 	}
+	processQueued(t, st)
 }
 
 func TestIngestAuth(t *testing.T) {
@@ -173,12 +208,13 @@ func TestIngestValidation(t *testing.T) {
 }
 
 func TestDataAddon(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, st := newTestServer(t)
 	client := enroll(t, srv)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(ingestBody()))
 	req.Header.Set("Authorization", "Bearer "+client.Token)
 	srv.ServeHTTP(httptest.NewRecorder(), req)
+	processQueued(t, st)
 
 	zipReq := httptest.NewRequest(http.MethodGet, "/v1/snapshot/eu:pve:horde/data-addon.zip", nil)
 	zipRec := httptest.NewRecorder()
@@ -216,7 +252,7 @@ func TestDataAddon(t *testing.T) {
 }
 
 func TestItemMetadataSearchHistory(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, st := newTestServer(t)
 	client := enroll(t, srv)
 
 	body := []byte(fmt.Sprintf(`{
@@ -239,9 +275,10 @@ func TestItemMetadataSearchHistory(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+client.Token)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("ingest status %d: %s", rec.Code, rec.Body.String())
 	}
+	processQueued(t, st)
 
 	searchReq := httptest.NewRequest(http.MethodGet, "/v1/items?market=eu:pve:horde&q=linen", nil)
 	searchRec := httptest.NewRecorder()
@@ -312,14 +349,14 @@ func TestMetadataOnlyIngest(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+client.Token)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("metadata ingest status %d: %s", rec.Code, rec.Body.String())
 	}
 	var result ingestResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.Meta != 1 || result.Accepted != 0 {
+	if result.Meta != 1 || result.Queued != 0 {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 }
@@ -445,23 +482,161 @@ func TestLoginCodeAndWatchSync(t *testing.T) {
 	}
 }
 
+func TestMetadataDetailsAdminAndFilters(t *testing.T) {
+	srv, st := newTestServer(t)
+	client := enroll(t, srv)
+
+	body := []byte(fmt.Sprintf(`{
+	  "v": 1,
+	  "scans": [{
+	    "market": "eu:pve:horde",
+	    "scanned_at": %d,
+	    "items": [
+	      {"k": "i:100", "p": 500, "q": 3, "n": 1},
+	      {"k": "i:200", "p": 1500, "q": 1, "n": 4}
+	    ]
+	  }],
+	  "items": [
+	    {"id": 100, "name": "Plain Cloth", "quality": 1, "class_id": 7, "subclass_id": 5, "icon": 1},
+	    {"id": 200, "name": "Fancy Blade", "quality": 4, "class_id": 2, "subclass_id": 7, "icon": 2,
+	     "item_level": 80, "required_level": 70, "bind_type": 1, "inventory_type": 13,
+	     "equip_loc": "INVTYPE_WEAPON", "armor": 0, "damage_min": 10, "damage_max": 20, "delay": 2600,
+	     "vendor_price": 999, "max_stack": 1, "unique_item": true, "set_id": 42,
+	     "stats": {"stamina": 10, "agility": 5},
+	     "details": {"description": "A test blade"}}
+	  ]
+	}`, time.Now().Unix()))
+	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+client.Token)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("ingest status %d: %s", rec.Code, rec.Body.String())
+	}
+	processQueued(t, st)
+
+	// Missing details returns only items without details by default.
+	missingRec := httptest.NewRecorder()
+	srv.ServeHTTP(missingRec, httptest.NewRequest(http.MethodGet,
+		"/v1/items/missing-details?market=eu:pve:horde", nil))
+	if missingRec.Code != http.StatusOK {
+		t.Fatalf("missing details status %d: %s", missingRec.Code, missingRec.Body.String())
+	}
+	var missing struct {
+		Items []int64 `json:"items"`
+		Count int     `json:"count"`
+	}
+	if err := json.Unmarshal(missingRec.Body.Bytes(), &missing); err != nil {
+		t.Fatal(err)
+	}
+	if missing.Count != 1 || len(missing.Items) != 1 || missing.Items[0] != 100 {
+		t.Fatalf("unexpected missing details: %+v", missing)
+	}
+
+	// force=1 returns every known item.
+	forceRec := httptest.NewRecorder()
+	srv.ServeHTTP(forceRec, httptest.NewRequest(http.MethodGet,
+		"/v1/items/missing-details?market=eu:pve:horde&force=1", nil))
+	var forced struct {
+		Items []int64 `json:"items"`
+		Count int     `json:"count"`
+	}
+	if err := json.Unmarshal(forceRec.Body.Bytes(), &forced); err != nil {
+		t.Fatal(err)
+	}
+	if forced.Count != 2 {
+		t.Fatalf("unexpected forced details: %+v", forced)
+	}
+
+	// Item detail carries metadata plus its latest price.
+	detailRec := httptest.NewRecorder()
+	srv.ServeHTTP(detailRec, httptest.NewRequest(http.MethodGet,
+		"/v1/item/detail?market=eu:pve:horde&key=i:200", nil))
+	if detailRec.Code != http.StatusOK {
+		t.Fatalf("detail status %d: %s", detailRec.Code, detailRec.Body.String())
+	}
+	var detail struct {
+		ID        int64          `json:"id"`
+		Name      string         `json:"name"`
+		ItemLevel int            `json:"item_level"`
+		EquipLoc  string         `json:"equip_loc"`
+		Stats     map[string]any `json:"stats"`
+		Details   map[string]any `json:"details"`
+		Price     int64          `json:"price"`
+	}
+	if err := json.Unmarshal(detailRec.Body.Bytes(), &detail); err != nil {
+		t.Fatal(err)
+	}
+	if detail.ID != 200 || detail.Name != "Fancy Blade" || detail.ItemLevel != 80 ||
+		detail.EquipLoc != "INVTYPE_WEAPON" || detail.Price != 1500 {
+		t.Fatalf("unexpected detail: %+v", detail)
+	}
+	if detail.Stats["stamina"] != float64(10) || detail.Details["description"] != "A test blade" {
+		t.Fatalf("unexpected detail json: %+v", detail)
+	}
+
+	// Filters, paging and totals.
+	filterRec := httptest.NewRecorder()
+	srv.ServeHTTP(filterRec, httptest.NewRequest(http.MethodGet,
+		"/v1/items?market=eu:pve:horde&quality=4&class_id=2&subclass_id=7&inventory_type=13"+
+			"&min_ilvl=50&max_ilvl=100&min_req_level=60&max_req_level=80"+
+			"&min_price=1000&max_price=2000&in_stock=1&sort=ilvl&page=1&limit=10", nil))
+	if filterRec.Code != http.StatusOK {
+		t.Fatalf("filter status %d: %s", filterRec.Code, filterRec.Body.String())
+	}
+	var page struct {
+		Items []struct {
+			Key        string `json:"key"`
+			HasDetails bool   `json:"has_details"`
+			ItemLevel  int    `json:"item_level"`
+		} `json:"items"`
+		Total int `json:"total"`
+		Page  int `json:"page"`
+		Limit int `json:"limit"`
+	}
+	if err := json.Unmarshal(filterRec.Body.Bytes(), &page); err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || page.Page != 1 || page.Limit != 10 || len(page.Items) != 1 {
+		t.Fatalf("unexpected page: %+v", page)
+	}
+	if page.Items[0].Key != "i:200" || !page.Items[0].HasDetails || page.Items[0].ItemLevel != 80 {
+		t.Fatalf("unexpected filtered item: %+v", page.Items[0])
+	}
+
+	// Default listing remains backwards compatible and reports the total.
+	allRec := httptest.NewRecorder()
+	srv.ServeHTTP(allRec, httptest.NewRequest(http.MethodGet, "/v1/items?market=eu:pve:horde", nil))
+	var all struct {
+		Items []json.RawMessage `json:"items"`
+		Total int               `json:"total"`
+	}
+	if err := json.Unmarshal(allRec.Body.Bytes(), &all); err != nil {
+		t.Fatal(err)
+	}
+	if all.Total != 2 || len(all.Items) != 2 {
+		t.Fatalf("unexpected default listing: %+v", all)
+	}
+}
+
 func TestHistoryRanges(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, st := newTestServer(t)
 	client := enroll(t, srv)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(ingestBody()))
 	req.Header.Set("Authorization", "Bearer "+client.Token)
 	rec := httptest.NewRecorder()
 	srv.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusAccepted {
 		t.Fatalf("ingest status %d: %s", rec.Code, rec.Body.String())
 	}
+	processQueued(t, st)
 
 	cases := []struct {
 		query      string
 		resolution string
 	}{
-		{"12h", "raw"},
+		{"12h", "1m"},
 		{"7d", "15m"},
 		{"all", "hour"},
 	}

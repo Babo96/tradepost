@@ -1,9 +1,14 @@
 package api
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/hex"
+	"encoding/json"
+	"io"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -13,37 +18,42 @@ import (
 
 // MemStore is an in-memory Store for handler tests and local smoke tests.
 type MemStore struct {
-	mu       sync.Mutex
-	clients  map[string]store.Client
-	tokens   map[string]string
-	seen     map[string]bool
-	markets  map[string]map[string]store.SnapshotItem
-	versions map[string]int64
-	items    map[int64]store.ItemMeta
-	history  map[string]map[string]map[int64]store.HistoryPoint
-	quarter  map[string]map[string]map[int64]store.HistoryPoint
-	raw      map[string]map[string][]store.HistoryPoint
-	codes    map[string]store.LoginGrant
-	used     map[string]bool
-	sessions map[string]store.WebSession
-	watches  map[string]store.WatchList
+	mu        sync.Mutex
+	clients   map[string]store.Client
+	tokens    map[string]string
+	seen      map[string]bool
+	processed map[string]bool
+	jobs      map[int64]store.IngestJob
+	jobSeq    int64
+	markets   map[string]map[string]store.SnapshotItem
+	versions  map[string]int64
+	items     map[int64]store.ItemMeta
+	history   map[string]map[string]map[int64]store.HistoryPoint
+	quarter   map[string]map[string]map[int64]store.HistoryPoint
+	minute    map[string]map[string]map[int64]store.HistoryPoint
+	codes     map[string]store.LoginGrant
+	used      map[string]bool
+	sessions  map[string]store.WebSession
+	watches   map[string]store.WatchList
 }
 
 func NewMemStore() *MemStore {
 	return &MemStore{
-		clients:  map[string]store.Client{},
-		tokens:   map[string]string{},
-		seen:     map[string]bool{},
-		markets:  map[string]map[string]store.SnapshotItem{},
-		versions: map[string]int64{},
-		items:    map[int64]store.ItemMeta{},
-		history:  map[string]map[string]map[int64]store.HistoryPoint{},
-		quarter:  map[string]map[string]map[int64]store.HistoryPoint{},
-		raw:      map[string]map[string][]store.HistoryPoint{},
-		codes:    map[string]store.LoginGrant{},
-		used:     map[string]bool{},
-		sessions: map[string]store.WebSession{},
-		watches:  map[string]store.WatchList{},
+		clients:   map[string]store.Client{},
+		tokens:    map[string]string{},
+		seen:      map[string]bool{},
+		processed: map[string]bool{},
+		jobs:      map[int64]store.IngestJob{},
+		markets:   map[string]map[string]store.SnapshotItem{},
+		versions:  map[string]int64{},
+		items:     map[int64]store.ItemMeta{},
+		history:   map[string]map[string]map[int64]store.HistoryPoint{},
+		quarter:   map[string]map[string]map[int64]store.HistoryPoint{},
+		minute:    map[string]map[string]map[int64]store.HistoryPoint{},
+		codes:     map[string]store.LoginGrant{},
+		used:      map[string]bool{},
+		sessions:  map[string]store.WebSession{},
+		watches:   map[string]store.WatchList{},
 	}
 }
 
@@ -71,22 +81,110 @@ func (m *MemStore) ClientByTokenHash(_ context.Context, tokenHash []byte) (store
 	return client, nil
 }
 
-func (m *MemStore) Ingest(_ context.Context, clientID string, scan store.Scan) (store.IngestResult, error) {
+func (m *MemStore) EnqueueIngest(_ context.Context, clientID string, job store.IngestJob) (bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	key := clientID + ":" + hex.EncodeToString(scan.Checksum)
+	key := clientID + ":" + hex.EncodeToString(job.Checksum)
 	if m.seen[key] {
-		return store.IngestResult{Rejected: 1}, nil
+		return false, nil
 	}
 	m.seen[key] = true
-	if m.markets[scan.Market] == nil {
-		m.markets[scan.Market] = map[string]store.SnapshotItem{}
+	m.jobSeq++
+	job.ID = m.jobSeq
+	job.ClientID = clientID
+	job.Status = "queued"
+	job.Attempts = 0
+	job.CreatedAt = time.Now()
+	job.UpdatedAt = job.CreatedAt
+	m.jobs[job.ID] = job
+	return true, nil
+}
+
+func (m *MemStore) ClaimIngestJobs(_ context.Context, limit int) ([]store.IngestJob, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit < 1 {
+		limit = 1
 	}
-	latest := m.markets[scan.Market]
-	for _, item := range scan.Items {
+	ids := make([]int64, 0, len(m.jobs))
+	for id, job := range m.jobs {
+		if job.Status == "queued" {
+			ids = append(ids, id)
+		}
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	if len(ids) > limit {
+		ids = ids[:limit]
+	}
+	jobs := make([]store.IngestJob, 0, len(ids))
+	for _, id := range ids {
+		job := m.jobs[id]
+		job.Status = "processing"
+		job.UpdatedAt = time.Now()
+		m.jobs[id] = job
+		jobs = append(jobs, job)
+	}
+	return jobs, nil
+}
+
+func (m *MemStore) ProcessIngestJob(_ context.Context, job store.IngestJob) error {
+	payload, err := decodeMemPayload(job.Payload)
+	if err != nil {
+		return err
+	}
+	if payload.Market == "" {
+		payload.Market = job.Market
+	}
+	scannedAt := job.ScannedAt
+	if payload.ScannedAt != 0 {
+		scannedAt = time.Unix(payload.ScannedAt, 0)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	key := job.ClientID + ":" + hex.EncodeToString(job.Checksum)
+	if m.processed[key] {
+		job.Status = "done"
+		m.jobs[job.ID] = job
+		return nil
+	}
+	m.processed[key] = true
+
+	m.applyScanLocked(payload.Market, scannedAt, payload.Items)
+	job.Status = "done"
+	job.Error = ""
+	job.UpdatedAt = time.Now()
+	m.jobs[job.ID] = job
+	return nil
+}
+
+func decodeMemPayload(payload []byte) (store.ScanPayload, error) {
+	var scan store.ScanPayload
+	gz, err := gzip.NewReader(bytes.NewReader(payload))
+	if err != nil {
+		return scan, err
+	}
+	defer gz.Close()
+	data, err := io.ReadAll(io.LimitReader(gz, 64<<20))
+	if err != nil {
+		return scan, err
+	}
+	if err := json.Unmarshal(data, &scan); err != nil {
+		return scan, err
+	}
+	return scan, nil
+}
+
+func (m *MemStore) applyScanLocked(market string, scannedAt time.Time, items []store.Item) {
+	if m.markets[market] == nil {
+		m.markets[market] = map[string]store.SnapshotItem{}
+	}
+	latest := m.markets[market]
+	for _, item := range items {
 		existing, ok := latest[item.Key]
-		if ok && existing.Scanned >= scan.ScannedAt.Unix() {
+		if ok && existing.Scanned >= scannedAt.Unix() {
 			continue
 		}
 		latest[item.Key] = store.SnapshotItem{
@@ -94,22 +192,30 @@ func (m *MemStore) Ingest(_ context.Context, clientID string, scan store.Scan) (
 			Price:    item.Price,
 			Quantity: item.Quantity,
 			Listings: item.Listings,
-			Scanned:  scan.ScannedAt.Unix(),
+			Scanned:  scannedAt.Unix(),
 		}
 	}
-	if m.history[scan.Market] == nil {
-		m.history[scan.Market] = map[string]map[int64]store.HistoryPoint{}
+
+	m.aggregateLocked(m.minute, market, scannedAt.Truncate(time.Minute), items)
+	m.aggregateLocked(m.quarter, market, scannedAt.Truncate(15*time.Minute), items)
+	m.aggregateLocked(m.history, market, scannedAt.Truncate(time.Hour), items)
+	m.versions[market]++
+}
+
+func (m *MemStore) aggregateLocked(target map[string]map[string]map[int64]store.HistoryPoint, market string, bucket time.Time, items []store.Item) {
+	if target[market] == nil {
+		target[market] = map[string]map[int64]store.HistoryPoint{}
 	}
-	bucket := scan.ScannedAt.Truncate(time.Hour).Unix()
-	for _, item := range scan.Items {
-		byKey := m.history[scan.Market][item.Key]
+	for _, item := range items {
+		byKey := target[market][item.Key]
 		if byKey == nil {
 			byKey = map[int64]store.HistoryPoint{}
-			m.history[scan.Market][item.Key] = byKey
+			target[market][item.Key] = byKey
 		}
-		point, ok := byKey[bucket]
+		key := bucket.Unix()
+		point, ok := byKey[key]
 		if !ok {
-			point = store.HistoryPoint{Bucket: bucket, Min: item.Price, Max: item.Price}
+			point = store.HistoryPoint{Bucket: key, Min: item.Price, Max: item.Price}
 		}
 		if item.Price < point.Min {
 			point.Min = item.Price
@@ -121,46 +227,40 @@ func (m *MemStore) Ingest(_ context.Context, clientID string, scan store.Scan) (
 			point.Quantity = item.Quantity
 		}
 		point.Samples++
-		byKey[bucket] = point
+		byKey[key] = point
 	}
+}
 
-	if m.quarter[scan.Market] == nil {
-		m.quarter[scan.Market] = map[string]map[int64]store.HistoryPoint{}
+func (m *MemStore) CompleteIngestJob(_ context.Context, id int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	job, ok := m.jobs[id]
+	if !ok {
+		return store.ErrNotFound
 	}
-	quarterBucket := scan.ScannedAt.Truncate(15 * time.Minute).Unix()
-	if m.raw[scan.Market] == nil {
-		m.raw[scan.Market] = map[string][]store.HistoryPoint{}
-	}
-	for _, item := range scan.Items {
-		byKey := m.quarter[scan.Market][item.Key]
-		if byKey == nil {
-			byKey = map[int64]store.HistoryPoint{}
-			m.quarter[scan.Market][item.Key] = byKey
-		}
-		point, ok := byKey[quarterBucket]
-		if !ok {
-			point = store.HistoryPoint{Bucket: quarterBucket, Min: item.Price, Max: item.Price}
-		}
-		if item.Price < point.Min {
-			point.Min = item.Price
-		}
-		if item.Price > point.Max {
-			point.Max = item.Price
-		}
-		if item.Quantity > point.Quantity {
-			point.Quantity = item.Quantity
-		}
-		point.Samples++
-		byKey[quarterBucket] = point
+	job.Status = "done"
+	job.UpdatedAt = time.Now()
+	m.jobs[id] = job
+	return nil
+}
 
-		m.raw[scan.Market][item.Key] = append(m.raw[scan.Market][item.Key], store.HistoryPoint{
-			Bucket: scan.ScannedAt.Unix(), Min: item.Price, Max: item.Price,
-			Quantity: item.Quantity, Listings: item.Listings, Samples: 1,
-		})
+func (m *MemStore) FailIngestJob(_ context.Context, id int64, attempts int, errMsg string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	job, ok := m.jobs[id]
+	if !ok {
+		return store.ErrNotFound
 	}
-
-	m.versions[scan.Market]++
-	return store.IngestResult{Accepted: 1, Items: len(scan.Items)}, nil
+	job.Attempts = attempts
+	job.Error = errMsg
+	if attempts >= 5 {
+		job.Status = "failed"
+	} else {
+		job.Status = "queued"
+	}
+	job.UpdatedAt = time.Now()
+	m.jobs[id] = job
+	return nil
 }
 
 func (m *MemStore) Meta(context.Context) ([]store.MarketMeta, error) {
@@ -212,51 +312,280 @@ func (m *MemStore) UpsertItems(_ context.Context, items []store.ItemMeta) error 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, item := range items {
+		existing, ok := m.items[item.ID]
+		if ok {
+			item = mergeItemMeta(existing, item)
+		}
+		if len(item.Details) > 0 {
+			item.DetailsVersion = existing.DetailsVersion + 1
+			item.DetailsUpdated = time.Now().Unix()
+		}
 		m.items[item.ID] = item
 	}
 	return nil
 }
 
-func (m *MemStore) SearchItems(_ context.Context, market, query string, limit int) ([]store.SearchResult, error) {
+func mergeItemMeta(existing, incoming store.ItemMeta) store.ItemMeta {
+	if incoming.ItemLevel == nil {
+		incoming.ItemLevel = existing.ItemLevel
+	}
+	if incoming.RequiredLevel == nil {
+		incoming.RequiredLevel = existing.RequiredLevel
+	}
+	if incoming.BindType == nil {
+		incoming.BindType = existing.BindType
+	}
+	if incoming.InventoryType == nil {
+		incoming.InventoryType = existing.InventoryType
+	}
+	if incoming.EquipLoc == nil {
+		incoming.EquipLoc = existing.EquipLoc
+	}
+	if incoming.Armor == nil {
+		incoming.Armor = existing.Armor
+	}
+	if incoming.DamageMin == nil {
+		incoming.DamageMin = existing.DamageMin
+	}
+	if incoming.DamageMax == nil {
+		incoming.DamageMax = existing.DamageMax
+	}
+	if incoming.Delay == nil {
+		incoming.Delay = existing.Delay
+	}
+	if incoming.VendorPrice == nil {
+		incoming.VendorPrice = existing.VendorPrice
+	}
+	if incoming.MaxStack == nil {
+		incoming.MaxStack = existing.MaxStack
+	}
+	if incoming.UniqueItem == nil {
+		incoming.UniqueItem = existing.UniqueItem
+	}
+	if incoming.SetID == nil {
+		incoming.SetID = existing.SetID
+	}
+	if len(incoming.Stats) == 0 {
+		incoming.Stats = existing.Stats
+	}
+	if len(incoming.Details) == 0 {
+		incoming.Details = existing.Details
+		incoming.DetailsVersion = existing.DetailsVersion
+		incoming.DetailsUpdated = existing.DetailsUpdated
+	}
+	return incoming
+}
+
+func (m *MemStore) SearchItems(_ context.Context, market string, query store.SearchQuery) (store.SearchPage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	query = strings.ToLower(strings.TrimSpace(query))
+
+	if query.Page < 1 {
+		query.Page = 1
+	}
+	if query.Limit < 1 {
+		query.Limit = 50
+	}
+	if query.Limit > 200 {
+		query.Limit = 200
+	}
+	search := strings.ToLower(strings.TrimSpace(query.Query))
+
 	result := []store.SearchResult{}
 	for key, item := range m.markets[market] {
 		id := store.ItemID(key)
 		meta := m.items[id]
-		name := meta.Name
-		if query != "" {
-			if !strings.Contains(strings.ToLower(name), query) &&
-				!strings.Contains(key, query) &&
-				key != query {
+		if search != "" {
+			if !strings.Contains(strings.ToLower(meta.Name), search) &&
+				!strings.Contains(strings.ToLower(key), search) &&
+				key != search && formatItemID(id) != search {
 				continue
 			}
 		}
+		if !matchesFilters(meta, item, query) {
+			continue
+		}
 		result = append(result, store.SearchResult{
-			Key:      key,
-			ItemID:   id,
-			Name:     name,
-			Quality:  meta.Quality,
-			Price:    item.Price,
-			Quantity: item.Quantity,
-			Listings: item.Listings,
-			Scanned:  item.Scanned,
+			Key:           key,
+			ItemID:        id,
+			Name:          meta.Name,
+			Quality:       meta.Quality,
+			Price:         item.Price,
+			Quantity:      item.Quantity,
+			Listings:      item.Listings,
+			Scanned:       item.Scanned,
+			ItemLevel:     meta.ItemLevel,
+			RequiredLevel: meta.RequiredLevel,
+			BindType:      meta.BindType,
+			InventoryType: meta.InventoryType,
+			EquipLoc:      derefString(meta.EquipLoc),
+			Armor:         meta.Armor,
+			DamageMin:     meta.DamageMin,
+			DamageMax:     meta.DamageMax,
+			Delay:         meta.Delay,
+			VendorPrice:   meta.VendorPrice,
+			MaxStack:      meta.MaxStack,
+			UniqueItem:    meta.UniqueItem,
+			SetID:         meta.SetID,
+			HasDetails:    len(meta.Details) > 0,
 		})
 	}
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].Price != result[j].Price {
-			return result[i].Price < result[j].Price
+
+	sortSearchResults(result, query.Sort)
+	total := int64(len(result))
+	start := (query.Page - 1) * query.Limit
+	if start > len(result) {
+		start = len(result)
+	}
+	end := start + query.Limit
+	if end > len(result) {
+		end = len(result)
+	}
+	return store.SearchPage{Items: result[start:end], Total: total}, nil
+}
+
+func matchesFilters(meta store.ItemMeta, item store.SnapshotItem, query store.SearchQuery) bool {
+	if len(query.Qualities) > 0 {
+		found := false
+		for _, quality := range query.Qualities {
+			if meta.Quality == quality {
+				found = true
+				break
+			}
 		}
-		if result[i].Name != result[j].Name {
-			return result[i].Name < result[j].Name
+		if !found {
+			return false
 		}
-		return result[i].Key < result[j].Key
+	}
+	if query.ClassID != nil && meta.ClassID != *query.ClassID {
+		return false
+	}
+	if query.SubclassID != nil && meta.SubclassID != *query.SubclassID {
+		return false
+	}
+	if query.InventoryType != nil && (meta.InventoryType == nil || *meta.InventoryType != *query.InventoryType) {
+		return false
+	}
+	if query.MinIlvl != nil && (meta.ItemLevel == nil || *meta.ItemLevel < *query.MinIlvl) {
+		return false
+	}
+	if query.MaxIlvl != nil && (meta.ItemLevel == nil || *meta.ItemLevel > *query.MaxIlvl) {
+		return false
+	}
+	if query.MinReqLevel != nil && (meta.RequiredLevel == nil || *meta.RequiredLevel < *query.MinReqLevel) {
+		return false
+	}
+	if query.MaxReqLevel != nil && (meta.RequiredLevel == nil || *meta.RequiredLevel > *query.MaxReqLevel) {
+		return false
+	}
+	if query.MinPrice != nil && item.Price < *query.MinPrice {
+		return false
+	}
+	if query.MaxPrice != nil && item.Price > *query.MaxPrice {
+		return false
+	}
+	if query.InStock && item.Quantity <= 0 {
+		return false
+	}
+	return true
+}
+
+func sortSearchResults(items []store.SearchResult, sortKey string) {
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i], items[j]
+		switch sortKey {
+		case "name":
+			if a.Name != b.Name {
+				return a.Name < b.Name
+			}
+		case "ilvl":
+			av, bv := intValue(a.ItemLevel), intValue(b.ItemLevel)
+			if av != bv {
+				return av > bv
+			}
+		case "quality":
+			if a.Quality != b.Quality {
+				return a.Quality > b.Quality
+			}
+		case "scanned":
+			if a.Scanned != b.Scanned {
+				return a.Scanned > b.Scanned
+			}
+		default:
+			if a.Price != b.Price {
+				return a.Price < b.Price
+			}
+			if a.Name != b.Name {
+				return a.Name < b.Name
+			}
+		}
+		return a.Key < b.Key
 	})
-	if limit > 0 && len(result) > limit {
+}
+
+func intValue(value *int) int {
+	if value == nil {
+		return -1
+	}
+	return *value
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func formatItemID(id int64) string {
+	return strconv.FormatInt(id, 10)
+}
+
+func (m *MemStore) MissingItemDetails(_ context.Context, market string, force bool, limit int) ([]int64, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if limit < 1 {
+		limit = 500
+	}
+	if limit > 2000 {
+		limit = 2000
+	}
+	seen := map[int64]bool{}
+	result := []int64{}
+	for key := range m.markets[market] {
+		id := store.ItemID(key)
+		if id <= 0 || seen[id] {
+			continue
+		}
+		seen[id] = true
+		meta := m.items[id]
+		if !force && len(meta.Details) > 0 {
+			continue
+		}
+		result = append(result, id)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i] < result[j] })
+	if len(result) > limit {
 		result = result[:limit]
 	}
 	return result, nil
+}
+
+func (m *MemStore) ItemDetail(_ context.Context, market, key string) (store.ItemDetail, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	meta, ok := m.items[store.ItemID(key)]
+	if !ok {
+		return store.ItemDetail{}, store.ErrNotFound
+	}
+	detail := store.ItemDetail{ItemMeta: meta}
+	if item, ok := m.markets[market][key]; ok {
+		detail.Price = item.Price
+		detail.Quantity = item.Quantity
+		detail.Listings = item.Listings
+		detail.Scanned = item.Scanned
+	}
+	return detail, nil
 }
 
 func (m *MemStore) ItemHistory(ctx context.Context, market, key string, limit int) (store.History, error) {
@@ -272,26 +601,19 @@ func (m *MemStore) HistoryPoints(_ context.Context, market, key, resolution stri
 		since = time.Unix(0, 0)
 	}
 
+	var source map[string]map[int64]store.HistoryPoint
 	switch resolution {
-	case "raw":
-		for _, point := range m.raw[market][key] {
-			if point.Bucket >= since.Unix() {
-				history.Points = append(history.Points, point)
-			}
-		}
+	case "1m", "raw":
+		source = m.minute[market]
 	case "15m":
-		for bucket, point := range m.quarter[market][key] {
-			if bucket >= since.Unix() {
-				point.Bucket = bucket
-				history.Points = append(history.Points, point)
-			}
-		}
+		source = m.quarter[market]
 	default:
-		for bucket, point := range m.history[market][key] {
-			if bucket >= since.Unix() {
-				point.Bucket = bucket
-				history.Points = append(history.Points, point)
-			}
+		source = m.history[market]
+	}
+	for bucket, point := range source[key] {
+		if bucket >= since.Unix() {
+			point.Bucket = bucket
+			history.Points = append(history.Points, point)
 		}
 	}
 
@@ -307,30 +629,18 @@ func (m *MemStore) HistoryPoints(_ context.Context, market, key, resolution stri
 func (m *MemStore) CleanupHistory(context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	rawCutoff := time.Now().Add(-12 * time.Hour).Unix()
+	minuteCutoff := time.Now().Add(-12 * time.Hour).Unix()
 	quarterCutoff := time.Now().Add(-7 * 24 * time.Hour).Unix()
-	for market, byKey := range m.raw {
-		for key, points := range byKey {
-			kept := points[:0]
-			for _, point := range points {
-				if point.Bucket >= rawCutoff {
-					kept = append(kept, point)
-				}
-			}
-			if len(kept) == 0 {
-				delete(byKey, key)
-			} else {
-				byKey[key] = kept
-			}
-		}
-		if len(byKey) == 0 {
-			delete(m.raw, market)
-		}
-	}
-	for market, byKey := range m.quarter {
+	cleanupBuckets(m.minute, minuteCutoff)
+	cleanupBuckets(m.quarter, quarterCutoff)
+	return nil
+}
+
+func cleanupBuckets(target map[string]map[string]map[int64]store.HistoryPoint, cutoff int64) {
+	for market, byKey := range target {
 		for key, points := range byKey {
 			for bucket := range points {
-				if bucket < quarterCutoff {
+				if bucket < cutoff {
 					delete(points, bucket)
 				}
 			}
@@ -339,10 +649,9 @@ func (m *MemStore) CleanupHistory(context.Context) error {
 			}
 		}
 		if len(byKey) == 0 {
-			delete(m.quarter, market)
+			delete(target, market)
 		}
 	}
-	return nil
 }
 
 func (m *MemStore) ItemMarkets(_ context.Context, key string) ([]store.MarketPrice, error) {

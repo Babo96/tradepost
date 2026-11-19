@@ -61,6 +61,24 @@ CREATE TABLE IF NOT EXISTS items (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE items ADD COLUMN IF NOT EXISTS item_level integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS required_level integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS bind_type integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS inventory_type integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS equip_loc text;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS armor integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS damage_min integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS damage_max integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS delay integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS vendor_price bigint;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS max_stack integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS unique_item boolean;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS set_id integer;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS stats jsonb;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS details jsonb;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS details_version integer NOT NULL DEFAULT 0;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS details_updated timestamptz;
+
 CREATE INDEX IF NOT EXISTS items_name_lower
   ON items (lower(name));
 
@@ -112,18 +130,37 @@ CREATE TABLE IF NOT EXISTS prices_15m (
 CREATE INDEX IF NOT EXISTS prices_15m_bucket
   ON prices_15m (bucket);
 
-CREATE TABLE IF NOT EXISTS prices_raw (
-  id bigserial PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS prices_1m (
   market text NOT NULL,
   item_key text NOT NULL,
-  price bigint NOT NULL,
+  bucket timestamptz NOT NULL,
+  min_price bigint NOT NULL,
+  max_price bigint NOT NULL,
   quantity bigint NOT NULL,
-  listings integer NOT NULL,
-  scanned_at timestamptz NOT NULL
+  samples integer NOT NULL DEFAULT 1,
+  PRIMARY KEY (market, item_key, bucket)
 );
 
-CREATE INDEX IF NOT EXISTS prices_raw_lookup
-  ON prices_raw (market, item_key, scanned_at);
+CREATE INDEX IF NOT EXISTS prices_1m_bucket
+  ON prices_1m (bucket);
 
-CREATE INDEX IF NOT EXISTS prices_raw_scanned
-  ON prices_raw (scanned_at);
+-- prices_raw was superseded by the 1-minute aggregate table.
+DROP TABLE IF EXISTS prices_raw;
+
+CREATE TABLE IF NOT EXISTS ingest_jobs (
+  id bigserial PRIMARY KEY,
+  client_id text NOT NULL REFERENCES clients(id),
+  market text NOT NULL,
+  scanned_at timestamptz NOT NULL,
+  checksum bytea NOT NULL,
+  payload bytea NOT NULL,
+  status text NOT NULL DEFAULT 'queued',
+  attempts integer NOT NULL DEFAULT 0,
+  error text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (client_id, checksum)
+);
+
+CREATE INDEX IF NOT EXISTS ingest_jobs_status_id
+  ON ingest_jobs (status, id);
