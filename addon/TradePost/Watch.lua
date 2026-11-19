@@ -420,9 +420,23 @@ function TP:PrintLoginCode(reply)
   end
 end
 
+local function freshLoginCode(reply, character)
+  if type(reply) ~= "table" or not reply.code then
+    return false
+  end
+  if reply.expires and reply.expires <= time() then
+    return false
+  end
+  if reply.character and character and reply.character ~= character then
+    return false
+  end
+  return true
+end
+
 function TP:ReadAuthReply(seq, attempt)
+  local character = self:CharacterKey()
   local reply = TRADEPOST_AUTH_REPLY
-  if reply and reply.seq == seq and reply.code then
+  if freshLoginCode(reply, character) then
     self:PrintLoginCode(reply)
     return true
   end
@@ -446,7 +460,7 @@ function TP:ReadAuthReply(seq, attempt)
     if not loaded then
       pcall(loader, name)
       reply = TRADEPOST_AUTH_REPLY
-      if reply and reply.seq == seq and reply.code then
+      if freshLoginCode(reply, character) then
         self:PrintLoginCode(reply)
         return true
       end
@@ -472,7 +486,7 @@ function TP:ReadAuthReplyFromRing(seq, attempt)
   local index = priceSlots + ((attempt or 0) % syncCount)
   local data = self:LoadSyncSlot(index)
   local auth = data and data.auth
-  if auth and auth.seq == seq and auth.code then
+  if freshLoginCode(auth, self:CharacterKey()) then
     self:PrintLoginCode(auth)
     return true
   end
@@ -495,6 +509,12 @@ function TP:PollAuth(seq, tries)
 end
 
 function TP:RequestLogin()
+  -- The companion publishes a fresh code every 8 minutes, so most logins can
+  -- use the cached one immediately instead of waiting for a throttled
+  -- SavedVariables flush round-trip.
+  if self:ReadAuthReply(0, 0) or self:ReadAuthReplyFromRing(0, 0) then
+    return
+  end
   TRADEPOST_AUTH = TRADEPOST_AUTH or { seq = 0 }
   local auth = TRADEPOST_AUTH
   auth.seq = (auth.seq or 0) + 1

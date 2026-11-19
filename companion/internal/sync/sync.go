@@ -45,17 +45,19 @@ type Status struct {
 }
 
 type Service struct {
-	mu       sync.Mutex
-	syncMu   sync.Mutex
-	cfg      config.Config
-	client   *api.Client
-	account  string
-	uploaded map[string]bool
-	meta     map[string]string
-	authSeq  int64
-	watch    []string
-	watchAt  int64
-	status   Status
+	mu              sync.Mutex
+	syncMu          sync.Mutex
+	cfg             config.Config
+	client          *api.Client
+	account         string
+	uploaded        map[string]bool
+	meta            map[string]string
+	authSeq         int64
+	activeCharacter string
+	lastLoginCodeAt time.Time
+	watch           []string
+	watchAt         int64
+	status          Status
 }
 
 func New(cfg config.Config) (*Service, error) {
@@ -143,6 +145,11 @@ func (s *Service) sync(ctx context.Context) error {
 	data, err := export.LoadData(s.status.SavedVariables)
 	if err != nil {
 		return err
+	}
+	if data.Active != "" {
+		s.mu.Lock()
+		s.activeCharacter = data.Active
+		s.mu.Unlock()
 	}
 	s.syncAuth(ctx, data)
 	s.syncWatch(ctx, data)
@@ -460,6 +467,7 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			s.maybeRefreshLoginCode(ctx)
 			info, err := os.Stat(s.savedVariablesPath())
 			changed := err == nil && !info.ModTime().Equal(lastMod)
 			if changed || time.Since(lastFull) >= interval {
@@ -474,6 +482,45 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 			}
 		}
 	}
+}
+
+// maybeRefreshLoginCode publishes a fresh login code every 8 minutes. The
+// addon can then read it from an auth/ring slot immediately instead of waiting
+// for the throttled SavedVariables flush after /tradepost login.
+func (s *Service) maybeRefreshLoginCode(ctx context.Context) {
+	s.mu.Lock()
+	character := s.activeCharacter
+	last := s.lastLoginCodeAt
+	s.mu.Unlock()
+	if character == "" || time.Since(last) < 8*time.Minute {
+		return
+	}
+	response, err := s.client.LoginCode(ctx, character)
+	if err != nil {
+		log.Printf("login code refresh: %v", err)
+		return
+	}
+	if err := wow.WriteAuthReply(s.cfg.WowDir, 0, response.Code, response.Character, response.ExpiresAt); err != nil {
+		log.Printf("login code slot: %v", err)
+		return
+	}
+	market := s.cfg.Market
+	if market == "" {
+		market = "eu:pve:horde"
+	}
+	if err := addon.WriteAuthRingSlots(s.cfg.WowDir, market, 0, response.Code, response.Character, response.ExpiresAt, s.cfg.RingSlots); err != nil {
+		log.Printf("login code ring: %v", err)
+	}
+	s.mu.Lock()
+	s.lastLoginCodeAt = time.Now()
+	s.status.LoginCode = response.Code
+	s.status.LoginCharacter = response.Character
+	s.status.LoginExpires = response.ExpiresAt
+	s.mu.Unlock()
+	if err := saveLogin(s.cfg.Server, s.cfg.ClientID, response.Code, response.Character, response.ExpiresAt); err != nil {
+		log.Printf("login state: %v", err)
+	}
+	log.Printf("fresh login code for %s: %s", response.Character, response.Code)
 }
 
 func (s *Service) savedVariablesPath() string {
