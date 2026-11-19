@@ -1,9 +1,9 @@
 local ADDON, TP = ...
 
 local AUTH_SLOTS = 16
-local AUTH_FIRST_DELAY = 8
-local AUTH_POLL_SECONDS = 2
-local AUTH_POLL_TRIES = 10
+local AUTH_FIRST_DELAY = 60
+local AUTH_POLL_SECONDS = 30
+local AUTH_POLL_TRIES = 12
 local AUTH_RING_TRIES = 8
 
 function TP:CharacterKey()
@@ -507,7 +507,12 @@ function TP:RequestLogin()
   }
   self:MarkActive()
   self:SaveExport()
-  self:Print("requesting a login code from the companion...")
+  -- The Forever client defers SavedVariables writes by several minutes; retry
+  -- the flush so the companion receives the request without a manual /reload.
+  if self.ScheduleExportRetry then
+    self:ScheduleExportRetry()
+  end
+  self:Print("requesting a login code from the companion (may take a few minutes)...")
   self:Print("the code also appears at http://127.0.0.1:8787")
   self:PollAuth(auth.seq, 0)
 end
