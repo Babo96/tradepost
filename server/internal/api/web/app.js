@@ -1232,7 +1232,31 @@ function currentParams() {
     if (value !== "") params[key] = value;
   }
   if ($("#in-stock").checked) params.in_stock = "1";
+  if ($("#stat-key").value) {
+    params.stat = $("#stat-key").value;
+    const minStat = filterNumber("#min-stat");
+    const maxStat = filterNumber("#max-stat");
+    if (minStat !== "") params.min_stat = minStat;
+    if (maxStat !== "") params.max_stat = maxStat;
+  }
+  if ($("#has-stats").checked) params.has_stats = "1";
   return params;
+}
+
+function syncStatInputs() {
+  const active = $("#stat-key").value !== "";
+  const block = $("#stats-block");
+  if (!active) {
+    $("#min-stat").value = "";
+    $("#max-stat").value = "";
+  }
+  $("#min-stat").disabled = !active;
+  $("#max-stat").disabled = !active;
+  $("#stat-key").classList.toggle("is-active", active);
+  block.classList.toggle("is-active", active);
+  $("#stats-hint").textContent = active
+    ? "Min/max limit this stat's value; each bound can be left empty."
+    : "Pick a stat to filter by its value.";
 }
 
 function updateFilterCount() {
@@ -1244,6 +1268,8 @@ function updateFilterCount() {
   if ($("#min-req-level").value.trim() || $("#max-req-level").value.trim()) count++;
   if ($("#min-price-gold").value.trim() || $("#max-price-gold").value.trim()) count++;
   if ($("#in-stock").checked) count++;
+  if ($("#stat-key").value !== "") count++;
+  if ($("#has-stats").checked) count++;
   if ($("#sort").value !== "price") count++;
   const badge = $("#filter-count");
   badge.textContent = count ? `${count} active` : "";
@@ -1328,8 +1354,11 @@ function resetFilters() {
     $(selector).value = "";
   }
   $("#in-stock").checked = false;
+  $("#stat-key").value = "";
+  $("#has-stats").checked = false;
   $("#sort").value = "price";
   syncSubclassFilter();
+  syncStatInputs();
   clearTimeout(searchTimer);
   applyFilters();
 }
@@ -1380,6 +1409,7 @@ $("#search-form").addEventListener("submit", (event) => {
 for (const selector of [
   "#min-ilvl", "#max-ilvl", "#min-req-level", "#max-req-level",
   "#min-price-gold", "#max-price-gold", "#subclass-id",
+  "#min-stat", "#max-stat",
 ]) {
   const input = $(selector);
   let timer;
@@ -1403,6 +1433,11 @@ $("#class-id").addEventListener("change", () => {
 $("#subclass-select").addEventListener("change", applyFilters);
 $("#sort").addEventListener("change", applyFilters);
 $("#in-stock").addEventListener("change", applyFilters);
+$("#stat-key").addEventListener("change", () => {
+  syncStatInputs();
+  applyFilters();
+});
+$("#has-stats").addEventListener("change", applyFilters);
 $("#filters-reset").addEventListener("click", resetFilters);
 
 $("#prev-page").addEventListener("click", () => {
@@ -1480,6 +1515,7 @@ $("#filters").open = window.innerWidth > 900;
 buildQualityFilters();
 buildClassFilter();
 syncSubclassFilter();
+syncStatInputs();
 updateFilterCount();
 
 loadMeta()

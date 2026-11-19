@@ -93,6 +93,65 @@
             </div>
           </div>
 
+          <div id="stats-block" class="filter-stats">
+            <span class="field-label">Stats</span>
+            <div class="stats-row">
+              <label class="field stats-select">
+                <span>Stat</span>
+                <select id="stat-key">
+                  <option value="">Any stat</option>
+                  <optgroup label="Primary">
+                    <option value="ITEM_MOD_STRENGTH_SHORT">Strength</option>
+                    <option value="ITEM_MOD_AGILITY_SHORT">Agility</option>
+                    <option value="ITEM_MOD_STAMINA_SHORT">Stamina</option>
+                    <option value="ITEM_MOD_INTELLECT_SHORT">Intellect</option>
+                    <option value="ITEM_MOD_SPIRIT_SHORT">Spirit</option>
+                  </optgroup>
+                  <optgroup label="Combat">
+                    <option value="ITEM_MOD_SPELL_POWER_SHORT">Spell Power</option>
+                    <option value="ITEM_MOD_SPELL_HEALING_DONE_SHORT">Spell Healing</option>
+                    <option value="ITEM_MOD_SPELL_DAMAGE_DONE_SHORT">Spell Damage</option>
+                    <option value="ITEM_MOD_ATTACK_POWER_SHORT">Attack Power</option>
+                    <option value="ITEM_MOD_CRIT_RATING_SHORT">Critical Strike</option>
+                    <option value="ITEM_MOD_HIT_RATING_SHORT">Hit</option>
+                    <option value="ITEM_MOD_DEFENSE_SKILL_RATING_SHORT">Defense</option>
+                    <option value="ITEM_MOD_DODGE_RATING_SHORT">Dodge</option>
+                    <option value="ITEM_MOD_PARRY_RATING_SHORT">Parry</option>
+                    <option value="ITEM_MOD_BLOCK_RATING_SHORT">Block</option>
+                    <option value="ITEM_MOD_EXPERTISE_RATING_SHORT">Expertise</option>
+                    <option value="ITEM_MOD_RESILIENCE_RATING_SHORT">Resilience</option>
+                    <option value="ITEM_MOD_MANA_REGENERATION_SHORT">Mana per 5 sec</option>
+                    <option value="ITEM_MOD_HEALTH_REGEN_SHORT">Health per 5 sec</option>
+                  </optgroup>
+                  <optgroup label="Resistances">
+                    <option value="RESISTANCE0_NAME">Armor</option>
+                    <option value="RESISTANCE1_NAME">Holy Resistance</option>
+                    <option value="RESISTANCE2_NAME">Fire Resistance</option>
+                    <option value="RESISTANCE3_NAME">Nature Resistance</option>
+                    <option value="RESISTANCE4_NAME">Frost Resistance</option>
+                    <option value="RESISTANCE5_NAME">Shadow Resistance</option>
+                    <option value="RESISTANCE6_NAME">Arcane Resistance</option>
+                  </optgroup>
+                </select>
+              </label>
+              <label class="field">
+                <span>Stat value</span>
+                <span class="pair-inputs">
+                  <input id="min-stat" type="number" step="1" inputmode="numeric" placeholder="Any" disabled>
+                  <span aria-hidden="true">–</span>
+                  <input id="max-stat" type="number" step="1" inputmode="numeric" placeholder="Any" disabled>
+                </span>
+              </label>
+              <div class="field stats-check">
+                <span>Item stats</span>
+                <label class="inline-check">
+                  <input id="has-stats" type="checkbox"> Has stats only
+                </label>
+              </div>
+            </div>
+            <p id="stats-hint" class="stats-hint">Pick a stat to filter by its value.</p>
+          </div>
+
           <div class="filter-actions">
             <button type="button" id="filters-reset" class="ghost">Reset filters</button>
             <span class="filter-hint">Filters apply to search results and carry across pages.</span>
