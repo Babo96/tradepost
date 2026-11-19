@@ -200,7 +200,11 @@ function typeLine(info) {
 }
 
 function statLabel(key) {
-  const normalized = String(key).replace(/^ITEM_MOD_/i, "").toLowerCase();
+  const normalized = String(key)
+    .replace(/^ITEM_MOD_/i, "")
+    .toLowerCase()
+    .replace(/_short$/, "");
+  if (normalized === "resistance0_name" || normalized === "resistance0") return "Armor";
   if (STAT_LABELS[normalized]) return STAT_LABELS[normalized];
   return normalized
     .replace(/[_-]+/g, " ")
