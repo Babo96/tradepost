@@ -422,6 +422,18 @@ async function api(path, params, options) {
   return response.json();
 }
 
+async function loadLive() {
+  try {
+    const data = await api("/v1/live");
+    const count = Number(data.live_clients) || 0;
+    const el = $("#live");
+    el.textContent = `${count} live contributor${count === 1 ? "" : "s"}`;
+    el.hidden = false;
+  } catch (_) {
+    $("#live").hidden = true;
+  }
+}
+
 async function loadMeta() {
   const markets = await api("/v1/meta");
   const select = $("#market");
@@ -1232,31 +1244,119 @@ function currentParams() {
     if (value !== "") params[key] = value;
   }
   if ($("#in-stock").checked) params.in_stock = "1";
-  if ($("#stat-key").value) {
-    params.stat = $("#stat-key").value;
-    const minStat = filterNumber("#min-stat");
-    const maxStat = filterNumber("#max-stat");
-    if (minStat !== "") params.min_stat = minStat;
-    if (maxStat !== "") params.max_stat = maxStat;
-  }
+  const stats = statsParam();
+  if (stats !== "") params.stats = stats;
   if ($("#has-stats").checked) params.has_stats = "1";
   return params;
 }
 
-function syncStatInputs() {
-  const active = $("#stat-key").value !== "";
-  const block = $("#stats-block");
-  if (!active) {
-    $("#min-stat").value = "";
-    $("#max-stat").value = "";
+const MAX_STAT_ROWS = 6;
+
+function statRows() {
+  return [...document.querySelectorAll("#stats-rows .stat-row")];
+}
+
+function statBound(row, selector) {
+  const raw = row.querySelector(selector).value.trim();
+  if (!raw) return "";
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) return "";
+  return String(Math.round(value));
+}
+
+// Every listed stat must match (AND). Omit empty bounds:
+// KEY, KEY:MIN, KEY::MAX, KEY:MIN:MAX.
+function statsParam() {
+  const parts = [];
+  for (const row of statRows()) {
+    const key = row.querySelector(".stat-key").value;
+    if (!key) continue;
+    const min = statBound(row, ".stat-min");
+    const max = statBound(row, ".stat-max");
+    if (min === "" && max === "") parts.push(key);
+    else if (min === "") parts.push(`${key}::${max}`);
+    else if (max === "") parts.push(`${key}:${min}`);
+    else parts.push(`${key}:${min}:${max}`);
   }
-  $("#min-stat").disabled = !active;
-  $("#max-stat").disabled = !active;
-  $("#stat-key").classList.toggle("is-active", active);
-  block.classList.toggle("is-active", active);
+  return parts.join(",");
+}
+
+function syncStatRow(row) {
+  const select = row.querySelector(".stat-key");
+  const min = row.querySelector(".stat-min");
+  const max = row.querySelector(".stat-max");
+  const active = select.value !== "";
+  if (!active) {
+    min.value = "";
+    max.value = "";
+  }
+  select.classList.toggle("is-active", active);
+  row.classList.toggle("is-active", active);
+  min.disabled = !active;
+  max.disabled = !active;
+}
+
+function updateAddStatButton() {
+  const button = $("#add-stat");
+  const full = statRows().length >= MAX_STAT_ROWS;
+  button.disabled = full;
+  button.title = full ? `Up to ${MAX_STAT_ROWS} stats` : "Add another stat";
+}
+
+function relabelStatRows() {
+  const rows = statRows();
+  rows.forEach((row, index) => {
+    const number = index + 1;
+    row.querySelector(".stat-row-key .stat-row-name").textContent = `Stat ${number}`;
+    row.querySelector(".stat-key").setAttribute("aria-label", `Stat ${number}`);
+    row.querySelector(".stat-min").setAttribute("aria-label", `Stat ${number} minimum value`);
+    row.querySelector(".stat-max").setAttribute("aria-label", `Stat ${number} maximum value`);
+    row.querySelector(".stat-remove").setAttribute("aria-label",
+      rows.length === 1 ? `Clear stat ${number}` : `Remove stat ${number}`);
+    row.querySelector(".stat-remove").title =
+      rows.length === 1 ? "Clear this stat" : "Remove this stat";
+  });
+}
+
+function updateStatsHint() {
+  const active = statRows()
+    .filter((row) => row.querySelector(".stat-key").value !== "").length;
+  $("#stats-block").classList.toggle("is-active", active > 0 || $("#has-stats").checked);
   $("#stats-hint").textContent = active
-    ? "Min/max limit this stat's value; each bound can be left empty."
-    : "Pick a stat to filter by its value.";
+    ? "All selected stats must match. Leave min or max empty for an open bound."
+    : "Add a stat to filter by its value. All selected stats must match.";
+}
+
+function addStatRow() {
+  const template = $("#stat-row-template");
+  const rows = $("#stats-rows");
+  if (!template || rows.children.length >= MAX_STAT_ROWS) return null;
+  const row = template.content.firstElementChild.cloneNode(true);
+  rows.append(row);
+  relabelStatRows();
+  updateAddStatButton();
+  updateStatsHint();
+  return row;
+}
+
+function removeStatRow(row) {
+  const rows = statRows();
+  if (!rows.length) return;
+  if (rows.length === 1) {
+    row.querySelector(".stat-key").value = "";
+    syncStatRow(row);
+  } else {
+    row.remove();
+    relabelStatRows();
+  }
+  updateAddStatButton();
+  updateStatsHint();
+  updateFilterCount();
+}
+
+function resetStatRows() {
+  $("#stats-rows").textContent = "";
+  addStatRow();
 }
 
 function updateFilterCount() {
@@ -1268,7 +1368,7 @@ function updateFilterCount() {
   if ($("#min-req-level").value.trim() || $("#max-req-level").value.trim()) count++;
   if ($("#min-price-gold").value.trim() || $("#max-price-gold").value.trim()) count++;
   if ($("#in-stock").checked) count++;
-  if ($("#stat-key").value !== "") count++;
+  count += statRows().filter((row) => row.querySelector(".stat-key").value !== "").length;
   if ($("#has-stats").checked) count++;
   if ($("#sort").value !== "price") count++;
   const badge = $("#filter-count");
@@ -1354,12 +1454,12 @@ function resetFilters() {
     $(selector).value = "";
   }
   $("#in-stock").checked = false;
-  $("#stat-key").value = "";
   $("#has-stats").checked = false;
+  resetStatRows();
   $("#sort").value = "price";
   syncSubclassFilter();
-  syncStatInputs();
   clearTimeout(searchTimer);
+  clearTimeout(statTimer);
   applyFilters();
 }
 
@@ -1409,7 +1509,6 @@ $("#search-form").addEventListener("submit", (event) => {
 for (const selector of [
   "#min-ilvl", "#max-ilvl", "#min-req-level", "#max-req-level",
   "#min-price-gold", "#max-price-gold", "#subclass-id",
-  "#min-stat", "#max-stat",
 ]) {
   const input = $(selector);
   let timer;
@@ -1426,6 +1525,43 @@ for (const selector of [
   });
 }
 
+let statTimer;
+$("#stats-rows").addEventListener("change", (event) => {
+  const select = event.target.closest(".stat-key");
+  if (!select) return;
+  syncStatRow(select.closest(".stat-row"));
+  updateStatsHint();
+  applyFilters();
+});
+
+$("#stats-rows").addEventListener("input", (event) => {
+  if (!event.target.closest(".stat-min, .stat-max")) return;
+  updateFilterCount();
+  clearTimeout(statTimer);
+  statTimer = setTimeout(applyFilters, 300);
+});
+
+$("#stats-rows").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  if (!event.target.closest(".stat-min, .stat-max")) return;
+  event.preventDefault();
+  clearTimeout(statTimer);
+  applyFilters();
+});
+
+$("#stats-rows").addEventListener("click", (event) => {
+  const button = event.target.closest(".stat-remove");
+  if (!button) return;
+  removeStatRow(button.closest(".stat-row"));
+  applyFilters();
+});
+
+$("#add-stat").addEventListener("click", () => {
+  const row = addStatRow();
+  if (!row) return;
+  row.querySelector(".stat-key").focus();
+});
+
 $("#class-id").addEventListener("change", () => {
   syncSubclassFilter();
   applyFilters();
@@ -1433,11 +1569,10 @@ $("#class-id").addEventListener("change", () => {
 $("#subclass-select").addEventListener("change", applyFilters);
 $("#sort").addEventListener("change", applyFilters);
 $("#in-stock").addEventListener("change", applyFilters);
-$("#stat-key").addEventListener("change", () => {
-  syncStatInputs();
+$("#has-stats").addEventListener("change", () => {
+  updateStatsHint();
   applyFilters();
 });
-$("#has-stats").addEventListener("change", applyFilters);
 $("#filters-reset").addEventListener("click", resetFilters);
 
 $("#prev-page").addEventListener("click", () => {
@@ -1515,8 +1650,10 @@ $("#filters").open = window.innerWidth > 900;
 buildQualityFilters();
 buildClassFilter();
 syncSubclassFilter();
-syncStatInputs();
+addStatRow();
 updateFilterCount();
+loadLive();
+setInterval(loadLive, 60_000);
 
 loadMeta()
   .then(initAuth)
