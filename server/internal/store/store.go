@@ -130,6 +130,10 @@ type SearchQuery struct {
 	MinPrice      *int64
 	MaxPrice      *int64
 	InStock       bool
+	StatKey       string
+	MinStat       *float64
+	MaxStat       *float64
+	HasStats      bool
 	Sort          string
 	Page          int
 	Limit         int

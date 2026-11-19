@@ -25,6 +25,7 @@ import (
 var (
 	marketRE = regexp.MustCompile(`^[a-z]{2}:[a-z0-9-]+:(alliance|horde|neutral)$`)
 	itemRE   = regexp.MustCompile(`^(i|g|p):[0-9]+(:[0-9]+)*$`)
+	statRE   = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)
 )
 
 const (
@@ -423,6 +424,22 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	statKey := strings.TrimSpace(query.Get("stat"))
+	if statKey != "" && !statRE.MatchString(statKey) {
+		writeError(w, http.StatusBadRequest, "invalid stat")
+		return
+	}
+	minStat, ok := parseFloatPtr(query.Get("min_stat"))
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid stat range")
+		return
+	}
+	maxStat, ok := parseFloatPtr(query.Get("max_stat"))
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid stat range")
+		return
+	}
+
 	filters := store.SearchQuery{
 		Query:         search,
 		Qualities:     parseCSVInts(query.Get("quality")),
@@ -436,6 +453,10 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		MinPrice:      parseInt64Ptr(query.Get("min_price")),
 		MaxPrice:      parseInt64Ptr(query.Get("max_price")),
 		InStock:       query.Get("in_stock") == "1",
+		StatKey:       statKey,
+		MinStat:       minStat,
+		MaxStat:       maxStat,
+		HasStats:      query.Get("has_stats") == "1",
 		Sort:          query.Get("sort"),
 		Page:          parsePositive(query.Get("page"), 1),
 		Limit:         parseLimit(query.Get("limit"), 50, 200),
@@ -614,6 +635,17 @@ func parseInt64Ptr(raw string) *int64 {
 		return nil
 	}
 	return &value
+}
+
+func parseFloatPtr(raw string) (*float64, bool) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, true
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return nil, false
+	}
+	return &value, true
 }
 
 func parseCSVInts(raw string) []int {

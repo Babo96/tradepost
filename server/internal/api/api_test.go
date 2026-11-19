@@ -619,6 +619,160 @@ func TestMetadataDetailsAdminAndFilters(t *testing.T) {
 	}
 }
 
+func TestItemStatFilters(t *testing.T) {
+	srv, st := newTestServer(t)
+	client := enroll(t, srv)
+
+	body := []byte(fmt.Sprintf(`{
+	  "v": 1,
+	  "scans": [{
+	    "market": "eu:pve:horde",
+	    "scanned_at": %d,
+	    "items": [
+	      {"k": "i:100", "p": 500, "q": 3, "n": 1},
+	      {"k": "i:200", "p": 1500, "q": 1, "n": 4},
+	      {"k": "i:300", "p": 50, "q": 10, "n": 2}
+	    ]
+	  }],
+	  "items": [
+	    {"id": 100, "name": "Stamina Chest", "quality": 3, "class_id": 4, "subclass_id": 2, "icon": 1,
+	     "stats": {"ITEM_MOD_STAMINA_SHORT": 20, "RESISTANCE0_NAME": 50}},
+	    {"id": 200, "name": "Agility Blade", "quality": 4, "class_id": 2, "subclass_id": 7, "icon": 2,
+	     "stats": {"ITEM_MOD_AGILITY_SHORT": 10, "ITEM_MOD_STAMINA_SHORT": 5, "RESISTANCE2_NAME": 15}},
+	    {"id": 300, "name": "Plain Cloth", "quality": 1, "class_id": 7, "subclass_id": 5, "icon": 3}
+	  ]
+	}`, time.Now().Unix()))
+	req := httptest.NewRequest(http.MethodPost, "/v1/ingest", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+client.Token)
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("ingest status %d: %s", rec.Code, rec.Body.String())
+	}
+	processQueued(t, st)
+
+	type searchPage struct {
+		Items []struct {
+			Key string `json:"key"`
+		} `json:"items"`
+		Total int `json:"total"`
+	}
+	search := func(path string) searchPage {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status %d: %s", path, rec.Code, rec.Body.String())
+		}
+		var page searchPage
+		if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil {
+			t.Fatal(err)
+		}
+		return page
+	}
+	// Exact key existence.
+	page := search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT")
+	if page.Total != 2 || len(page.Items) != 2 {
+		t.Fatalf("unexpected stat matches: %+v", page)
+	}
+
+	// Minimum and maximum bounds.
+	page = search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT&min_stat=10")
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].Key != "i:100" {
+		t.Fatalf("unexpected min stat matches: %+v", page)
+	}
+	page = search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_AGILITY_SHORT&min_stat=5&max_stat=10")
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].Key != "i:200" {
+		t.Fatalf("unexpected range stat matches: %+v", page)
+	}
+
+	// Resistance keys use their own stat names.
+	page = search("/v1/items?market=eu:pve:horde&stat=RESISTANCE2_NAME")
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].Key != "i:200" {
+		t.Fatalf("unexpected resistance matches: %+v", page)
+	}
+	page = search("/v1/items?market=eu:pve:horde&stat=RESISTANCE0_NAME&min_stat=40")
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].Key != "i:100" {
+		t.Fatalf("unexpected armor resistance matches: %+v", page)
+	}
+
+	// has_stats only returns items with a non-empty stats object.
+	page = search("/v1/items?market=eu:pve:horde&has_stats=1")
+	if page.Total != 2 || len(page.Items) != 2 {
+		t.Fatalf("unexpected has_stats matches: %+v", page)
+	}
+
+	// Combined with quality and paging.
+	page = search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT&quality=4")
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].Key != "i:200" {
+		t.Fatalf("unexpected combined matches: %+v", page)
+	}
+	page = search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT&page=1&limit=1&sort=name")
+	if page.Total != 2 || len(page.Items) != 1 {
+		t.Fatalf("unexpected first stat page: %+v", page)
+	}
+	page = search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT&page=2&limit=1&sort=name")
+	if page.Total != 2 || len(page.Items) != 1 {
+		t.Fatalf("unexpected second stat page: %+v", page)
+	}
+
+	// Inverted range and unknown keys return empty pages, not errors.
+	page = search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT&min_stat=100&max_stat=1")
+	if page.Total != 0 || len(page.Items) != 0 {
+		t.Fatalf("expected empty inverted range: %+v", page)
+	}
+	page = search("/v1/items?market=eu:pve:horde&stat=ITEM_MOD_SPIRIT_SHORT")
+	if page.Total != 0 || len(page.Items) != 0 {
+		t.Fatalf("expected empty unknown stat: %+v", page)
+	}
+
+	// Invalid stat key and invalid numeric inputs are rejected.
+	badStat := httptest.NewRecorder()
+	srv.ServeHTTP(badStat, httptest.NewRequest(http.MethodGet,
+		"/v1/items?market=eu:pve:horde&stat=bad-key", nil))
+	if badStat.Code != http.StatusBadRequest || !strings.Contains(badStat.Body.String(), "invalid stat") {
+		t.Fatalf("unexpected invalid stat response %d: %s", badStat.Code, badStat.Body.String())
+	}
+	badRange := httptest.NewRecorder()
+	srv.ServeHTTP(badRange, httptest.NewRequest(http.MethodGet,
+		"/v1/items?market=eu:pve:horde&stat=ITEM_MOD_STAMINA_SHORT&min_stat=abc", nil))
+	if badRange.Code != http.StatusBadRequest || !strings.Contains(badRange.Body.String(), "invalid stat range") {
+		t.Fatalf("unexpected invalid stat range response %d: %s", badRange.Code, badRange.Body.String())
+	}
+}
+
+func TestMemStoreStatFilters(t *testing.T) {
+	st := NewMemStore()
+	ctx := context.Background()
+	if err := st.UpsertItems(ctx, []store.ItemMeta{
+		{ID: 1, Name: "Numeric", Stats: json.RawMessage(`{"ITEM_MOD_STAMINA_SHORT": 12}`)},
+		{ID: 2, Name: "Textual", Stats: json.RawMessage(`{"ITEM_MOD_STAMINA_SHORT": "12"}`)},
+		{ID: 3, Name: "No Stats", Stats: json.RawMessage(`{}`)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"i:1", "i:2", "i:3"} {
+		st.applyScanLocked("eu:pve:horde", time.Now(), []store.Item{{Key: key, Price: 1, Quantity: 1}})
+	}
+
+	query := store.SearchQuery{StatKey: "ITEM_MOD_STAMINA_SHORT", Page: 1, Limit: 10}
+	page, err := st.SearchItems(ctx, "eu:pve:horde", query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].Key != "i:1" {
+		t.Fatalf("unexpected numeric stat matches: %+v", page)
+	}
+
+	hasStats, err := st.SearchItems(ctx, "eu:pve:horde", store.SearchQuery{HasStats: true, Page: 1, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasStats.Total != 2 {
+		t.Fatalf("unexpected has_stats matches: %+v", hasStats)
+	}
+}
+
 func TestHistoryRanges(t *testing.T) {
 	srv, st := newTestServer(t)
 	client := enroll(t, srv)

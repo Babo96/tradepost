@@ -487,6 +487,40 @@ func matchesFilters(meta store.ItemMeta, item store.SnapshotItem, query store.Se
 	if query.InStock && item.Quantity <= 0 {
 		return false
 	}
+	if !matchesStats(meta, query) {
+		return false
+	}
+	return true
+}
+
+func matchesStats(meta store.ItemMeta, query store.SearchQuery) bool {
+	if query.StatKey == "" && !query.HasStats {
+		return true
+	}
+	var stats map[string]any
+	if len(meta.Stats) > 0 {
+		_ = json.Unmarshal(meta.Stats, &stats)
+	}
+	if query.HasStats && len(stats) == 0 {
+		return false
+	}
+	if query.StatKey == "" {
+		return true
+	}
+	value, ok := stats[query.StatKey]
+	if !ok {
+		return false
+	}
+	number, ok := value.(float64)
+	if !ok {
+		return false
+	}
+	if query.MinStat != nil && number < *query.MinStat {
+		return false
+	}
+	if query.MaxStat != nil && number > *query.MaxStat {
+		return false
+	}
 	return true
 }
 
