@@ -3,6 +3,7 @@ package export
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -27,18 +28,58 @@ type Scan struct {
 }
 
 // Meta is the client-side item cache uploaded separately from price scans.
+// Optional fields are populated by the advanced/admin full metadata backfill.
 type Meta struct {
-	ID         int64
-	Name       string
-	Quality    int
-	ClassID    int
-	SubclassID int
-	Icon       int64
+	ID            int64
+	Name          string
+	Quality       int
+	ClassID       int
+	SubclassID    int
+	Icon          int64
+	ItemLevel     *int
+	RequiredLevel *int
+	BindType      *int
+	InventoryType *int
+	EquipLoc      *string
+	Armor         *int
+	DamageMin     *int
+	DamageMax     *int
+	Delay         *int
+	VendorPrice   *int64
+	MaxStack      *int
+	UniqueItem    *bool
+	SetID         *int
+	Stats         map[string]float64
+	Details       *Details
+}
+
+// Details is the compact rendered-tooltip representation stored by Meta.lua.
+type Details struct {
+	Lines []DetailLine `json:"lines"`
+}
+
+// DetailLine is one tooltip line. Textures and colors are intentionally absent.
+type DetailLine struct {
+	Left  string `json:"left,omitempty"`
+	Right string `json:"right,omitempty"`
+	Type  int    `json:"type"`
+}
+
+// MetaBatch is one acknowledged upload batch from TRADEPOST_META_BATCH.
+type MetaBatch struct {
+	Seq   int64
+	Count int
+	Items []Meta
 }
 
 func (m Meta) Hash() string {
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%d|%s|%d|%d|%d|%d",
-		m.ID, m.Name, m.Quality, m.ClassID, m.SubclassID, m.Icon)))
+	// json.Marshal sorts map keys, so the hash is stable across runs and
+	// includes every optional metadata field plus stats/details.
+	payload, err := json.Marshal(m)
+	if err != nil {
+		payload = []byte(fmt.Sprintf("%d|%s", m.ID, m.Name))
+	}
+	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:8])
 }
 
@@ -56,11 +97,13 @@ type WatchSet struct {
 }
 
 type Data struct {
-	Scans  []Scan
-	Items  []Meta
-	Auth   *AuthRequest
-	Watch  map[string]WatchSet
-	Active string
+	Scans     []Scan
+	Items     []Meta
+	Details   []Meta
+	MetaBatch *MetaBatch
+	Auth      *AuthRequest
+	Watch     map[string]WatchSet
+	Active    string
 }
 
 func Load(path string) ([]Scan, error) {
@@ -86,13 +129,16 @@ func LoadData(path string) (Data, error) {
 	}
 
 	data := Data{
-		Scans:  loadScans(L),
-		Items:  loadItems(L),
-		Auth:   loadAuth(L),
-		Watch:  loadWatch(L),
-		Active: loadActive(L),
+		Scans:     loadScans(L),
+		Items:     loadItems(L),
+		Details:   loadDetails(L),
+		MetaBatch: loadMetaBatch(L),
+		Auth:      loadAuth(L),
+		Watch:     loadWatch(L),
+		Active:    loadActive(L),
 	}
 	sort.Slice(data.Items, func(i, j int) bool { return data.Items[i].ID < data.Items[j].ID })
+	sort.Slice(data.Details, func(i, j int) bool { return data.Details[i].ID < data.Details[j].ID })
 	return data, nil
 }
 
@@ -150,6 +196,160 @@ func loadItems(L *lua.LState) []Meta {
 		})
 	})
 	return result
+}
+
+func loadDetails(L *lua.LState) []Meta {
+	table, ok := L.GetGlobal("TRADEPOST_ITEM_DETAILS").(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	var result []Meta
+	table.ForEach(func(key, value lua.LValue) {
+		fields, ok := value.(*lua.LTable)
+		if !ok {
+			return
+		}
+		meta, ok := readDetailMeta(fields)
+		if !ok {
+			return
+		}
+		if meta.ID <= 0 {
+			meta.ID = int64(lua.LVAsNumber(key))
+		}
+		if meta.ID > 0 {
+			result = append(result, meta)
+		}
+	})
+	return result
+}
+
+func loadMetaBatch(L *lua.LState) *MetaBatch {
+	table, ok := L.GetGlobal("TRADEPOST_META_BATCH").(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	seq := int64(lua.LVAsNumber(table.RawGetString("seq")))
+	if seq <= 0 {
+		return nil
+	}
+	batch := &MetaBatch{Seq: seq, Count: int(lua.LVAsNumber(table.RawGetString("count")))}
+	items, ok := table.RawGetString("items").(*lua.LTable)
+	if !ok {
+		return batch
+	}
+	items.ForEach(func(_, value lua.LValue) {
+		fields, ok := value.(*lua.LTable)
+		if !ok {
+			return
+		}
+		meta, ok := readDetailMeta(fields)
+		if ok && meta.ID > 0 && meta.Name != "" {
+			batch.Items = append(batch.Items, meta)
+		}
+	})
+	if batch.Count == 0 {
+		batch.Count = len(batch.Items)
+	}
+	return batch
+}
+
+func readDetailMeta(fields *lua.LTable) (Meta, bool) {
+	meta := Meta{
+		ID:            int64(lua.LVAsNumber(fields.RawGetString("id"))),
+		Name:          lua.LVAsString(fields.RawGetString("name")),
+		Quality:       int(lua.LVAsNumber(fields.RawGetString("quality"))),
+		ClassID:       int(lua.LVAsNumber(fields.RawGetString("class_id"))),
+		SubclassID:    int(lua.LVAsNumber(fields.RawGetString("subclass_id"))),
+		Icon:          int64(lua.LVAsNumber(fields.RawGetString("icon"))),
+		ItemLevel:     optionalInt(fields.RawGetString("item_level")),
+		RequiredLevel: optionalInt(fields.RawGetString("required_level")),
+		BindType:      optionalInt(fields.RawGetString("bind_type")),
+		InventoryType: optionalInt(fields.RawGetString("inventory_type")),
+		Armor:         optionalInt(fields.RawGetString("armor")),
+		DamageMin:     optionalInt(fields.RawGetString("damage_min")),
+		DamageMax:     optionalInt(fields.RawGetString("damage_max")),
+		Delay:         optionalInt(fields.RawGetString("delay")),
+		MaxStack:      optionalInt(fields.RawGetString("max_stack")),
+		SetID:         optionalInt(fields.RawGetString("set_id")),
+		VendorPrice:   optionalInt64(fields.RawGetString("vendor_price")),
+		UniqueItem:    optionalBool(fields.RawGetString("unique_item")),
+		Stats:         readStats(fields.RawGetString("stats")),
+		Details:       readDetails(fields.RawGetString("details")),
+	}
+	if value := fields.RawGetString("equip_loc"); value.Type() == lua.LTString && value.String() != "" {
+		equipLoc := value.String()
+		meta.EquipLoc = &equipLoc
+	}
+	if meta.Name == "" {
+		return Meta{}, false
+	}
+	return meta, true
+}
+
+func readStats(value lua.LValue) map[string]float64 {
+	table, ok := value.(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	stats := map[string]float64{}
+	table.ForEach(func(key, value lua.LValue) {
+		if key.Type() != lua.LTString || value.Type() != lua.LTNumber {
+			return
+		}
+		stats[key.String()] = float64(value.(lua.LNumber))
+	})
+	if len(stats) == 0 {
+		return nil
+	}
+	return stats
+}
+
+func readDetails(value lua.LValue) *Details {
+	table, ok := value.(*lua.LTable)
+	if !ok {
+		return nil
+	}
+	details := &Details{Lines: []DetailLine{}}
+	lines, ok := table.RawGetString("lines").(*lua.LTable)
+	if !ok {
+		return details
+	}
+	lines.ForEach(func(_, value lua.LValue) {
+		line, ok := value.(*lua.LTable)
+		if !ok {
+			return
+		}
+		details.Lines = append(details.Lines, DetailLine{
+			Left:  lua.LVAsString(line.RawGetString("left")),
+			Right: lua.LVAsString(line.RawGetString("right")),
+			Type:  int(lua.LVAsNumber(line.RawGetString("type"))),
+		})
+	})
+	return details
+}
+
+func optionalInt(value lua.LValue) *int {
+	if value.Type() != lua.LTNumber {
+		return nil
+	}
+	result := int(float64(value.(lua.LNumber)))
+	return &result
+}
+
+func optionalInt64(value lua.LValue) *int64 {
+	if value.Type() != lua.LTNumber {
+		return nil
+	}
+	result := int64(float64(value.(lua.LNumber)))
+	return &result
+}
+
+func optionalBool(value lua.LValue) *bool {
+	if value.Type() != lua.LTBool {
+		return nil
+	}
+	result := lua.LVAsBool(value)
+	return &result
 }
 
 func loadAuth(L *lua.LState) *AuthRequest {

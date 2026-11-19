@@ -2,9 +2,11 @@ package sync
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -17,6 +19,9 @@ import (
 )
 
 const clientVersion = "0.1.0"
+
+// Matches the server-side limit in server/internal/api/api.go.
+const maxMetaPerRequest = 20000
 
 type Status struct {
 	Running        bool   `json:"running"`
@@ -56,6 +61,9 @@ type Service struct {
 func New(cfg config.Config) (*Service, error) {
 	if err := wow.EnsureAuthSlots(cfg.WowDir); err != nil {
 		return nil, fmt.Errorf("auth slots: %w", err)
+	}
+	if err := wow.EnsureMetaAckSlots(cfg.WowDir); err != nil {
+		return nil, fmt.Errorf("meta ack slots: %w", err)
 	}
 	accounts, err := wow.AccountDirs(cfg.WowDir)
 	if err != nil {
@@ -144,24 +152,69 @@ func (s *Service) sync(ctx context.Context) error {
 			newScans = append(newScans, scan)
 		}
 	}
-	newMeta := make([]api.IngestMeta, 0, len(data.Items))
-	updatedMeta := map[string]string{}
+	// Merge basic cache entries, full details, and the pending backfill batch.
+	// Later sources win: details override the icon/name cache, and an
+	// unacknowledged batch is always re-sent so it can be acknowledged.
+	merged := map[int64]export.Meta{}
 	for _, item := range data.Items {
+		merged[item.ID] = item
+	}
+	for _, item := range data.Details {
+		merged[item.ID] = item
+	}
+	batch := data.MetaBatch
+	batchIDs := map[int64]bool{}
+	if batch != nil {
+		for _, item := range batch.Items {
+			merged[item.ID] = item
+			batchIDs[item.ID] = true
+		}
+	}
+
+	mergedIDs := make([]int64, 0, len(merged))
+	for id := range merged {
+		mergedIDs = append(mergedIDs, id)
+	}
+	sort.Slice(mergedIDs, func(i, j int) bool { return mergedIDs[i] < mergedIDs[j] })
+
+	var batchUpload []metaUpload
+	var otherUpload []metaUpload
+	for _, itemID := range mergedIDs {
+		item := merged[itemID]
 		id := strconv.FormatInt(item.ID, 10)
 		hash := item.Hash()
-		if s.meta[id] == hash {
+		if s.meta[id] == hash && !batchIDs[item.ID] {
 			continue
 		}
-		newMeta = append(newMeta, api.IngestMeta{
-			ID:         item.ID,
-			Name:       item.Name,
-			Quality:    item.Quality,
-			ClassID:    item.ClassID,
-			SubclassID: item.SubclassID,
-			Icon:       item.Icon,
-		})
-		updatedMeta[id] = hash
+		upload := metaUpload{id: id, hash: hash, meta: ingestMetaFrom(item)}
+		if batchIDs[item.ID] {
+			batchUpload = append(batchUpload, upload)
+		} else {
+			otherUpload = append(otherUpload, upload)
+		}
 	}
+	// Keep the request under the server's metadata cap. The pending batch is
+	// always uploaded in full; other changed entries wait for a later sync.
+	uploads := append([]metaUpload{}, batchUpload...)
+	if remaining := maxMetaPerRequest - len(uploads); remaining > 0 {
+		if len(otherUpload) > remaining {
+			otherUpload = otherUpload[:remaining]
+		}
+		uploads = append(uploads, otherUpload...)
+	}
+	newMeta := make([]api.IngestMeta, 0, len(uploads))
+	updatedMeta := map[string]string{}
+	for _, upload := range uploads {
+		newMeta = append(newMeta, upload.meta)
+		updatedMeta[upload.id] = upload.hash
+	}
+
+	if batch != nil && len(batch.Items) == 0 {
+		if err := wow.WriteMetaAck(s.cfg.WowDir, batch.Seq); err != nil {
+			return fmt.Errorf("meta ack: %w", err)
+		}
+	}
+
 	if len(newScans) > 0 || len(newMeta) > 0 {
 		payload := make([]api.IngestScan, 0, len(newScans))
 		for _, scan := range newScans {
@@ -185,6 +238,13 @@ func (s *Service) sync(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("upload: %w", err)
 		}
+		if batch != nil {
+			// The server accepted the batch; let the addon advance. If this
+			// write fails, the batch stays pending and will be re-sent.
+			if err := wow.WriteMetaAck(s.cfg.WowDir, batch.Seq); err != nil {
+				return fmt.Errorf("meta ack: %w", err)
+			}
+		}
 		for _, scan := range newScans {
 			s.uploaded[scan.Hash] = true
 		}
@@ -203,7 +263,7 @@ func (s *Service) sync(ctx context.Context) error {
 		}
 		s.mu.Lock()
 		s.status.LastUpload = now
-		s.status.Accepted = result.Accepted
+		s.status.Accepted = result.Queued
 		s.status.Rejected = result.Rejected
 		s.status.Meta = result.Meta
 		s.mu.Unlock()
@@ -335,6 +395,47 @@ func (s *Service) syncWatch(ctx context.Context, data export.Data) {
 	s.mu.Lock()
 	s.status.Watch = len(remote.Items)
 	s.mu.Unlock()
+}
+
+type metaUpload struct {
+	id   string
+	hash string
+	meta api.IngestMeta
+}
+
+func ingestMetaFrom(item export.Meta) api.IngestMeta {
+	meta := api.IngestMeta{
+		ID:            item.ID,
+		Name:          item.Name,
+		Quality:       item.Quality,
+		ClassID:       item.ClassID,
+		SubclassID:    item.SubclassID,
+		Icon:          item.Icon,
+		ItemLevel:     item.ItemLevel,
+		RequiredLevel: item.RequiredLevel,
+		BindType:      item.BindType,
+		InventoryType: item.InventoryType,
+		EquipLoc:      item.EquipLoc,
+		Armor:         item.Armor,
+		DamageMin:     item.DamageMin,
+		DamageMax:     item.DamageMax,
+		Delay:         item.Delay,
+		VendorPrice:   item.VendorPrice,
+		MaxStack:      item.MaxStack,
+		UniqueItem:    item.UniqueItem,
+		SetID:         item.SetID,
+	}
+	if len(item.Stats) > 0 {
+		if data, err := json.Marshal(item.Stats); err == nil {
+			meta.Stats = data
+		}
+	}
+	if item.Details != nil {
+		if data, err := json.Marshal(item.Details); err == nil {
+			meta.Details = data
+		}
+	}
+	return meta
 }
 
 func (s *Service) Run(ctx context.Context, interval time.Duration) {

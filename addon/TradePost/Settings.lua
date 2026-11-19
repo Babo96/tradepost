@@ -1,7 +1,7 @@
 local ADDON, TP = ...
 
 local PANEL_WIDTH = 620
-local PANEL_HEIGHT = 540
+local PANEL_HEIGHT = 760
 local HOUSE_LABELS = {
   auto = "Auto",
   alliance = "Alliance",
@@ -68,6 +68,43 @@ local function createButton(parent, x, y, width, label, tooltip, onClick)
     addTooltip(button, label, tooltip)
   end
   return button
+end
+
+-- Admin checkbox: enabling is destructive/large enough that it must be
+-- confirmed first. Unchecking turns the backfill off immediately.
+local function createAdminCheckbox(parent, x, y, label, tooltip, onEnable)
+  local checkbox = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
+  checkbox:SetPoint("TOPLEFT", x, y)
+  checkbox.Text:SetText(label)
+  if tooltip then
+    addTooltip(checkbox, label, tooltip)
+  end
+  checkbox:SetScript("OnClick", function(button)
+    local value = button:GetChecked() and true or false
+    if value then
+      if TP.config and TP.config.adminFullSync then
+        if onEnable then
+          onEnable()
+        end
+      else
+        button:SetChecked(false)
+        if StaticPopup_Show then
+          StaticPopup_Show("TRADEPOST_CONFIRM_ADMIN")
+        else
+          TP:Print("admin full sync must be enabled from the settings panel")
+        end
+      end
+    else
+      TP:SetConfig("adminFullSync", false)
+      if TP.MetaStop then
+        TP:MetaStop()
+      end
+    end
+    if TP.settings then
+      TP.settings.refresh()
+    end
+  end)
+  return checkbox
 end
 
 local function createPanel()
@@ -245,6 +282,62 @@ local function createPanel()
       StaticPopup_Show("TRADEPOST_CONFIRM_CLEAR", TP:MarketKey())
     end)
 
+  -- Advanced / Admin -------------------------------------------------------
+  y = y - 44
+  local adminHeading = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  adminHeading:SetPoint("TOPLEFT", 20, y)
+  adminHeading:SetText("|cffff5555Advanced / Admin|r")
+
+  y = y - 22
+  local adminWarning = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  adminWarning:SetPoint("TOPLEFT", 20, y)
+  adminWarning:SetWidth(PANEL_WIDTH - 40)
+  adminWarning:SetHeight(42)
+  adminWarning:SetJustifyH("LEFT")
+  adminWarning:SetJustifyV("TOP")
+  adminWarning:SetText("|cffff5555WARNING:|r Full metadata sync collects complete item " ..
+    "tooltips (all lines and stats). This can make SavedVariables and uploads very " ..
+    "large, and the client will load the companion acknowledgement addons while it runs.")
+
+  y = y - 50
+  settings.controls.adminFullSync = createAdminCheckbox(panel, 20, y,
+    "|cffff5555Enable full metadata sync|r", "Advanced/admin: backfill complete item " ..
+    "tooltip details for every known item. Off by default because the payload is large.",
+    function()
+      TP:MetaStart(false)
+    end)
+
+  y = y - 28
+  settings.adminStatus = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  settings.adminStatus:SetPoint("TOPLEFT", 20, y)
+  settings.adminStatus:SetWidth(PANEL_WIDTH - 40)
+  settings.adminStatus:SetJustifyH("LEFT")
+  settings.adminStatus:SetText("Admin full sync: off")
+
+  y = y - 24
+  createButton(panel, 20, y, 130, "Meta start", "Start or resume the metadata backfill.",
+    function()
+      TP:MetaStart(false)
+    end)
+  createButton(panel, 158, y, 130, "Meta stop", "Stop the metadata backfill. The pending " ..
+    "batch and queue are kept.",
+    function()
+      TP:MetaStop()
+    end)
+  createButton(panel, 296, y, 160, "Force refresh all", "Discard the pending batch and " ..
+    "requeue every known item for a full refresh.",
+    function()
+      if not (TP.config and TP.config.adminFullSync) then
+        TP:Print("enable full metadata sync first")
+        return
+      end
+      if StaticPopup_Show then
+        StaticPopup_Show("TRADEPOST_CONFIRM_ADMIN_FORCE")
+      else
+        TP:MetaStart(true)
+      end
+    end)
+
   refresh = function()
     if not panel:IsShown() then
       return
@@ -288,6 +381,14 @@ local function createPanel()
       "Central: " .. TP:CentralLabel(),
       "Live ring: seq " .. tostring(live and live.seq or 0) .. " (" .. liveCount .. " items)",
     }, "\n"))
+
+    if settings.adminStatus then
+      local adminText = "Admin full sync: off"
+      if TP.MetaStatusText then
+        adminText = TP:MetaStatusText()
+      end
+      settings.adminStatus:SetText(adminText)
+    end
 
     settings.refreshing = false
   end
@@ -339,6 +440,58 @@ if StaticPopupDialogs then
     button2 = NO,
     OnAccept = function()
       TP:ClearLocal()
+      if TP.settings and TP.settings.refresh then
+        TP.settings.refresh()
+      end
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+  }
+
+  StaticPopupDialogs["TRADEPOST_CONFIRM_ADMIN"] = {
+    text = "|cffff5555WARNING:|r Full metadata sync collects complete item tooltip " ..
+      "text for every known item. This can make SavedVariables and uploads very " ..
+      "large. Enable the advanced/admin backfill?",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function()
+      TP:SetConfig("adminFullSync", true)
+      if TP.MetaStart then
+        TP:MetaStart(false)
+      end
+      if TP.settings and TP.settings.refresh then
+        TP.settings.refresh()
+      end
+    end,
+    OnCancel = function()
+      TP:SetConfig("adminFullSync", false)
+      if TP.settings then
+        if TP.settings.controls and TP.settings.controls.adminFullSync then
+          TP.settings.controls.adminFullSync:SetChecked(false)
+        end
+        if TP.settings.refresh then
+          TP.settings.refresh()
+        end
+      end
+    end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+  }
+
+  StaticPopupDialogs["TRADEPOST_CONFIRM_ADMIN_FORCE"] = {
+    text = "Force a full metadata refresh? The pending batch is discarded and every " ..
+      "known item is queued again.",
+    button1 = YES,
+    button2 = NO,
+    OnAccept = function()
+      TP:SetConfig("adminFullSync", true)
+      if TP.MetaStart then
+        TP:MetaStart(true)
+      end
       if TP.settings and TP.settings.refresh then
         TP.settings.refresh()
       end

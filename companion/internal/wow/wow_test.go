@@ -54,6 +54,62 @@ func TestFindAcceptsForeverDir(t *testing.T) {
 	}
 }
 
+func TestMetaAckSlots(t *testing.T) {
+	wowDir := t.TempDir()
+	if err := os.MkdirAll(AddonsDir(wowDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureMetaAckSlots(wowDir); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < MetaAckSlots; index++ {
+		tocPath := filepath.Join(AddonsDir(wowDir), MetaAckSlotName(index), MetaAckSlotName(index)+".toc")
+		data, err := os.ReadFile(tocPath)
+		if err != nil {
+			t.Fatalf("missing ack TOC %d: %v", index, err)
+		}
+		if !strings.Contains(string(data), "## LoadOnDemand: 1") ||
+			!strings.Contains(string(data), "## Group: TradePost_LiveData") {
+			t.Fatalf("unexpected ack TOC %d:\n%s", index, data)
+		}
+	}
+
+	if err := WriteMetaAck(wowDir, 17); err != nil {
+		t.Fatal(err)
+	}
+	// Every slot carries the acknowledgement, so any unloaded slot the addon
+	// consumes yields the current batch.
+	for index := 0; index < MetaAckSlots; index++ {
+		data, err := os.ReadFile(MetaAckSlotPath(wowDir, index))
+		if err != nil {
+			t.Fatalf("missing ack payload %d: %v", index, err)
+		}
+		if !strings.Contains(string(data), "batch = 17") || !strings.Contains(string(data), "ok = true") {
+			t.Fatalf("unexpected ack payload %d:\n%s", index, data)
+		}
+	}
+	// 17 % 16 == 1
+	data, err := os.ReadFile(MetaAckSlotPath(wowDir, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "batch = 17") || !strings.Contains(string(data), "ok = true") {
+		t.Fatalf("unexpected ack payload:\n%s", data)
+	}
+
+	// Re-ensuring must not overwrite a pending ack.
+	if err := EnsureMetaAckSlots(wowDir); err != nil {
+		t.Fatal(err)
+	}
+	again, err := os.ReadFile(MetaAckSlotPath(wowDir, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(again) != string(data) {
+		t.Fatal("EnsureMetaAckSlots overwrote an existing ack")
+	}
+}
+
 func TestInstall(t *testing.T) {
 	source := t.TempDir()
 	addon := filepath.Join(source, "addon", "TradePost")

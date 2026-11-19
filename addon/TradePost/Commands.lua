@@ -68,6 +68,7 @@ function TP:PrintHelp()
   self:Print("  /tradepost bridge [on/off]  Auctionator display bridge")
   self:Print("  /tradepost bridgetest [id]  original vs current Auctionator price")
   self:Print("  /tradepost export [clear/save/local] buffer status / flush / local test")
+  self:Print("  /tradepost meta status|start|stop|force  full item metadata backfill (admin)")
   self:Print("  /tradepost clear            clear local prices for this market")
   self:Print("  /tradepost debug            toggle debug output")
   self:Print("  /tradepost lasterror        show the last caught error")
@@ -194,6 +195,17 @@ SlashCmdList["TRADEPOST"] = function(msg)
       TP:ExportLocal()
     else
       TP:ExportStatus()
+    end
+  elseif command == "meta" then
+    local sub = string.match(rest or "", "^(%S*)")
+    if sub == "start" then
+      TP:MetaStart(false)
+    elseif sub == "stop" then
+      TP:MetaStop()
+    elseif sub == "force" then
+      TP:MetaStart(true)
+    else
+      TP:MetaStatus()
     end
   elseif command == "debug" then
     TP:SetConfig("debug", not TP.config.debug)

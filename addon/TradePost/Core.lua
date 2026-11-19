@@ -60,6 +60,9 @@ function TP:OnLogin()
       TP:SyncAuctionatorWatchList(false)
     end)
   end)
+  if self.MetaResume then
+    pcall(self.MetaResume, self)
+  end
   if not self.favouritesTimer then
     self.favouritesTimer = C_Timer.NewTicker(60, function()
       pcall(function()

@@ -11,6 +11,9 @@ local DEFAULTS = {
   ringWindow = 300,
   auctionatorBridge = true,
   auctionatorFavourites = true,
+  -- Advanced/admin only. Collects full item tooltip metadata. Off by default
+  -- because the SavedVariables payload can be large.
+  adminFullSync = false,
 }
 
 function TP:InitConfig()

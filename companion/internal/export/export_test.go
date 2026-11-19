@@ -100,6 +100,88 @@ TRADEPOST_ITEMS = {
 	}
 }
 
+func TestLoadMetaBatchAndDetails(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TradePost.lua")
+	data := `TRADEPOST_ITEM_DETAILS = {
+  [2589] = {
+    id = 2589, name = "Linen Cloth", quality = 1,
+    class_id = 7, subclass_id = 5, icon = 132889,
+    item_level = 5, required_level = 1, bind_type = 0,
+    inventory_type = 0, equip_loc = "", vendor_price = 12,
+    max_stack = 20, unique_item = false, set_id = 0,
+    stats = { ITEM_MOD_STAMINA = 5, ITEM_MOD_ARMOR = 12 },
+    details = {
+      lines = {
+        { left = "Linen Cloth", right = "", type = 0 },
+        { left = "5 Armor", right = "", type = 1 },
+      },
+    },
+  },
+}
+TRADEPOST_META_BATCH = {
+  seq = 7,
+  count = 1,
+  items = {
+    {
+      id = 12345, name = "Test Blade", quality = 3,
+      class_id = 2, subclass_id = 7, icon = 135274,
+      item_level = 70, required_level = 60, bind_type = 1,
+      inventory_type = 13, equip_loc = "MAINHAND", armor = 0,
+      damage_min = 10, damage_max = 20, delay = 2000,
+      vendor_price = 999, max_stack = 1, unique_item = true, set_id = 42,
+      stats = { ITEM_MOD_AGILITY = 7 },
+      details = { lines = { { left = "Test Blade", right = "", type = 0 } } },
+    },
+  },
+}
+`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadData(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Details) != 1 {
+		t.Fatalf("expected 1 detail entry, got %d", len(loaded.Details))
+	}
+	detail := loaded.Details[0]
+	if detail.ID != 2589 || detail.Stats["ITEM_MOD_STAMINA"] != 5 {
+		t.Fatalf("unexpected detail: %+v", detail)
+	}
+	if detail.Details == nil || len(detail.Details.Lines) != 2 || detail.Details.Lines[1].Left != "5 Armor" {
+		t.Fatalf("unexpected detail lines: %+v", detail.Details)
+	}
+	if detail.ItemLevel == nil || *detail.ItemLevel != 5 || detail.RequiredLevel == nil || *detail.RequiredLevel != 1 {
+		t.Fatalf("unexpected optional levels: %+v", detail)
+	}
+
+	if loaded.MetaBatch == nil || loaded.MetaBatch.Seq != 7 {
+		t.Fatalf("unexpected batch: %+v", loaded.MetaBatch)
+	}
+	if len(loaded.MetaBatch.Items) != 1 {
+		t.Fatalf("expected 1 batch item, got %d", len(loaded.MetaBatch.Items))
+	}
+	item := loaded.MetaBatch.Items[0]
+	if item.ID != 12345 || item.EquipLoc == nil || *item.EquipLoc != "MAINHAND" {
+		t.Fatalf("unexpected batch item: %+v", item)
+	}
+	if item.SetID == nil || *item.SetID != 42 || item.UniqueItem == nil || !*item.UniqueItem {
+		t.Fatalf("unexpected batch optional fields: %+v", item)
+	}
+	if item.Stats["ITEM_MOD_AGILITY"] != 7 || item.Details == nil || len(item.Details.Lines) != 1 {
+		t.Fatalf("unexpected batch stats/details: %+v", item)
+	}
+
+	// Two otherwise identical records with different details must hash apart.
+	other := item
+	other.Details = &Details{Lines: []DetailLine{{Left: "Different", Type: 1}}}
+	if item.Hash() == other.Hash() {
+		t.Fatal("expected details to affect metadata hash")
+	}
+}
+
 func TestLoadDataAuthWatch(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "TradePost.lua")

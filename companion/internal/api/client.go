@@ -39,15 +39,31 @@ type IngestItem struct {
 }
 
 type IngestMeta struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	Quality    int    `json:"quality"`
-	ClassID    int    `json:"class_id"`
-	SubclassID int    `json:"subclass_id"`
-	Icon       int64  `json:"icon"`
+	ID            int64           `json:"id"`
+	Name          string          `json:"name"`
+	Quality       int             `json:"quality"`
+	ClassID       int             `json:"class_id"`
+	SubclassID    int             `json:"subclass_id"`
+	Icon          int64           `json:"icon"`
+	ItemLevel     *int            `json:"item_level,omitempty"`
+	RequiredLevel *int            `json:"required_level,omitempty"`
+	BindType      *int            `json:"bind_type,omitempty"`
+	InventoryType *int            `json:"inventory_type,omitempty"`
+	EquipLoc      *string         `json:"equip_loc,omitempty"`
+	Armor         *int            `json:"armor,omitempty"`
+	DamageMin     *int            `json:"damage_min,omitempty"`
+	DamageMax     *int            `json:"damage_max,omitempty"`
+	Delay         *int            `json:"delay,omitempty"`
+	VendorPrice   *int64          `json:"vendor_price,omitempty"`
+	MaxStack      *int            `json:"max_stack,omitempty"`
+	UniqueItem    *bool           `json:"unique_item,omitempty"`
+	SetID         *int            `json:"set_id,omitempty"`
+	Stats         json.RawMessage `json:"stats,omitempty"`
+	Details       json.RawMessage `json:"details,omitempty"`
 }
 
 type IngestResponse struct {
+	Queued   int `json:"queued"`
 	Accepted int `json:"accepted"`
 	Rejected int `json:"rejected"`
 	Items    int `json:"items"`
@@ -146,7 +162,7 @@ func (c *Client) Ingest(ctx context.Context, scans []IngestScan, meta []IngestMe
 		return IngestResponse{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return IngestResponse{}, responseError(resp)
 	}
 	var result IngestResponse
