@@ -383,29 +383,27 @@ function TP:MetaFinalizeBatch()
   }
   self.meta.batchSeq = seq
   self.meta.batchCount = #pending
-  self.meta.waitingAck = true
-  self.meta.ackStarted = time()
+  -- Batch markers are for companion progress/ack only; collection keeps
+  -- running. The Forever client flushes SavedVariables on a ~5 minute timer,
+  -- so waiting per batch would stall and exhaust the one-shot ack slots.
+  self.meta.waitingAck = false
+  self.meta.ackStarted = nil
   self.meta.ackTimedOut = false
   self.meta.paused = false
-  -- Do not burn an ack slot before the companion has had a chance to write
-  -- the acknowledgement; the first poll happens ACK_POLL_SECONDS later.
-  self.meta.lastAckPoll = time()
+  self.meta.lastAckPoll = self.meta.lastAckPoll or time()
   self.meta.ackIndex = 0
   self.meta.ackTried = {}
   TRADEPOST_META_QUEUE.ackTried = 0
-  self:MetaStopProcessTicker()
   self:SaveExport()
-  -- The Forever client defers/throttles SavedVariables writes. Retry the
-  -- flush so the companion can see the batch without a manual /reload.
+  -- Retry the throttled flush so the companion sees details as soon as the
+  -- client permits a write; a manual /reload also flushes.
   if self.ScheduleExportRetry then
     self:ScheduleExportRetry()
   end
   self:MetaEnsureAckTicker()
-  self:Print("metadata batch " .. seq .. " ready (" .. #pending ..
-    " items). Waiting for the companion before continuing.")
+  self:Debug("metadata batch " .. seq .. " ready (" .. #pending .. " items)")
   return true
 end
-
 function TP:MetaFinish(reason)
   self:MetaStopProcessTicker()
   self:MetaStopAckTicker()
@@ -423,6 +421,9 @@ function TP:MetaFinish(reason)
     queue.completed = true
   end
   self:SaveExport()
+  if self.ScheduleExportRetry then
+    self:ScheduleExportRetry()
+  end
   self:Print("metadata sync " .. (reason or "finished") .. " (" ..
     tostring(queue.synced or 0) .. " synced)")
   if self.settings and self.settings.refresh then
@@ -430,35 +431,25 @@ function TP:MetaFinish(reason)
   end
 end
 
-function TP:MetaAckReceived()
-  local meta = self.meta
-  local count = meta.batchCount
-    or (TRADEPOST_META_BATCH and TRADEPOST_META_BATCH.count)
-    or 0
-  TRADEPOST_META_BATCH = nil
+function TP:MetaAckReceived(seq, count)
   local queue = TRADEPOST_META_QUEUE
-  queue.synced = (queue.synced or 0) + count
-  meta.waitingAck = false
-  meta.paused = false
-  meta.ackTimedOut = false
-  meta.ackStarted = nil
-  meta.lastAckPoll = nil
-  meta.batchSeq = nil
-  meta.batchCount = nil
-  self:SaveExport()
-  self:Print("metadata batch acknowledged (" .. count .. " items, " ..
-    tostring(queue.synced) .. " synced)")
-  if (queue.index or 1) <= (queue.total or 0) then
-    meta.running = true
-    self:MetaEnsureProcessTicker()
-  else
-    self:MetaFinish("complete")
+  seq = tonumber(seq) or tonumber(self.meta.batchSeq) or 0
+  count = tonumber(count) or tonumber(self.meta.batchCount)
+    or (TRADEPOST_META_BATCH and TRADEPOST_META_BATCH.count) or BATCH_SIZE
+  if seq > (queue.lastAckSeq or 0) then
+    queue.lastAckSeq = seq
+    queue.synced = (queue.synced or 0) + count
   end
+  if TRADEPOST_META_BATCH and tonumber(TRADEPOST_META_BATCH.seq) == seq then
+    TRADEPOST_META_BATCH = nil
+  end
+  self:SaveExport()
+  self:Debug("metadata batch " .. seq .. " acknowledged (" .. count ..
+    " items, " .. tostring(queue.synced or 0) .. " synced)")
   if self.settings and self.settings.refresh then
     self.settings.refresh()
   end
 end
-
 local function isAddonLoaded(name)
   if C_AddOns and type(C_AddOns.IsAddOnLoaded) == "function" then
     return C_AddOns.IsAddOnLoaded(name) and true or false
@@ -525,7 +516,7 @@ end
 
 function TP:MetaAckTick()
   local meta = self.meta
-  if not meta.running or not meta.waitingAck then
+  if not meta.running then
     return
   end
   -- Never touch ack slots unless the admin mode is still enabled.
@@ -539,40 +530,28 @@ function TP:MetaAckTick()
     meta.lastAckPoll = now
     local name = self:MetaNextAckSlot()
     if name then
-      local ok, err = pcall(loadAddon, name)
+      local ok, result = pcall(loadAddon, name)
       if not ok then
-        self:Debug("ack slot " .. name .. ": " .. tostring(err))
+        self:Debug("ack slot " .. name .. ": " .. tostring(result))
       else
-        self:Debug("ack poll: loaded " .. name .. " -> " .. tostring(err))
+        self:Debug("ack poll: loaded " .. name .. " -> " .. tostring(result))
       end
     else
-      self:Debug("ack poll: no untried slots left for batch " .. tostring(meta.batchSeq))
+      self:Debug("ack poll: no untried slots left")
     end
   end
 
   local ack = TRADEPOST_META_ACK
-  if type(ack) == "table" and tonumber(ack.batch) == meta.batchSeq and ack.ok ~= false then
-    self:MetaAckReceived()
-    return
-  end
-
-  if not meta.ackTimedOut and meta.ackStarted
-    and (now - meta.ackStarted) >= ACK_TIMEOUT_SECONDS then
-    meta.ackTimedOut = true
-    meta.paused = true
-    self:MetaStopAckTicker()
-    self:Print("metadata batch " .. tostring(meta.batchSeq) ..
-      " was not acknowledged after " .. ACK_TIMEOUT_SECONDS ..
-      "s; paused and kept the batch. /reload or /tradepost meta start to retry")
-    if self.settings and self.settings.refresh then
-      self.settings.refresh()
+  if type(ack) == "table" and ack.ok ~= false then
+    local seq = tonumber(ack.batch)
+    if seq and seq > (TRADEPOST_META_QUEUE.lastAckSeq or 0) then
+      self:MetaAckReceived(seq, ack.count)
     end
   end
 end
-
 function TP:MetaProcessTick()
   local meta = self.meta
-  if not meta.running or meta.waitingAck or meta.paused then
+  if not meta.running or meta.paused then
     return
   end
   local queue = TRADEPOST_META_QUEUE
@@ -617,25 +596,18 @@ function TP:MetaStart(force)
     TRADEPOST_META_BATCH = nil
     TRADEPOST_ITEM_DETAILS = {}
     self:MetaQueueBuild(true)
-  elseif TRADEPOST_META_BATCH and TRADEPOST_META_BATCH.seq then
-    meta.running = true
-    meta.paused = false
-    meta.waitingAck = true
-    meta.batchSeq = tonumber(TRADEPOST_META_BATCH.seq)
-    meta.batchCount = TRADEPOST_META_BATCH.count
-      or #(TRADEPOST_META_BATCH.items or {})
-    meta.ackStarted = time()
-    meta.ackTimedOut = false
-    meta.lastAckPoll = time()
-    meta.ackIndex = 0
-    meta.ackTried = {}
-    TRADEPOST_META_QUEUE.ackTried = 0
-    self:MetaEnsureAckTicker()
-    self:Print("resuming metadata batch " .. tostring(meta.batchSeq) ..
-      "; waiting for the companion")
-    return
   elseif not (TRADEPOST_META_QUEUE.ids and #TRADEPOST_META_QUEUE.ids > 0)
     or (TRADEPOST_META_QUEUE.index or 1) > (TRADEPOST_META_QUEUE.total or 0) then
+    if TRADEPOST_META_BATCH and TRADEPOST_META_BATCH.seq then
+      -- Collection is already done; just make sure the last batch reaches the
+      -- companion on the next (or a manual) SavedVariables flush.
+      self:SaveExport()
+      if self.ScheduleExportRetry then
+        self:ScheduleExportRetry()
+      end
+      self:Print("metadata collection complete; waiting for the next SavedVariables flush")
+      return
+    end
     local count = self:MetaQueueBuild(false)
     if count == 0 then
       self:Print("no known items to sync yet; scan the auction house first.")
