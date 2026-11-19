@@ -14,7 +14,7 @@ local BATCH_SIZE = 500
 local TICK_INTERVAL = 0.1 -- seconds
 local PER_TICK = 2        -- 20 items/sec
 local ACK_POLL_SECONDS = 10
-local ACK_TIMEOUT_SECONDS = 60
+local ACK_TIMEOUT_SECONDS = 300
 local ACK_SLOTS = 16
 local DEFAULT_ICON = 134400 -- inv_misc_questionmark
 
@@ -393,6 +393,11 @@ function TP:MetaFinalizeBatch()
   self.meta.ackIndex = 0
   self:MetaStopProcessTicker()
   self:SaveExport()
+  -- The Forever client defers/throttles SavedVariables writes. Retry the
+  -- flush so the companion can see the batch without a manual /reload.
+  if self.ScheduleExportRetry then
+    self:ScheduleExportRetry()
+  end
   self:MetaEnsureAckTicker()
   self:Print("metadata batch " .. seq .. " ready (" .. #pending ..
     " items). Waiting for the companion before continuing.")
