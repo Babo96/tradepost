@@ -140,6 +140,7 @@ type SearchQuery struct {
 	Stats         []StatFilter
 	HasStats      bool
 	Sort          string
+	Dir           string
 	Page          int
 	Limit         int
 }

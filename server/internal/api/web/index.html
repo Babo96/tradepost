@@ -62,16 +62,6 @@
               <input id="subclass-id" type="number" min="0" step="1" inputmode="numeric" placeholder="Any">
             </label>
             <label class="field">
-              <span>Sort</span>
-              <select id="sort">
-                <option value="price">Cheapest first</option>
-                <option value="name">Name A–Z</option>
-                <option value="ilvl">Item level</option>
-                <option value="quality">Quality</option>
-                <option value="scanned">Recently scanned</option>
-              </select>
-            </label>
-            <label class="field">
               <span>Item level</span>
               <span class="pair-inputs">
                 <input id="min-ilvl" type="number" min="0" step="1" inputmode="numeric" placeholder="Min">
@@ -176,18 +166,40 @@
         </div>
       </details>
 
-      <div class="toolbar">
-        <label class="watch-toggle">
-          <input id="watch-only" type="checkbox"> Watchlist only
-        </label>
-        <span id="sync-state" class="sync-state"></span>
-        <span id="status" class="status"></span>
-      </div>
-      <div id="pager" class="pager" hidden>
-        <button type="button" id="prev-page" class="ghost">Prev</button>
-        <span id="page-label" class="page-label"></span>
-        <span id="page-of" class="page-of"></span>
-        <button type="button" id="next-page" class="ghost">Next</button>
+      <div class="results-head">
+        <div class="results-bar">
+          <div class="sort-field">
+            <label class="sort-label" for="sort">Sort by</label>
+            <select id="sort">
+              <option value="price">Price</option>
+              <option value="name">Name</option>
+              <option value="ilvl">Item level</option>
+              <option value="quality">Quality</option>
+              <option value="scanned">Last scanned</option>
+            </select>
+          </div>
+          <div id="sort-dir" class="sort-dir" role="group" aria-label="Sort direction">
+            <button type="button" data-dir="asc" aria-pressed="true">
+              <span aria-hidden="true">↑</span> Asc
+            </button>
+            <button type="button" data-dir="desc" aria-pressed="false">
+              <span aria-hidden="true">↓</span> Desc
+            </button>
+          </div>
+          <label class="watch-toggle">
+            <input id="watch-only" type="checkbox"> Watchlist only
+          </label>
+        </div>
+        <div class="results-meta">
+          <span id="status" class="status"></span>
+          <span id="sync-state" class="sync-state"></span>
+        </div>
+        <div id="pager" class="pager" hidden>
+          <button type="button" id="prev-page" class="ghost">Prev</button>
+          <span id="page-label" class="page-label"></span>
+          <span id="page-of" class="page-of"></span>
+          <button type="button" id="next-page" class="ghost">Next</button>
+        </div>
       </div>
       <div id="results" class="results">
         <p class="empty">Loading…</p>

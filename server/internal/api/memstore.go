@@ -433,7 +433,7 @@ func (m *MemStore) SearchItems(_ context.Context, market string, query store.Sea
 		})
 	}
 
-	sortSearchResults(result, query.Sort)
+	sortSearchResults(result, query.Sort, query.Dir)
 	total := int64(len(result))
 	start := (query.Page - 1) * query.Limit
 	if start > len(result) {
@@ -525,37 +525,71 @@ func matchesStats(meta store.ItemMeta, query store.SearchQuery) bool {
 	return true
 }
 
-func sortSearchResults(items []store.SearchResult, sortKey string) {
+func sortSearchResults(items []store.SearchResult, sortKey, dir string) {
+	desc := sortDescending(sortKey, dir)
 	sort.SliceStable(items, func(i, j int) bool {
 		a, b := items[i], items[j]
+		cmp := 0
 		switch sortKey {
 		case "name":
-			if a.Name != b.Name {
-				return a.Name < b.Name
-			}
+			cmp = strings.Compare(a.Name, b.Name)
 		case "ilvl":
-			av, bv := intValue(a.ItemLevel), intValue(b.ItemLevel)
-			if av != bv {
-				return av > bv
-			}
+			cmp = compareInts(intValue(a.ItemLevel), intValue(b.ItemLevel))
 		case "quality":
-			if a.Quality != b.Quality {
-				return a.Quality > b.Quality
-			}
+			cmp = compareInts(a.Quality, b.Quality)
 		case "scanned":
-			if a.Scanned != b.Scanned {
-				return a.Scanned > b.Scanned
-			}
+			cmp = compareInt64s(a.Scanned, b.Scanned)
 		default:
-			if a.Price != b.Price {
-				return a.Price < b.Price
-			}
-			if a.Name != b.Name {
-				return a.Name < b.Name
+			cmp = compareInt64s(a.Price, b.Price)
+			if cmp == 0 {
+				cmp = strings.Compare(a.Name, b.Name)
 			}
 		}
-		return a.Key < b.Key
+		if cmp == 0 {
+			cmp = strings.Compare(a.Key, b.Key)
+		}
+		if desc {
+			return cmp > 0
+		}
+		return cmp < 0
 	})
+}
+
+func sortDescending(sortKey, dir string) bool {
+	switch dir {
+	case "asc":
+		return false
+	case "desc":
+		return true
+	}
+	switch sortKey {
+	case "ilvl", "quality", "scanned":
+		return true
+	default:
+		return false
+	}
+}
+
+func compareInts(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func compareInt64s(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func intValue(value *int) int {

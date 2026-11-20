@@ -13,6 +13,15 @@ const QUALITY_NAMES = [
 
 const PAGE_SIZE = 50;
 
+// Starting direction for each sort key. The user can flip it afterwards.
+const DEFAULT_SORT_DIR = {
+  price: "asc",
+  name: "asc",
+  ilvl: "desc",
+  quality: "desc",
+  scanned: "desc",
+};
+
 const CLASS_NAMES = {
   0: "Consumable", 1: "Container", 2: "Weapon", 3: "Gem",
   4: "Armor", 5: "Reagent", 6: "Projectile", 7: "Trade Goods",
@@ -1218,6 +1227,18 @@ function selectedSubclass() {
   return $("#subclass-select").value;
 }
 
+function setSortDir(dir) {
+  const next = dir === "desc" ? "desc" : "asc";
+  for (const button of document.querySelectorAll("#sort-dir button[data-dir]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.dir === next));
+  }
+}
+
+function sortDir() {
+  const active = document.querySelector('#sort-dir button[data-dir][aria-pressed="true"]');
+  return active ? active.dataset.dir : "asc";
+}
+
 function currentParams() {
   const params = {
     market: state.market,
@@ -1225,6 +1246,7 @@ function currentParams() {
     limit: PAGE_SIZE,
     page: state.page,
     sort: $("#sort").value,
+    dir: sortDir(),
   };
   const qualities = [...document.querySelectorAll("#quality-list input:checked")]
     .map((input) => input.value);
@@ -1370,7 +1392,6 @@ function updateFilterCount() {
   if ($("#in-stock").checked) count++;
   count += statRows().filter((row) => row.querySelector(".stat-key").value !== "").length;
   if ($("#has-stats").checked) count++;
-  if ($("#sort").value !== "price") count++;
   const badge = $("#filter-count");
   badge.textContent = count ? `${count} active` : "";
   badge.hidden = count === 0;
@@ -1457,6 +1478,7 @@ function resetFilters() {
   $("#has-stats").checked = false;
   resetStatRows();
   $("#sort").value = "price";
+  setSortDir(DEFAULT_SORT_DIR.price);
   syncSubclassFilter();
   clearTimeout(searchTimer);
   clearTimeout(statTimer);
@@ -1567,7 +1589,16 @@ $("#class-id").addEventListener("change", () => {
   applyFilters();
 });
 $("#subclass-select").addEventListener("change", applyFilters);
-$("#sort").addEventListener("change", applyFilters);
+$("#sort").addEventListener("change", () => {
+  setSortDir(DEFAULT_SORT_DIR[$("#sort").value] || "asc");
+  applyFilters();
+});
+$("#sort-dir").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-dir]");
+  if (!button || button.getAttribute("aria-pressed") === "true") return;
+  setSortDir(button.dataset.dir);
+  applyFilters();
+});
 $("#in-stock").addEventListener("change", applyFilters);
 $("#has-stats").addEventListener("change", () => {
   updateStatsHint();
@@ -1647,6 +1678,7 @@ $("#results").addEventListener("scroll", () => {
 });
 
 $("#filters").open = window.innerWidth > 900;
+setSortDir(DEFAULT_SORT_DIR[$("#sort").value] || "asc");
 buildQualityFilters();
 buildClassFilter();
 syncSubclassFilter();

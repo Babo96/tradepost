@@ -109,7 +109,7 @@ func (p *Postgres) SearchItems(ctx context.Context, market string, q SearchQuery
 		return SearchPage{}, err
 	}
 
-	order := searchOrder(q.Sort)
+	order := searchOrder(q.Sort, q.Dir)
 	offset := (q.Page - 1) * q.Limit
 	args = append(args, q.Limit, offset)
 	limitIdx := len(args) - 1
@@ -221,18 +221,38 @@ func searchWhere(market string, q SearchQuery) (string, []any) {
 	return strings.Join(clauses, " AND "), args
 }
 
-func searchOrder(sortKey string) string {
+func searchOrder(sortKey, dir string) string {
+	desc := sortDescending(sortKey, dir)
+	order := "ASC"
+	if desc {
+		order = "DESC"
+	}
 	switch sortKey {
 	case "name":
-		return "i.name ASC NULLS LAST, p.item_key ASC"
+		return "i.name " + order + " NULLS LAST, p.item_key ASC"
 	case "ilvl":
-		return "i.item_level DESC NULLS LAST, p.item_key ASC"
+		return "i.item_level " + order + " NULLS LAST, p.item_key ASC"
 	case "quality":
-		return "i.quality DESC NULLS LAST, p.item_key ASC"
+		return "i.quality " + order + " NULLS LAST, p.item_key ASC"
 	case "scanned":
-		return "p.scanned_at DESC, p.item_key ASC"
+		return "p.scanned_at " + order + ", p.item_key ASC"
 	default:
-		return "p.price ASC, i.name ASC, p.item_key ASC"
+		return "p.price " + order + ", i.name ASC, p.item_key ASC"
+	}
+}
+
+func sortDescending(sortKey, dir string) bool {
+	switch dir {
+	case "asc":
+		return false
+	case "desc":
+		return true
+	}
+	switch sortKey {
+	case "ilvl", "quality", "scanned":
+		return true
+	default:
+		return false
 	}
 }
 

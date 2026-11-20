@@ -32,7 +32,7 @@ CurseForge/WoWUI or manual installs.
 - Filter by quality, class, subclass, inventory type, item level, required
   level, price, stock, and structured stats/resistances.
 - Page through 50 results at a time and sort by price, name, item level,
-  quality or scan time.
+  quality or scan time, in ascending or descending order.
 - Hover or click a row for a text-only item card with the full tooltip lines,
   stats, bind, slot, item level, required level, vendor price, max stack and
   current price. No item images are rendered.
@@ -107,7 +107,7 @@ GET /v1/meta
 GET /v1/items?market=eu:pve:horde&q=linen&limit=50&page=1
 GET /v1/items?market=eu:pve:horde&quality=2,3&class_id=4&min_ilvl=30
 GET /v1/items?market=eu:pve:horde&stats=ITEM_MOD_STAMINA_SHORT:10,ITEM_MOD_INTELLECT_SHORT:5
-GET /v1/items?market=eu:pve:horde&has_stats=1&in_stock=1&sort=price
+GET /v1/items?market=eu:pve:horde&has_stats=1&in_stock=1&sort=price&dir=asc
 GET /v1/item/detail?market=eu:pve:horde&key=i:2589
 GET /v1/items/missing-details?market=eu:pve:horde&limit=500&force=0
 GET /v1/item/history?market=eu:pve:horde&key=i:2589&range=12h
@@ -138,6 +138,7 @@ Filters:
 | `stats` | comma-separated `KEY[:MIN[:MAX]]`, ANDed |
 | `has_stats=1` | non-empty stats object |
 | `sort` | `price`, `name`, `ilvl`, `quality`, `scanned` |
+| `dir` | `asc` or `desc`; omitted defaults to asc for price/name and desc for ilvl/quality/scanned |
 | `page`, `limit` | 1-based page; limit max 200 |
 
 `/v1/item/detail` returns the item metadata (`stats`, `details`,

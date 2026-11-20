@@ -154,7 +154,8 @@ build.
 
 - Search by name, item ID or exact key; filters for quality, class, subclass,
   inventory type, item level, required level, price, stock, and structured
-  stats/resistances; page size 50; sort by price/name/ilvl/quality/scanned.
+  stats/resistances; page size 50; sort by price/name/ilvl/quality/scanned in
+  either direction.
 - Text-only hover cards with the full tooltip, stats, bind, slot, vendor price,
   max stack and current price. No item images are rendered.
 - History: 12 h at 1-minute, 7 days at 15-minute, all time hourly.

@@ -446,6 +446,11 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid stat filter")
 		return
 	}
+	direction := strings.ToLower(strings.TrimSpace(query.Get("dir")))
+	if direction != "" && direction != "asc" && direction != "desc" {
+		writeError(w, http.StatusBadRequest, "invalid sort direction")
+		return
+	}
 	statKey := strings.TrimSpace(query.Get("stat"))
 	if statKey != "" && !statRE.MatchString(statKey) {
 		writeError(w, http.StatusBadRequest, "invalid stat")
@@ -481,6 +486,7 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		Stats:         stats,
 		HasStats:      query.Get("has_stats") == "1",
 		Sort:          query.Get("sort"),
+		Dir:           direction,
 		Page:          parsePositive(query.Get("page"), 1),
 		Limit:         parseLimit(query.Get("limit"), 50, 200),
 	}

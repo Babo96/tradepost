@@ -54,7 +54,9 @@ Market keys are `region:ruleset:house`, e.g. `eu:pve:horde`.
 `GET /v1/items` accepts `quality`, `class_id`, `subclass_id`,
 `inventory_type`, `min_ilvl`, `max_ilvl`, `min_req_level`, `max_req_level`,
 `min_price`, `max_price`, `in_stock=1`, `stats=KEY[:MIN[:MAX]],...`,
-`has_stats=1`, `sort`, `page` and `limit` (max 200).
+`has_stats=1`, `sort`, `dir` (`asc`/`desc`), `page` and `limit` (max 200).
+Sort keys are `price`, `name`, `ilvl`, `quality` and `scanned`; the default
+direction is ascending for price/name and descending for the others.
 
 `/v1/live` counts distinct clients that requested a login code in the last 10
 minutes. It is the website's "live contributors" badge, not a per-addon
