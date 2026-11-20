@@ -10,7 +10,7 @@ the tooltips.
 
 ## Original implementation (0.1.0)
 
-- Minimap coin button; left click toggles the window, `/tradepost browse` also works.
+- Minimap TradePost button; left click toggles the window, `/tradepost browse` also works.
 - Search by item name or item ID, live filtering while typing.
 - Columns: item (quality colored), price, age, quantity, and source marker
   (`R` live ring, `C` central snapshot, `L` local scan).
@@ -38,7 +38,7 @@ Two options, in order of preference:
 
 1. **Addon compartment icon** (`AddonCompartmentFunc`): the official small icon
    next to the minimap. No custom minimap math; the icon can use
-   `Interface\Icons\inv_misc_coin_01` or a custom 32×32 TGA/BLP later.
+   `Interface\AddOns\TradePost\Media\icon` (a custom 32×32 TGA).
 2. **Minimap button** fallback with saved position, for clients/addon managers
    where the compartment is not available.
 

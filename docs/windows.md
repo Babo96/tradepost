@@ -44,7 +44,7 @@ separate download.
    addon, the status addon and the ring/auth slots, saves the config, and starts
    syncing.
 7. **Start WoW.** Restart the client once after the first install so the new
-   addon folders are discovered. Open `/tradepost` or the minimap coin button,
+   addon folders are discovered. Open `/tradepost` or the minimap TradePost button,
    then open the auction house for the first scan.
 
 ## Everyday use

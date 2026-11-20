@@ -38,16 +38,25 @@ header {
 }
 
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   font-size: 21px;
   font-weight: 700;
   color: var(--gold);
   letter-spacing: .2px;
 }
+.brand-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex: none;
+}
 .brand span {
   color: var(--muted);
   font-size: 13px;
   font-weight: 500;
-  margin-left: 8px;
+  margin-left: 0;
   text-transform: uppercase;
   letter-spacing: 1.5px;
 }
@@ -607,6 +616,7 @@ tr.row:focus-visible {
 @media (max-width: 640px) {
   header { gap: 10px 12px; padding: 12px 14px; }
   .brand { font-size: 19px; }
+  .brand-icon { width: 24px; height: 24px; }
   .meta { font-size: 12px; }
   .toolbar { flex-wrap: wrap; row-gap: 4px; }
   .watch-toggle { white-space: nowrap; }

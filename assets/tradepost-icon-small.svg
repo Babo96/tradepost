@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="TradePost">
+  <title>TradePost</title>
+  <!-- Small-size cut of the mark: same silhouette and colours, one straight
+       market line, heavier shafts, larger arrowhead, no fine bevels. -->
+  <defs>
+    <linearGradient id="tps-badge" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1a2531"/>
+      <stop offset="0.6" stop-color="#121a22"/>
+      <stop offset="1" stop-color="#0c1218"/>
+    </linearGradient>
+    <linearGradient id="tps-gold" x1="0" y1="90" x2="0" y2="426" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f8d989"/>
+      <stop offset="0.36" stop-color="#eebd58"/>
+      <stop offset="1" stop-color="#e0a83c"/>
+    </linearGradient>
+    <linearGradient id="tps-market" x1="70" y1="410" x2="450" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#41b567"/>
+      <stop offset="1" stop-color="#7ce4a0"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#tps-badge)"/>
+  <rect x="3" y="3" width="506" height="506" rx="109" fill="none" stroke="#3f5568" stroke-width="6" stroke-opacity="0.5"/>
+
+  <!-- Rising market line, behind the post -->
+  <g fill="none" stroke="url(#tps-market)" stroke-width="44" stroke-linecap="butt" stroke-linejoin="round">
+    <path d="M72 408.7 L392.5 279.2"/>
+  </g>
+  <path d="M450 256 L374.1 329.8 L377.7 285.2 L344.1 255.6 Z" fill="url(#tps-market)"/>
+
+  <!-- Auction post / T monogram -->
+  <path d="M108 92 H364 L384 112 V166 L354 196 H288 L284 410 L272 424 H200 L188 410 L184 196 H118 L88 166 V112 Z"
+        fill="none" stroke="#0a1016" stroke-width="24" stroke-opacity="0.9" stroke-linejoin="round"/>
+  <path d="M108 92 H364 L384 112 V166 L354 196 H288 L284 410 L272 424 H200 L188 410 L184 196 H118 L88 166 V112 Z"
+        fill="url(#tps-gold)"/>
+</svg>

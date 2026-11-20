@@ -47,6 +47,16 @@ A static data pack does not count as a running companion.
    `ghcr.io/babo96/tradepost-server:sha-<commit>` on `main`; update the Argo
    manifest tag if the server changed.
 
+## Project icon
+
+Use an original TradePost asset, not a Blizzard texture:
+
+- **Project icon (CurseForge/WoWUI):** `assets/tradepost-icon-512.png`
+- **Source:** `assets/tradepost-icon.svg`
+- **In-game:** `addon/TradePost/Media/icon.tga`, referenced by the TOC
+  `## IconTexture` and the minimap button.
+- **Regenerate:** `make icon` (uses `tools/assets/render_icon.sh`).
+
 ## CurseForge / WoWUI listing
 
 - **Game version:** WoW Forever 1.60.1 (`## Interface: 16001`).

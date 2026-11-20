@@ -47,6 +47,12 @@ Horde/Alliance and PvP/PvE alts are supported.
 data pack can also be downloaded from the server, but live updates require the
 companion.
 
+## Branding
+
+The TradePost mark is an original asset, not a Blizzard texture. The vector
+source and 512px export live in `assets/`; the game uses the 32×32
+`Media/icon.tga` through the TOC `## IconTexture` and the minimap button.
+
 ## License
 
 MIT.

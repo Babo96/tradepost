@@ -371,8 +371,7 @@ func EnsureCompanionStatus(wow string) error {
 		return err
 	}
 	tocPath := filepath.Join(dir, CompanionStatusAddon+".toc")
-	if _, err := os.Stat(tocPath); os.IsNotExist(err) {
-		toc := `## Interface: 16001
+	toc := `## Interface: 16001
 ## Title: TradePost Companion
 ## Group: TradePost
 ## Category: TradePost
@@ -380,12 +379,13 @@ func EnsureCompanionStatus(wow string) error {
 ## Author: babo
 ## Version: 1
 ## X-Category: Auction/Economy
+## X-Website: https://tradepost.b4b0.de/
+## IconTexture: Interface\AddOns\TradePost\Media\icon
 
 Data.lua
 `
-		if err := os.WriteFile(tocPath, []byte(toc), 0o644); err != nil {
-			return err
-		}
+	if err := WriteAtomic(tocPath, []byte(toc)); err != nil {
+		return err
 	}
 	dataPath := CompanionStatusPath(wow)
 	if _, err := os.Stat(dataPath); os.IsNotExist(err) {

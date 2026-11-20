@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/tradepost-icon.svg" width="96" height="96" alt="TradePost icon"></p>
+
 # TradePost
 
 **Crowd-sourced auction house prices for World of Warcraft: Forever.**
@@ -99,9 +101,9 @@ starts, when it stops, and once when the addon asks after a reload.
    data addon, the status addon and the ring/auth slots, and starts syncing.
 7. Start WoW. **Restart the client once** after the first install so the new
    addon folders are discovered. Later addon code updates only need `/reload`.
-8. In game, open `/tradepost` for settings, or use the coin button on the
-   minimap (left click: browser, right click: settings). Open the auction house
-   to make your first scan.
+8. In game, open `/tradepost` for settings, or use the TradePost button next
+   to the minimap (left click: browser, right click: settings). Open the
+   auction house to make your first scan.
 
 Keep the companion running while you play. Its dashboard is
 `http://127.0.0.1:8787`; it shows the last sync, the active market, the login
@@ -274,6 +276,7 @@ Common commands:
 make lint                  # luac syntax check for addon/data/probe
 make test                  # server + companion + protocol tests
 make check                 # lint + tests
+make icon                  # regenerate brand icons from the SVG source
 make companion-build       # dist/tradepost (host)
 make companion-build-windows
 make server-run            # local API on :8080

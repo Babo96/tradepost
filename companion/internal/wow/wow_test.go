@@ -201,7 +201,7 @@ func TestCompanionStatus(t *testing.T) {
 	if err := os.MkdirAll(AddonsDir(wowDir), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteCompanionStatus(wowDir, true, "0.2.7", "https://github.com/Babo96/tradepost/releases/tag/v0.2.7"); err != nil {
+	if err := WriteCompanionStatus(wowDir, true, "0.2.8", "https://github.com/Babo96/tradepost/releases/tag/v0.2.8"); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(CompanionStatusPath(wowDir))
@@ -209,15 +209,31 @@ func TestCompanionStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(data), "online = true") ||
-		!strings.Contains(string(data), `addon_latest = "0.2.7"`) {
+		!strings.Contains(string(data), `addon_latest = "0.2.8"`) {
 		t.Fatalf("status did not publish online/latest:\n%s", data)
 	}
 	toc, err := os.ReadFile(filepath.Join(AddonsDir(wowDir), CompanionStatusAddon, CompanionStatusAddon+".toc"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(toc), "## Title: TradePost Companion") {
+	if !strings.Contains(string(toc), "## Title: TradePost Companion") ||
+		!strings.Contains(string(toc), `## IconTexture: Interface\AddOns\TradePost\Media\icon`) {
 		t.Fatalf("unexpected status TOC:\n%s", toc)
+	}
+
+	// Upgrading an older generated status addon must add the icon metadata.
+	if err := os.WriteFile(filepath.Join(AddonsDir(wowDir), CompanionStatusAddon, CompanionStatusAddon+".toc"), []byte("## Interface: 16001\n## Title: TradePost Companion\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureCompanionStatus(wowDir); err != nil {
+		t.Fatal(err)
+	}
+	toc, err = os.ReadFile(filepath.Join(AddonsDir(wowDir), CompanionStatusAddon, CompanionStatusAddon+".toc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(toc), "## IconTexture:") {
+		t.Fatalf("status TOC was not upgraded:\n%s", toc)
 	}
 	if err := WriteCompanionStatus(wowDir, false, "", ""); err != nil {
 		t.Fatal(err)

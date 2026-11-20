@@ -36,7 +36,7 @@ The setup wizard opens at `http://127.0.0.1:8787/setup` (using `xdg-open`). Add
 5. **Install.** The companion enrolls, writes the addon, the data addon, the
    status addon and the ring/auth slots, and starts syncing.
 6. **Start WoW.** Restart the client once after the first install so the new
-   addon folders are discovered. Open `/tradepost` or the minimap coin button,
+   addon folders are discovered. Open `/tradepost` or the minimap TradePost button,
    then open the auction house for the first scan.
 
 ## Everyday use

@@ -23,7 +23,7 @@ COMPANION_LDFLAGS := -s -w -X main.version=$(VERSION)
 
 PROBE_ADDONS := TradePostProbe TPProbeDataA TPProbeDataB TPProbeDataC TPProbeDataD
 
-.PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-build-windows release-windows companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
+.PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-build-windows icon release-windows companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
 	@echo "TradePost"
@@ -41,6 +41,7 @@ help:
 	@echo "  make server-test            go test the API"
 	@echo "  make companion-build        build dist/tradepost (host platform)"
 	@echo "  make companion-build-windows build dist/tradepost.exe"
+	@echo "  make icon                   regenerate brand icons from the SVG source"
 	@echo "  make release-windows        package the Windows companion zip"
 	@echo "  make companion-install      install addon + COUNT slots via tradepost"
 	@echo "  make companion-enroll       enroll this machine with SERVER"
@@ -105,6 +106,9 @@ companion-build:
 companion-build-windows:
 	@mkdir -p dist
 	@cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/tradepost.exe ./cmd/tradepost
+
+icon:
+	@tools/assets/render_icon.sh
 
 release-windows: companion-build-windows
 	@$(PYTHON) tools/release/package_windows.py --version "$(VERSION)" --binary dist/tradepost.exe

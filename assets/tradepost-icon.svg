@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="TradePost">
+  <title>TradePost</title>
+  <defs>
+    <!-- Badge body: deep blue-black slate, lit from the upper left. -->
+    <linearGradient id="tp-badge" x1="96" y1="8" x2="416" y2="504" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1b2732"/>
+      <stop offset="0.42" stop-color="#131c24"/>
+      <stop offset="1" stop-color="#0b1117"/>
+    </linearGradient>
+    <radialGradient id="tp-glow" cx="248" cy="140" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2e4254" stop-opacity="0.7"/>
+      <stop offset="0.55" stop-color="#1a2733" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#131c24" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tp-rim" x1="256" y1="0" x2="256" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#63809a" stop-opacity="0.9"/>
+      <stop offset="0.3" stop-color="#3a4f62" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#141d25" stop-opacity="0.65"/>
+    </linearGradient>
+    <!-- Gold: warm upper face fading into a carved lower face. -->
+    <linearGradient id="tp-gold" x1="240" y1="96" x2="252" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f6d27a"/>
+      <stop offset="0.34" stop-color="#e8b34a"/>
+      <stop offset="1" stop-color="#d69b36"/>
+    </linearGradient>
+    <linearGradient id="tp-gold-light" x1="128" y1="110" x2="360" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff0bd" stop-opacity="0.42"/>
+      <stop offset="0.4" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset="0.72" stop-color="#5c3a05" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#3a2403" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="tp-topface" x1="240" y1="104" x2="240" y2="164" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffefbf" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#ffefbf" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="tp-leftface" x1="190" y1="0" x2="252" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe6a4" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#ffe6a4" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="tp-joint" x1="240" y1="200" x2="240" y2="242" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3a2403" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#3a2403" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Market line: deep green at the open, bright green into the arrow. -->
+    <linearGradient id="tp-market" x1="72" y1="392" x2="450" y2="242" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3cb868"/>
+      <stop offset="0.5" stop-color="#46c46a"/>
+      <stop offset="1" stop-color="#79e39a"/>
+    </linearGradient>
+    <clipPath id="tp-post-clip">
+      <path d="M116 104 H364 L380 120 V168 L348 200 H290 L285 398 L273 412 H207 L195 398 L190 200 H132 L100 168 V120 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Badge -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#tp-badge)"/>
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#tp-glow)"/>
+  <rect x="3" y="3" width="506" height="506" rx="109" fill="none" stroke="url(#tp-rim)" stroke-width="6"/>
+
+  <!-- Rising market line, drawn behind the post -->
+  <g fill="none" stroke="url(#tp-market)" stroke-width="36" stroke-linecap="butt" stroke-linejoin="round">
+    <path d="M74 396 L236 346.4 L393.2 276.4"/>
+  </g>
+  <path d="M448 252 L381.4 318.7 L384 280.4 L353.8 256.6 Z" fill="url(#tp-market)"/>
+
+  <!-- Auction post / T monogram -->
+  <path d="M116 104 H364 L380 120 V168 L348 200 H290 L285 398 L273 412 H207 L195 398 L190 200 H132 L100 168 V120 Z"
+        fill="none" stroke="#0a1016" stroke-width="18" stroke-opacity="0.85" stroke-linejoin="round"/>
+  <path d="M116 104 H364 L380 120 V168 L348 200 H290 L285 398 L273 412 H207 L195 398 L190 200 H132 L100 168 V120 Z"
+        fill="url(#tp-gold)"/>
+  <g clip-path="url(#tp-post-clip)">
+    <path d="M116 104 H364 L380 120 V168 L348 200 H290 L285 398 L273 412 H207 L195 398 L190 200 H132 L100 168 V120 Z"
+          fill="url(#tp-gold-light)"/>
+    <rect x="90" y="104" width="300" height="60" fill="url(#tp-topface)"/>
+    <rect x="190" y="200" width="64" height="220" fill="url(#tp-leftface)"/>
+    <rect x="190" y="200" width="100" height="42" fill="url(#tp-joint)"/>
+  </g>
+  <!-- Lit top edge -->
+  <path d="M132 110 H348" fill="none" stroke="#ffe6a6" stroke-width="9" stroke-opacity="0.32" stroke-linecap="round"/>
+</svg>
