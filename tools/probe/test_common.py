@@ -74,12 +74,12 @@ class ProbeHelpersTest(unittest.TestCase):
     def test_replace_toc_metadata(self) -> None:
         toc = "## Interface: 16001\n## Title: Probe\n\nData.lua\n"
         updated = write_toc.replace_metadata(toc, "NEW_VALUE")
-        self.assertIn("## X-TP-Data: NEW_VALUE", updated)
+        self.assertIn("## X-TradePost-Data: NEW_VALUE", updated)
         self.assertTrue(updated.endswith("Data.lua\n"))
 
         updated_again = write_toc.replace_metadata(updated, "OTHER")
-        self.assertIn("## X-TP-Data: OTHER", updated_again)
-        self.assertEqual(updated_again.count("## X-TP-Data: OTHER"), 1)
+        self.assertIn("## X-TradePost-Data: OTHER", updated_again)
+        self.assertEqual(updated_again.count("## X-TradePost-Data: OTHER"), 1)
 
 
 if __name__ == "__main__":
