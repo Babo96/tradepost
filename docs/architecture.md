@@ -136,7 +136,8 @@ See [protocol.md](protocol.md) for the payloads and slot rules.
 
 ## Metadata backfill
 
-The optional Advanced/Admin backfill collects full tooltip text and
+The optional Advanced/Admin backfill is off by default; normal installs do not
+carry item details. When enabled, it collects full tooltip text and
 `C_Item.GetItemStats` for every known item in 500-item batches. It runs at most
 once per day when enabled (manual start/force overrides), skips the client's
 "Retrieving item information" placeholder, uses item links captured by

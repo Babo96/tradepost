@@ -1,11 +1,17 @@
 local ADDON, TP = ...
 
-local MAX_SCANS = 3
+-- The local DB keeps every price; this table is only the upload buffer. One
+-- unacknowledged scan is enough because the companion polls the file every
+-- few seconds. A new scan replaces the previous one.
+local MAX_SCANS = 1
 
 function TP:ExportDB()
   TRADEPOST_EXPORT = TRADEPOST_EXPORT or {}
   TRADEPOST_EXPORT.version = 1
   TRADEPOST_EXPORT.scans = TRADEPOST_EXPORT.scans or {}
+  while #TRADEPOST_EXPORT.scans > MAX_SCANS do
+    table.remove(TRADEPOST_EXPORT.scans, 1)
+  end
   return TRADEPOST_EXPORT
 end
 

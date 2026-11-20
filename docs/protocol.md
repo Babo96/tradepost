@@ -1,6 +1,6 @@
 # Companion ↔ game protocol
 
-Current as of TradePost **v0.2.13**. This document describes how the addon and
+Current as of TradePost **v0.2.14**. This document describes how the addon and
 the local companion exchange data. It is the technical counterpart to the
 player-facing [README](../README.md) and [architecture](architecture.md).
 
@@ -32,7 +32,7 @@ so scans, batches and requests eventually reach the companion without
 
 | Global | Meaning |
 | --- | --- |
-| `TRADEPOST_EXPORT.scans` | compact scan records: `market|unix|key,price,qty,listings;...` |
+| `TRADEPOST_EXPORT.scans` | one compact scan record: `market|unix|key,price,qty,listings;...` |
 | `TRADEPOST_EXPORT.companionRequest` | one-time reload request: "refresh the status flag" |
 | `TRADEPOST_EXPORT.ringRequest` | `{ market, at }`: force a full ring snapshot |
 | `TRADEPOST_ITEMS` | basic item cache: name, quality, class, subclass, icon |
@@ -55,8 +55,8 @@ A tiny regular addon written by the companion:
 TRADEPOST_COMPANION = {
   online = true,
   updated = 1795163048,
-  addon_latest = "0.2.13",
-  addon_url = "https://github.com/Babo96/tradepost/releases/tag/v0.2.13",
+  addon_latest = "0.2.14",
+  addon_url = "https://github.com/Babo96/tradepost/releases/tag/v0.2.14",
 }
 ```
 
@@ -200,7 +200,7 @@ gzip JSON:
   "scans": [{
     "market": "eu:pve:horde",
     "scanned_at": 1795162000,
-    "client_version": "0.2.13",
+    "client_version": "0.2.14",
     "items": [{"k": "i:2589", "p": 125, "q": 20, "n": 3}]
   }],
   "items": [{"id": 2589, "name": "Linen Cloth", "quality": 1,
