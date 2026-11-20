@@ -55,6 +55,8 @@ separate download.
   terminal window is shown.
 - **Left-click** the tray icon to open the dashboard. **Right-click** for
   **Sync now** and **Quit**.
+- Only one companion instance can run. Launching `tradepost.exe` again opens
+  the existing dashboard and exits, so there is only one tray icon.
 - The dashboard is `http://127.0.0.1:8787`:
   - last sync, active market, item count, errors;
   - **Sync now**, **login code**, the update card;

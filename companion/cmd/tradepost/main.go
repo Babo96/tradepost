@@ -24,7 +24,7 @@ import (
 	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
-var version = "0.2.18"
+var version = "0.2.19"
 
 func main() {
 	setupLogging()
@@ -192,6 +192,19 @@ func cmdRun(args []string) error {
 	cfgPath := fs.String("config", config.DefaultPath(), "config path")
 	noBrowser := fs.Bool("no-browser", false, "do not open the setup dashboard in a browser")
 	_ = fs.Parse(args)
+
+	if !acquireSingleInstance() {
+		if !*noBrowser {
+			url := "http://127.0.0.1:8787"
+			if cfg, err := config.Load(*cfgPath); err == nil && cfg.DashboardAddr != "" {
+				url = "http://" + cfg.DashboardAddr
+			}
+			if err := browser.Open(url); err != nil {
+				log.Printf("already running; could not open dashboard: %v", err)
+			}
+		}
+		return nil
+	}
 
 	application := apppkg.New(*cfgPath, version)
 	if err := application.Load(); err != nil {
