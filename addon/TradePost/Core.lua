@@ -1,6 +1,6 @@
 local ADDON, TP = ...
 TP.name = ADDON
-TP.version = "0.2.6"
+TP.version = "0.2.7"
 TP.atAuctionHouse = false
 
 function TP:Print(...)
@@ -82,7 +82,37 @@ function TP:OnLogin()
     TRADEPOST_EXPORT.companionRequest = time()
     self:WarnNoCompanion()
   end
+  self:CheckAddonVersion()
   self:Print("v" .. self.version .. " ready. Market: " .. self:MarketKey() .. ". /tradepost help")
+end
+
+function TP:CheckAddonVersion()
+  local getMetadata
+  if C_AddOns and type(C_AddOns.GetAddOnMetadata) == "function" then
+    getMetadata = function(field)
+      return C_AddOns.GetAddOnMetadata(ADDON, field)
+    end
+  elseif type(GetAddOnMetadata) == "function" then
+    getMetadata = function(field)
+      return GetAddOnMetadata(ADDON, field)
+    end
+  end
+  local tocInterface = getMetadata and tonumber(getMetadata("Interface")) or 0
+  local _, _, _, clientInterface = GetBuildInfo()
+  self.interfaceOutdated = tocInterface > 0 and clientInterface ~= nil
+    and tocInterface < clientInterface
+  if self.interfaceOutdated then
+    self:Print("|cffff5555out of date for this client|r (addon interface " ..
+      tostring(tocInterface) .. ", client " .. tostring(clientInterface) ..
+      "). Update: https://github.com/Babo96/tradepost/releases")
+  end
+  if self:AddonUpdateAvailable() then
+    local url = self.companion and self.companion.addon_url
+      or "https://github.com/Babo96/tradepost/releases"
+    self:Print("|cff33ff99v" .. tostring(self:AddonLatest()) ..
+      " is available|r (installed " .. tostring(self.version) ..
+      "). Update via the companion or " .. tostring(url))
+  end
 end
 
 function TP:WarnNoCompanion()

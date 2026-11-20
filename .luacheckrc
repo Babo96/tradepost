@@ -61,6 +61,7 @@ globals = {
   "CreateFrame",
   "GetBindingAction",
   "GetBuildInfo",
+  "GetAddOnMetadata",
   "GetCurrentBindingSet",
   "GetCurrentRegion",
   "GetNumBindings",

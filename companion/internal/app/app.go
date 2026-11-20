@@ -312,6 +312,7 @@ func (a *App) checkUpdate(ctx context.Context, automatic bool) (update.Info, err
 	}
 	info, err := update.New(a.version).Check(ctx)
 	a.storeUpdate(info)
+	a.syncAddonLatest(info)
 	return info, err
 }
 
@@ -328,6 +329,20 @@ func (a *App) updateLoop() {
 		case <-ticker.C:
 			_, _ = a.checkUpdate(a.baseCtx, true)
 		}
+	}
+}
+
+// syncAddonLatest pushes a successful update-check result to the running
+// service, which writes it into the tiny status addon for the game.
+func (a *App) syncAddonLatest(info update.Info) {
+	if strings.TrimSpace(info.Latest) == "" {
+		return
+	}
+	a.mu.Lock()
+	service := a.service
+	a.mu.Unlock()
+	if service != nil {
+		service.SetAddonLatest(info.Latest, info.HTMLURL)
 	}
 }
 
@@ -390,6 +405,7 @@ func (a *App) ApplyUpdate(ctx context.Context) (update.Info, error) {
 
 	info.Message = message
 	a.storeUpdate(info)
+	a.syncAddonLatest(info)
 	return info, nil
 }
 
@@ -449,6 +465,9 @@ func (a *App) startServiceLocked() error {
 	ctx, cancel := context.WithCancel(a.baseCtx)
 	a.service = service
 	a.cancel = cancel
+	if info := a.UpdateStatus(); info.Latest != "" {
+		service.SetAddonLatest(info.Latest, info.HTMLURL)
+	}
 	interval := time.Duration(a.cfg.IntervalSeconds) * time.Second
 	go service.Run(ctx, interval)
 	return nil

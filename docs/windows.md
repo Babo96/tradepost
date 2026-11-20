@@ -77,6 +77,9 @@ The binary is replaced; the running process keeps using the old code until you
 restart it. The addon files are refreshed too, so `/reload` in game (or a
 client restart if new addon folders were created). `tradepost.exe update
 --check` prints the current and latest versions without changing anything.
+The addon also shows a chat and Settings notice when its `## Interface` is
+older than the client, or when the companion reports a newer addon release.
+CurseForge/WoWUI managers can update the standalone addon.
 
 ## Config and state
 

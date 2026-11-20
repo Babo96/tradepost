@@ -76,6 +76,21 @@ It provides static prices but no live updates and does not satisfy the
 companion status check. The addon will still show the warning and disable
 live-only options.
 
+## TOC project IDs
+
+Once the CurseForge/WoWUI/Wago project pages exist, add their IDs to
+`addon/TradePost/TradePost.toc`:
+
+```toc
+## X-Curse-Project-ID: <numeric id>
+## X-WoWI-ID: <id>
+## X-Wago-ID: <id>
+```
+
+The addon managers then identify and update the standalone addon. Independently,
+the addon warns in chat and Settings when the companion reports a newer release
+(`addon_latest`) or when its `## Interface` is older than the client.
+
 ## Companion hint
 
 Put the companion link in the project description and in the first screenshot

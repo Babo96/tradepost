@@ -217,6 +217,10 @@ dashboard. Use **Install update**, or run `tradepost update` (Windows:
 addon files are refreshed too; `/reload` in game (or restart once if new addon
 folders were added).
 
+The addon also warns in chat and in Settings when its `## Interface` is older
+than the client, or when the companion reports a newer addon release. Standalone
+addon users get the release notice from their addon manager (CurseForge/WoWUI).
+
 **Windows flags the download.**
 The binary is unsigned. Use **More info → Run anyway** if you trust the source,
 or build it yourself with the instructions in the

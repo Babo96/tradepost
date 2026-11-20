@@ -397,14 +397,25 @@ Data.lua
 	return nil
 }
 
-// WriteCompanionStatus publishes the online flag once when the companion
-// starts, once on a reload request, and once on shutdown. No heartbeat.
-func WriteCompanionStatus(wow string, online bool) error {
+// WriteCompanionStatus publishes the online flag and the latest addon
+// release once when the companion starts, once on a reload request, once on
+// shutdown, and once when the update check discovers a new version. No heartbeat.
+func WriteCompanionStatus(wow string, online bool, addonLatest, addonURL string) error {
 	if err := EnsureCompanionStatus(wow); err != nil {
 		return err
 	}
-	content := fmt.Sprintf("TRADEPOST_COMPANION = {\n  online = %t,\n  updated = %d,\n}\n", online, time.Now().Unix())
-	return WriteAtomic(CompanionStatusPath(wow), []byte(content))
+	var b strings.Builder
+	b.WriteString("TRADEPOST_COMPANION = {\n")
+	fmt.Fprintf(&b, "  online = %t,\n", online)
+	fmt.Fprintf(&b, "  updated = %d,\n", time.Now().Unix())
+	if strings.TrimSpace(addonLatest) != "" {
+		fmt.Fprintf(&b, "  addon_latest = %q,\n", addonLatest)
+	}
+	if strings.TrimSpace(addonURL) != "" {
+		fmt.Fprintf(&b, "  addon_url = %q,\n", addonURL)
+	}
+	b.WriteString("}\n")
+	return WriteAtomic(CompanionStatusPath(wow), []byte(b.String()))
 }
 
 func Install(source, wow string, count int) error {

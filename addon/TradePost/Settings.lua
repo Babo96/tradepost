@@ -413,9 +413,17 @@ local function createPanel()
       end
     end
 
+    local addonState = "Addon: v" .. tostring(TP.version)
+    if TP.interfaceOutdated then
+      addonState = addonState .. " |cffff5555(outdated for client)|r"
+    end
+    if TP:AddonUpdateAvailable() then
+      addonState = addonState .. " |cff33ff99(v" ..
+        tostring(TP:AddonLatest()) .. " available)|r"
+    end
     settings.status:SetText(table.concat({
       ready and "Companion: |cff33ff99running|r" or "Companion: |cffff5555not detected|r (local data only)",
-      "Version: v" .. tostring(TP.version),
+      addonState,
       "Market: " .. TP:MarketLabel() .. "  [" .. TP:MarketKey() .. "]",
       "Local: " .. TP:CountLocal() .. " items, last scan " .. ageText(db.lastScan),
       "Central: " .. TP:CentralLabel(),

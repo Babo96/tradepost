@@ -8,6 +8,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,6 +72,8 @@ type Service struct {
 	ringMarket        string
 	lastRingRequestAt int64
 	lastCompanionReq  int64
+	addonLatest       string
+	addonURL          string
 	dataAddonAt       time.Time
 	watch             []string
 	watchAt           int64
@@ -87,7 +90,7 @@ func New(cfg config.Config) (*Service, error) {
 	if err := wow.EnsureCompanionStatus(cfg.WowDir); err != nil {
 		return nil, fmt.Errorf("companion status: %w", err)
 	}
-	if err := wow.WriteCompanionStatus(cfg.WowDir, true); err != nil {
+	if err := wow.WriteCompanionStatus(cfg.WowDir, true, "", ""); err != nil {
 		return nil, fmt.Errorf("companion status: %w", err)
 	}
 	accounts, err := wow.AccountDirs(cfg.WowDir)
@@ -181,7 +184,10 @@ func (s *Service) sync(ctx context.Context) error {
 	}
 	if data.CompanionRequest > s.lastCompanionReq {
 		s.lastCompanionReq = data.CompanionRequest
-		if err := wow.WriteCompanionStatus(s.cfg.WowDir, true); err != nil {
+		s.mu.Lock()
+		latest, addonURL := s.addonLatest, s.addonURL
+		s.mu.Unlock()
+		if err := wow.WriteCompanionStatus(s.cfg.WowDir, true, latest, addonURL); err != nil {
 			log.Printf("companion status: %v", err)
 		}
 	}
@@ -433,7 +439,26 @@ func (s *Service) SetOnline(online bool) {
 	if s.cfg.WowDir == "" {
 		return
 	}
-	if err := wow.WriteCompanionStatus(s.cfg.WowDir, online); err != nil {
+	s.mu.Lock()
+	latest, addonURL := s.addonLatest, s.addonURL
+	s.mu.Unlock()
+	if err := wow.WriteCompanionStatus(s.cfg.WowDir, online, latest, addonURL); err != nil {
+		log.Printf("companion status: %v", err)
+	}
+}
+
+// SetAddonLatest publishes the newest known addon release to the status
+// addon so the game can show an update notice. It is written only when the
+// update check discovers a new version (or on the next start/request).
+func (s *Service) SetAddonLatest(latest, addonURL string) {
+	if s.cfg.WowDir == "" || strings.TrimSpace(latest) == "" {
+		return
+	}
+	s.mu.Lock()
+	s.addonLatest = latest
+	s.addonURL = addonURL
+	s.mu.Unlock()
+	if err := wow.WriteCompanionStatus(s.cfg.WowDir, true, latest, addonURL); err != nil {
 		log.Printf("companion status: %v", err)
 	}
 }

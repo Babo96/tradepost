@@ -13,7 +13,7 @@ companion is the bridge.
 | **Addon** (`addon/TradePost`) | Scans the auction house, keeps a local per-market database, renders tooltips, the in-game browser, watchlist, Auctionator bridge and settings. Applies the live ring deltas and the central data addon. |
 | **Data addon** (`TradePost_Data`) | Full price baseline for every known market. Written by the companion on startup and every 30 minutes; loaded by the game at login/reload. |
 | **Ring slots** (`TradePost_Data_XX`) | Load-on-demand addons that carry the 5-minute live price deltas for the active character's market. |
-| **Status addon** (`TradePost_Companion`) | A tiny addon with `TRADEPOST_COMPANION.online`. It is written once on companion start/stop and once on a reload request. No heartbeat. |
+| **Status addon** (`TradePost_Companion`) | A tiny addon with `TRADEPOST_COMPANION.online`, `addon_latest` and `addon_url`. It is written on companion start/stop, on a reload request, and when the update check finds a new addon release. No heartbeat. |
 | **Companion** (`companion/`) | Go service on the player's machine. Setup wizard, local dashboard, SavedVariables parsing, uploads, snapshot/data-addon/ring writing, login codes, watchlist, metadata backfill and self-update. |
 | **Server** (`server/`) | Go + Postgres API. Async ingest queue, price aggregation, item metadata, search/filters, history, auth, watchlist, snapshots and the embedded website. |
 | **Website** (`https://tradepost.b4b0.de/`) | The same API's web UI: search, filters, stats, history, hover cards, market selector, watchlist and live contributor count. |
@@ -120,11 +120,14 @@ few hundred bytes to a few tens of kilobytes. The default is 64 slots: 56 price 
 reserved for login codes; the slider allows up to 128.
 
 The **status addon** is the presence check, not a heartbeat. The companion
-writes `online = true` when it starts, `online = false` when it stops, and once
-more when the addon writes `TRADEPOST_EXPORT.companionRequest` after a reload.
-The addon reads the flag once at login/reload. Without the companion it shows
-a warning and disables live-only options; local scans, central data, the
-browser, watchlist and Auctionator bridge still work.
+writes `online = true` when it starts, `online = false` when it stops, once
+more when the addon writes `TRADEPOST_EXPORT.companionRequest` after a reload,
+and when its update check finds a new addon release (`addon_latest` +
+`addon_url`). The addon reads the flags once at login/reload. It compares
+`TP.version` to `addon_latest` and its TOC `## Interface` to
+`GetBuildInfo()`, and shows a chat/Settings update notice. Without the
+companion it shows a warning and disables live-only options; local scans,
+central data, the browser, watchlist and Auctionator bridge still work.
 
 The data addon is a login-time baseline and is refreshed on startup, every 30
 minutes. The 5-minute live data rides the ring.

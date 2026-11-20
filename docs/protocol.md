@@ -1,6 +1,6 @@
 # Companion ↔ game protocol
 
-Current as of TradePost **v0.2.6**. This document describes how the addon and
+Current as of TradePost **v0.2.7**. This document describes how the addon and
 the local companion exchange data. It is the technical counterpart to the
 player-facing [README](../README.md) and [architecture](architecture.md).
 
@@ -55,6 +55,8 @@ A tiny regular addon written by the companion:
 TRADEPOST_COMPANION = {
   online = true,
   updated = 1795163048,
+  addon_latest = "0.2.7",
+  addon_url = "https://github.com/Babo96/tradepost/releases/tag/v0.2.7",
 }
 ```
 
@@ -62,6 +64,10 @@ TRADEPOST_COMPANION = {
 - `online = false` is written when it stops.
 - It is written once more when the addon's `companionRequest` is seen after a
   login/reload.
+- `addon_latest`/`addon_url` are written when the companion's update check
+  finds a new addon release. The addon compares them with `TP.version` and
+  its TOC `## Interface` with `GetBuildInfo()` and shows a chat/Settings
+  notice.
 
 There is **no heartbeat** and no timestamp check. The addon loads the flag once
 at login/reload:
