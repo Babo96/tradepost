@@ -17,6 +17,7 @@ import (
 	"github.com/babo96/tradepost/companion/internal/config"
 	"github.com/babo96/tradepost/companion/internal/picker"
 	syncsvc "github.com/babo96/tradepost/companion/internal/sync"
+	"github.com/babo96/tradepost/companion/internal/update"
 	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
@@ -35,6 +36,9 @@ type Backend interface {
 	UpdateSettings(context.Context, config.SetupRequest) (config.Config, error)
 	Reinstall(context.Context) error
 	Sync(context.Context) error
+	UpdateStatus() update.Info
+	CheckUpdate(context.Context) (update.Info, error)
+	ApplyUpdate(context.Context) (update.Info, error)
 }
 
 type Server struct {
@@ -86,6 +90,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/settings", s.handleSettingsSubmit)
 	mux.HandleFunc("POST /api/settings/install", s.handleReinstall)
 	mux.HandleFunc("POST /api/sync", s.handleSync)
+	mux.HandleFunc("POST /api/update/check", s.handleUpdateCheck)
+	mux.HandleFunc("POST /api/update/apply", s.handleUpdateApply)
 	return s.secure(mux)
 }
 
@@ -119,7 +125,7 @@ func (s *Server) Start(addr string) *http.Server {
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      180 * time.Second,
+		WriteTimeout:      10 * time.Minute,
 	}
 	go func() {
 		log.Printf("dashboard: http://%s", server.Addr)
@@ -178,6 +184,7 @@ type statusResponse struct {
 	Status syncsvc.Status `json:"status"`
 	Setup  bool           `json:"setup_required"`
 	Reason string         `json:"setup_reason,omitempty"`
+	Update update.Info    `json:"update"`
 }
 
 func (s *Server) statusPayload() statusResponse {
@@ -198,6 +205,7 @@ func (s *Server) statusPayload() statusResponse {
 		Status: s.backend.Status(),
 		Setup:  s.backend.SetupRequired(),
 		Reason: s.backend.SetupReason(),
+		Update: s.backend.UpdateStatus(),
 	}
 }
 
@@ -308,6 +316,28 @@ func (s *Server) handleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": s.backend.Status()})
+}
+
+func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	info, err := s.backend.CheckUpdate(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error(), "update": info})
+		return
+	}
+	writeJSON(w, http.StatusOK, info)
+}
+
+func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+	defer cancel()
+	info, err := s.backend.ApplyUpdate(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error(), "update": info})
+		return
+	}
+	writeJSON(w, http.StatusOK, info)
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

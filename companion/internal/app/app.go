@@ -16,6 +16,7 @@ import (
 	"github.com/babo96/tradepost/companion/internal/config"
 	"github.com/babo96/tradepost/companion/internal/picker"
 	syncsvc "github.com/babo96/tradepost/companion/internal/sync"
+	"github.com/babo96/tradepost/companion/internal/update"
 	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
@@ -30,9 +31,14 @@ type App struct {
 	baseCtx    context.Context
 	baseCancel context.CancelFunc
 	closeOnce  sync.Once
+
+	version       string
+	updateMu      sync.Mutex
+	updateCheckMu sync.Mutex
+	updateInfo    update.Info
 }
 
-func New(cfgPath string) *App {
+func New(cfgPath, version string) *App {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &App{
 		cfgPath:    cfgPath,
@@ -40,6 +46,8 @@ func New(cfgPath string) *App {
 		setup:      true,
 		baseCtx:    ctx,
 		baseCancel: cancel,
+		version:    version,
+		updateInfo: update.Info{Current: version},
 	}
 }
 
@@ -59,7 +67,6 @@ func (a *App) Load() error {
 	}
 
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.cfg = cfg
 	a.setup = required
 	a.setupWhy = reason
@@ -69,6 +76,9 @@ func (a *App) Load() error {
 			a.setupWhy = err.Error()
 		}
 	}
+	a.mu.Unlock()
+
+	go a.updateLoop()
 	return nil
 }
 
@@ -270,6 +280,117 @@ func (a *App) Sync(ctx context.Context) error {
 		return errors.New("sync service is not running")
 	}
 	return service.Sync(ctx)
+}
+
+// UpdateStatus returns the last known update state for the dashboard.
+func (a *App) UpdateStatus() update.Info {
+	a.updateMu.Lock()
+	defer a.updateMu.Unlock()
+	return a.updateInfo
+}
+
+func (a *App) storeUpdate(info update.Info) {
+	a.updateMu.Lock()
+	a.updateInfo = info
+	a.updateMu.Unlock()
+}
+
+// CheckUpdate forces a release check and records the result.
+func (a *App) CheckUpdate(ctx context.Context) (update.Info, error) {
+	return a.checkUpdate(ctx, false)
+}
+
+func (a *App) checkUpdate(ctx context.Context, automatic bool) (update.Info, error) {
+	a.updateCheckMu.Lock()
+	defer a.updateCheckMu.Unlock()
+
+	if automatic {
+		current := a.UpdateStatus()
+		if current.Applying {
+			return current, nil
+		}
+	}
+	info, err := update.New(a.version).Check(ctx)
+	a.storeUpdate(info)
+	return info, err
+}
+
+// updateLoop checks once at startup and then daily until shutdown. Network
+// failures are recorded in the status and never block the companion.
+func (a *App) updateLoop() {
+	_, _ = a.checkUpdate(a.baseCtx, true)
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-a.baseCtx.Done():
+			return
+		case <-ticker.C:
+			_, _ = a.checkUpdate(a.baseCtx, true)
+		}
+	}
+}
+
+// ApplyUpdate downloads and installs the available release. When the config
+// points at a valid game folder, the addon sources from the same release are
+// installed too. The running process keeps using the old binary until restart.
+func (a *App) ApplyUpdate(ctx context.Context) (update.Info, error) {
+	a.updateCheckMu.Lock()
+	defer a.updateCheckMu.Unlock()
+
+	info := a.UpdateStatus()
+	if strings.TrimSpace(info.AssetURL) == "" || info.Latest == "" {
+		checked, err := update.New(a.version).Check(ctx)
+		a.storeUpdate(checked)
+		if err != nil {
+			return checked, err
+		}
+		info = checked
+	}
+	if !info.Available {
+		return info, update.ErrNoUpdate
+	}
+
+	info.Applying = true
+	info.Error = ""
+	info.Message = "Downloading and installing v" + info.Latest + "…"
+	a.storeUpdate(info)
+
+	result, err := update.Apply(ctx, info, update.ApplyOptions{})
+	info.Applying = false
+	if err != nil {
+		info.Error = err.Error()
+		info.Message = "Update failed: " + err.Error()
+		a.storeUpdate(info)
+		return info, err
+	}
+	defer result.Cleanup()
+
+	info.Applied = true
+	info.RestartRequired = result.RestartRequired
+	info.Available = false
+	message := fmt.Sprintf("Companion v%s installed. Restart the companion to use it.", result.Version)
+
+	cfg := a.Config()
+	valid, validErr := wow.Validate(cfg.WowDir)
+	if validErr != nil {
+		message += " Addon not updated: " + validErr.Error()
+	} else if err := wow.Install(result.SourceDir, valid.Root, cfg.RingSlots); err != nil {
+		info.Error = err.Error()
+		info.Message = message + " Addon install failed: " + err.Error()
+		a.storeUpdate(info)
+		return info, fmt.Errorf("companion updated but addon install failed: %w", err)
+	} else {
+		info.AddonUpdated = true
+		message += " Addon files updated; use /reload in game or restart the game to apply them."
+		a.mu.Lock()
+		a.cfg.WowDir = valid.Root
+		a.mu.Unlock()
+	}
+
+	info.Message = message
+	a.storeUpdate(info)
+	return info, nil
 }
 
 func (a *App) Shutdown() {

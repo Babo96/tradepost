@@ -31,6 +31,7 @@ tradepost install --count 64
 tradepost sync
 tradepost run [--no-browser]
 tradepost status
+tradepost update [--check] [--force] [--yes] [--config PATH]
 tradepost version
 ```
 
@@ -44,7 +45,7 @@ the sync service without a restart.
 
 The dashboard has:
 
-- `/` — status, “Sync now”, login code, raw JSON
+- `/` — status, “Sync now”, login code, companion update card, raw JSON
 - `/setup` — three-step setup wizard (game folder, server/default market, install)
 - `/settings` — change the game folder, server, default market, ring slots, interval,
   and re-run the addon install
@@ -67,6 +68,36 @@ Config:
 - Windows: `%AppData%\tradepost\config.json`
 
 Upload state lives next to it as `state.json` (per server/client ID).
+
+## Updates
+
+The companion checks the public GitHub releases for `Babo96/tradepost` once at
+startup and then every 24 hours. The check runs in the background and network
+errors only show up as a status message; they never block syncing or setup.
+Automatic checks do not install anything.
+
+To update, use the status page's “Companion update” card (“Check now”, then
+“Install vX”), or the CLI:
+
+```sh
+tradepost update --check   # print current/latest/available and exit
+tradepost update           # download, verify, install; asks for confirmation
+tradepost update --yes     # no confirmation prompt
+tradepost update --force   # reinstall even if versions are equal
+```
+
+The download is verified against the release SHA-256 digest (when GitHub
+provides one), extracted safely, and swapped into place. On Linux the new
+executable is renamed over the running one. On Windows the running
+`tradepost.exe` is renamed to `tradepost.exe.old` before the new file is moved
+in; if that swap fails, the new binary is left as `tradepost.exe.new` and the
+error says so. The running process keeps using the old code, so **restart the
+companion** after an install.
+
+If a config with a valid game folder exists, the same release's addon sources
+are installed too. The game needs `/reload` (or a restart) before the updated
+addon files are used. Set up the addon first if there is no config; `update`
+then only replaces the companion binary.
 
 ## Windows quick start
 

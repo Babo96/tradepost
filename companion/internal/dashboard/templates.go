@@ -78,12 +78,74 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
     <span id="message" class="sub" style="align-self:center"></span>
   </p>
 
+  <section class="card" id="updateCard" style="margin-bottom:16px">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div>
+        <div class="label">Companion update</div>
+        <div class="value" id="updateCurrent">–</div>
+        <div class="muted" id="updateLatest"></div>
+      </div>
+      <div class="actions" style="margin-top:0">
+        <button class="secondary" id="updateCheck" type="button">Check now</button>
+        <button id="updateInstall" type="button" style="display:none">Install</button>
+      </div>
+    </div>
+    <div id="updateMessage" class="muted" style="margin-top:8px"></div>
+    <div id="updateNotes" style="margin-top:6px;display:none">
+      <a id="updateLink" href="#" target="_blank" rel="noreferrer">Release notes</a>
+    </div>
+  </section>
+
   <pre id="json">loading…</pre>
   <footer>Local dashboard. No data leaves this machine except scans sent to your server.</footer>
 </main>
 <script>
 const TOKEN = "{{.Token}}";
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString() : 'never';
+function renderUpdate(u) {
+  u = u || {};
+  document.getElementById('updateCurrent').textContent = u.current ? ('v' + u.current) : '–';
+  const meta = [];
+  if (u.latest) meta.push('Latest v' + u.latest);
+  if (u.checked_at && !u.checked_at.startsWith('0001-')) meta.push('checked ' + new Date(u.checked_at).toLocaleString());
+  document.getElementById('updateLatest').textContent = meta.join(' · ');
+  const install = document.getElementById('updateInstall');
+  install.textContent = u.latest ? ('Install v' + u.latest) : 'Install';
+  install.style.display = u.available ? '' : 'none';
+  install.disabled = !!u.applying;
+  document.getElementById('updateCheck').disabled = !!u.applying;
+  const message = document.getElementById('updateMessage');
+  const tags = [];
+  if (u.applying) tags.push('applying…');
+  if (u.applied) tags.push('installed');
+  if (u.restart_required) tags.push('restart required');
+  if (u.addon_updated) tags.push('addon updated');
+  message.textContent = u.message || u.error || tags.join(' · ');
+  message.className = (u.error && !u.applied) ? 'bad' : 'muted';
+  const notes = document.getElementById('updateNotes');
+  if (u.html_url) {
+    notes.style.display = '';
+    document.getElementById('updateLink').href = u.html_url;
+  } else {
+    notes.style.display = 'none';
+  }
+}
+async function postUpdate(path) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-TradePost-Token': TOKEN},
+    body: '{}'
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) { data = {error: 'unexpected response'}; }
+  if (data.update) renderUpdate(data.update);
+  if (!res.ok) {
+    const message = document.getElementById('updateMessage');
+    message.className = 'bad';
+    message.textContent = data.error || 'Update request failed';
+  }
+  return data;
+}
 async function refresh() {
   const res = await fetch('/api/status');
   const data = await res.json();
@@ -104,6 +166,7 @@ async function refresh() {
   } else {
     loginCard.style.display = 'none';
   }
+  renderUpdate(data.update);
   if (data.setup_required) {
     location.href = '/setup';
     return;
@@ -117,6 +180,23 @@ document.getElementById('sync').addEventListener('click', async (e) => {
   e.target.disabled = true;
   await fetch('/api/sync', {method: 'POST', headers: {'X-TradePost-Token': TOKEN}});
   e.target.disabled = false;
+  refresh();
+});
+document.getElementById('updateCheck').addEventListener('click', async (e) => {
+  const button = e.target;
+  button.disabled = true;
+  button.textContent = 'Checking…';
+  await postUpdate('/api/update/check');
+  button.textContent = 'Check now';
+  button.disabled = false;
+  refresh();
+});
+document.getElementById('updateInstall').addEventListener('click', async (e) => {
+  const button = e.target;
+  button.disabled = true;
+  button.textContent = 'Installing…';
+  await postUpdate('/api/update/apply');
+  button.disabled = false;
   refresh();
 });
 refresh();
