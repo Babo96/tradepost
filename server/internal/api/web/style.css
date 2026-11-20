@@ -703,6 +703,107 @@ main {
 .card-price .card-price-main strong { color: var(--gold); }
 .card-price .card-price-main span { color: var(--gold); opacity: .8; }
 
+/* ---------- Variant selector ---------- */
+
+.variants {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #1e2836;
+}
+
+.variants-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+.variants-count {
+  color: #6b7787;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .3px;
+  text-transform: none;
+}
+
+.variant-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 158px;
+  padding-bottom: 1px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #334155 transparent;
+}
+.variant-list.has-more {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
+}
+
+.variant {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: #0e141c;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+}
+button.variant { cursor: pointer; }
+button.variant:hover {
+  filter: none;
+  background: #17202b;
+  border-color: #2c3a4c;
+}
+.variant.is-active {
+  background: rgba(240, 192, 64, .1);
+  border-color: rgba(240, 192, 64, .48);
+  box-shadow: inset 2px 0 var(--gold);
+}
+.variant-level {
+  color: var(--muted);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.variant.is-active .variant-level { color: var(--gold); }
+.variant-price {
+  overflow: hidden;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.variant.is-active .variant-price { color: #ffd97a; }
+.variant-qty {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.variant.is-active .variant-qty { color: var(--text); }
+button.variant:focus-visible {
+  outline: 2px solid rgba(240, 192, 64, .65);
+  outline-offset: 1px;
+}
+
 tr.row:focus-visible {
   outline: 2px solid rgba(240, 192, 64, .5);
   outline-offset: -2px;
@@ -809,6 +910,25 @@ tr.row.active { background: #1e2b3a; box-shadow: inset 3px 0 var(--gold); }
 }
 .detail .current strong { display: block; color: var(--gold); font-size: 18px; }
 .detail .current span { color: var(--muted); font-size: 12px; }
+
+/* Variant block sits between the current price and the watch button. */
+.detail .variants {
+  margin: 0 0 14px;
+  padding: 0;
+  border-top: 0;
+}
+.detail .variants-head {
+  margin-bottom: 6px;
+  font-size: 11px;
+  letter-spacing: 1.2px;
+}
+.detail .variants-count { font-size: 11px; }
+.detail .variant-list { max-height: 238px; }
+.detail .variant {
+  padding: 7px 10px;
+  font-size: 13px;
+}
+.detail .variant-qty { font-size: 12px; }
 
 .chart-wrap {
   position: relative;

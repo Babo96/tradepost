@@ -123,7 +123,14 @@ const state = {
 };
 
 const detailCache = new Map();
-const cardState = { el: null, timer: 0, pinned: false, key: "", token: 0, x: 0, y: 0 };
+const variantCache = new Map();
+const cardState = {
+  el: null, timer: 0, pinned: false, key: "", token: 0, x: 0, y: 0,
+  restoreScroll: null,
+};
+// Keeps keyboard focus on the variant list that was just used, even though
+// selecting a variant rebuilds the card and the detail panel.
+const variantFocus = { surface: "", level: -1, itemID: 0, expires: 0 };
 
 function saveWatch() {
   localStorage.setItem("tradepost-watch", JSON.stringify([...state.watch]));
@@ -605,6 +612,167 @@ function getDetail(item) {
   return request;
 }
 
+// ---------- Variant selector ----------
+
+function keyItemID(key) {
+  const parts = String(key || "").split(":");
+  if (parts[0] !== "i" && parts[0] !== "g") return 0;
+  const id = Number(parts[1]);
+  return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+// One item ID can have several price keys (i:<id>, g:<id>:0, g:<id>:<level>).
+// They are grouped by effective level: an explicit level in the key wins,
+// then the item's metadata level, and 0 means the base variant.
+function effectiveLevel(item, fallbackLevel) {
+  const fromKey = levelFromKey(item && item.key);
+  if (fromKey > 0) return fromKey;
+  const meta = Number(item && item.item_level) || Number(fallbackLevel) || 0;
+  return meta > 0 ? Math.floor(meta) : 0;
+}
+
+function variantLabel(level) {
+  return level > 0 ? `ilvl ${level}` : "Base";
+}
+
+// When two keys resolve to the same level, prefer the explicit level key,
+// then the level-0 key, then a plain item key.
+function variantRank(key) {
+  const parts = String(key || "").split(":");
+  if (parts[0] === "g") return Number(parts[2]) > 0 ? 0 : 1;
+  return 2;
+}
+
+function preferredVariant(candidate, current) {
+  if (candidate.rank !== current.rank) return candidate.rank < current.rank;
+  if (candidate.price !== current.price) return candidate.price < current.price;
+  return candidate.quantity > current.quantity;
+}
+
+function buildVariants(items, itemID) {
+  const byLevel = new Map();
+  for (const raw of items || []) {
+    if (!raw || !raw.key) continue;
+    if (itemID && keyItemID(raw.key) !== itemID) continue;
+    const level = effectiveLevel(raw);
+    const entry = {
+      ...raw,
+      level,
+      label: variantLabel(level),
+      rank: variantRank(raw.key),
+      price: Number(raw.price) || 0,
+      quantity: Number(raw.quantity) || 0,
+    };
+    const current = byLevel.get(level);
+    if (!current || preferredVariant(entry, current)) byLevel.set(level, entry);
+  }
+  return [...byLevel.values()].sort((a, b) => a.level - b.level);
+}
+
+function getVariants(item) {
+  const itemID = Number(item && item.item_id) || keyItemID(item && item.key);
+  if (!itemID) return Promise.resolve([]);
+  const cacheKey = `${state.market}|${itemID}`;
+  const cached = variantCache.get(cacheKey);
+  if (cached) return cached;
+  const request = api("/v1/items", { market: state.market, q: itemID, limit: 200 })
+    .then((data) => buildVariants(data && data.items, itemID))
+    .catch((error) => {
+      variantCache.delete(cacheKey);
+      throw error;
+    });
+  variantCache.set(cacheKey, request);
+  return request;
+}
+
+function selectVariant(item, surface) {
+  if (!item || !item.key) return;
+  if (state.selected && state.selected.key === item.key) return;
+  const card = cardElement();
+  if (card && !card.hidden) cardState.restoreScroll = card.scrollTop;
+  variantFocus.surface = surface || "detail";
+  variantFocus.level = effectiveLevel(item);
+  variantFocus.itemID = Number(item.item_id) || keyItemID(item.key);
+  variantFocus.expires = Date.now() + 2500;
+  selectItem(item, cardState.x, cardState.y);
+}
+
+function variantSection(options) {
+  const interactive = Boolean(options.interactive);
+  const surface = options.surface;
+  const activeLevel = Number(options.activeLevel) || 0;
+  const itemID = Number(options.item && options.item.item_id) ||
+    keyItemID(options.item && options.item.key);
+
+  const box = el("div", "variants");
+  box.hidden = true;
+  const head = el("div", "variants-head");
+  const count = el("span", "variants-count");
+  head.append(el("span", "", "Variants"), count);
+  const list = el("div", "variant-list");
+  if (interactive) {
+    list.setAttribute("role", "group");
+    list.setAttribute("aria-label", "Item variants");
+  }
+  box.append(head, list);
+
+  getVariants(options.item).then((variants) => {
+    if (!variants.length || variants.length < 2 || !box.isConnected) return;
+    count.textContent = `${variants.length} levels`;
+    let activeEntry = null;
+    for (const variant of variants) {
+      const active = variant.level === activeLevel;
+      const entry = document.createElement(interactive ? "button" : "div");
+      entry.className = "variant" + (active ? " is-active" : "");
+      const quantity = (variant.quantity || 0).toLocaleString();
+      entry.append(
+        el("span", "variant-level", variant.label),
+        el("span", "variant-price", money(variant.price)),
+        el("span", "variant-qty", quantity),
+      );
+      entry.title = `${variant.label} · ${money(variant.price)} · ${quantity} available`;
+      if (interactive) {
+        entry.type = "button";
+        entry.setAttribute("aria-pressed", String(active));
+        entry.setAttribute("aria-label",
+          `${variant.label}, ${money(variant.price)}, ${quantity} in stock`);
+        entry.addEventListener("click", (event) => {
+          // Keep the document click handler from closing the pinned card when
+          // the click target is replaced by the re-render.
+          event.preventDefault();
+          event.stopPropagation();
+          selectVariant(variant, surface);
+        });
+      }
+      if (active) activeEntry = entry;
+      list.append(entry);
+    }
+    box.hidden = false;
+    if (activeEntry && list.scrollHeight > list.clientHeight) {
+      list.scrollTop = Math.max(0,
+        activeEntry.offsetTop - (list.clientHeight - activeEntry.offsetHeight) / 2);
+    }
+    if (list.scrollHeight > list.clientHeight) {
+      const syncMore = () => {
+        const remaining = list.scrollHeight - list.clientHeight - list.scrollTop;
+        list.classList.toggle("has-more", remaining > 2);
+      };
+      list.addEventListener("scroll", syncMore, { passive: true });
+      syncMore();
+    }
+    if (interactive && variantFocus.surface === surface &&
+        variantFocus.itemID === itemID && variantFocus.level === activeLevel &&
+        Date.now() < variantFocus.expires) {
+      variantFocus.surface = "";
+      const target = activeEntry || list.querySelector(".variant");
+      if (target) target.focus({ preventScroll: true });
+    }
+    if (typeof options.onGrow === "function") options.onGrow();
+  }).catch(() => { /* variants are a bonus; leave the rest of the card intact */ });
+
+  return box;
+}
+
 function cardElement() {
   if (!cardState.el) cardState.el = $("#item-card");
   return cardState.el;
@@ -629,6 +797,7 @@ function hideCard() {
   clearTimeout(cardState.timer);
   cardState.token++;
   cardState.pinned = false;
+  cardState.restoreScroll = null;
   const card = cardElement();
   if (!card) return;
   card.hidden = true;
@@ -809,6 +978,15 @@ function paintCard(detail, fallbackItem) {
   const quantity = Number(info.quantity ?? fallbackItem.quantity) || 0;
   const listings = Number(info.listings ?? fallbackItem.listings) || 0;
   const scanned = Number(info.scanned ?? fallbackItem.scanned) || 0;
+  card.append(variantSection({
+    item: fallbackItem,
+    activeLevel: effectiveLevel({ key: fallbackItem.key, item_level: itemLevelValue }),
+    interactive: cardState.pinned,
+    surface: "card",
+    onGrow: () => {
+      if (cardState.el && !cardState.el.hidden) placeCard(cardState.x, cardState.y);
+    },
+  }));
   const grid = el("div", "card-price");
   const cell = (label, value, main) => {
     const wrap = el("div", main ? "card-price-main" : "");
@@ -822,6 +1000,11 @@ function paintCard(detail, fallbackItem) {
     cell("Scanned", ageText(scanned)),
   );
   card.append(grid);
+
+  if (cardState.restoreScroll != null) {
+    card.scrollTop = cardState.restoreScroll;
+    cardState.restoreScroll = null;
+  }
 }
 
 function selectItem(item, x, y) {
@@ -863,7 +1046,14 @@ function renderDetail(item) {
   watch.textContent = state.watch.has(item.key) ? "★ Watching" : "☆ Watch";
   watch.addEventListener("click", () => toggleWatch(item.key));
 
-  detail.append(heading, key, current, watch);
+  detail.append(heading, key, current);
+  detail.append(variantSection({
+    item,
+    activeLevel: effectiveLevel(item),
+    interactive: true,
+    surface: "detail",
+  }));
+  detail.append(watch);
 
   const chartTitle = document.createElement("h3");
   const rangeLabel = state.range === "12h" ? "12h · 1-minute buckets"
