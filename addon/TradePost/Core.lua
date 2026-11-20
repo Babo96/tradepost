@@ -1,6 +1,6 @@
 local ADDON, TP = ...
 TP.name = ADDON
-TP.version = "0.2.11"
+TP.version = "0.2.12"
 TP.atAuctionHouse = false
 
 function TP:Print(...)
@@ -133,8 +133,23 @@ function TP:OnAuctionHouseShow()
     pcall(function()
       TP:SyncBlizzardFavorites(false)
     end)
+    -- Let the Blizzard AH frames initialize before asking for a full snapshot.
+    if TP.atAuctionHouse then
+      TP:TryScan(false)
+    end
   end)
-  self:TryScan(false)
+end
+
+function TP:OnAuctionHouseFailure()
+  if self.scan then
+    self.scan.waiting = false
+    self.scan.suppressUntil = time() + 60
+  end
+  local now = time()
+  if not self.lastAhError or now - self.lastAhError >= 60 then
+    self.lastAhError = now
+    self:Print("Auction House returned an internal error; TradePost will retry its scan in 60 s.")
+  end
 end
 
 function TP:OnAuctionHouseClosed()
@@ -205,6 +220,8 @@ function TP:DispatchEvent(event, arg1)
     TP:OnAuctionHouseShow()
   elseif event == "AUCTION_HOUSE_CLOSED" then
     TP:OnAuctionHouseClosed()
+  elseif event == "AUCTION_HOUSE_BROWSE_FAILURE" then
+    TP:OnAuctionHouseFailure()
   elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
     TP:OnReplicateUpdate()
   end
@@ -215,6 +232,7 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:RegisterEvent("PLAYER_LOGIN")
 frame:RegisterEvent("AUCTION_HOUSE_SHOW")
 frame:RegisterEvent("AUCTION_HOUSE_CLOSED")
+frame:RegisterEvent("AUCTION_HOUSE_BROWSE_FAILURE")
 frame:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
 frame:SetScript("OnEvent", function(_, event, arg1)
   local ok, err = pcall(TP.DispatchEvent, TP, event, arg1)

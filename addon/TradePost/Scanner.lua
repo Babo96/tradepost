@@ -31,6 +31,11 @@ function TP:TryScan(force)
     self:Print("already waiting for auction data")
     return
   end
+  if self.scan.suppressUntil and time() < self.scan.suppressUntil then
+    self:Print("Auction House error; scan retry in " ..
+      remaining(self.scan.suppressUntil - time()))
+    return
+  end
 
   local count = (C_AuctionHouse and C_AuctionHouse.GetNumReplicateItems()) or 0
   local now = time()
@@ -92,6 +97,11 @@ function TP:TryScan(force)
 
   self.scan.lastEventCount = nil
   self.scan.suppressUntil = nil
+  -- Record the request, not only a successful list update. A failed or
+  -- throttled request must not make us hammer the AH on every open.
+  if TRADEPOST_DB then
+    TRADEPOST_DB.lastReplicate = now
+  end
   local ok, err = pcall(C_AuctionHouse.ReplicateItems)
   if not ok then
     self:Print("could not request a scan: " .. tostring(err))
@@ -104,7 +114,7 @@ function TP:TryScan(force)
   C_Timer.After(30, function()
     if self.scan.waiting then
       self.scan.waiting = false
-      self:Print("no auction data after 30 s. The client throttle may still be active.")
+      self:Print("no auction data after 30 s. The full-scan API is still throttled or the AH returned an error; Auctionator browse uses a different API.")
     end
   end)
 end

@@ -1,6 +1,6 @@
 # Companion ↔ game protocol
 
-Current as of TradePost **v0.2.11**. This document describes how the addon and
+Current as of TradePost **v0.2.12**. This document describes how the addon and
 the local companion exchange data. It is the technical counterpart to the
 player-facing [README](../README.md) and [architecture](architecture.md).
 
@@ -55,8 +55,8 @@ A tiny regular addon written by the companion:
 TRADEPOST_COMPANION = {
   online = true,
   updated = 1795163048,
-  addon_latest = "0.2.11",
-  addon_url = "https://github.com/Babo96/tradepost/releases/tag/v0.2.11",
+  addon_latest = "0.2.12",
+  addon_url = "https://github.com/Babo96/tradepost/releases/tag/v0.2.12",
 }
 ```
 
@@ -200,7 +200,7 @@ gzip JSON:
   "scans": [{
     "market": "eu:pve:horde",
     "scanned_at": 1795162000,
-    "client_version": "0.2.11",
+    "client_version": "0.2.12",
     "items": [{"k": "i:2589", "p": 125, "q": 20, "n": 3}]
   }],
   "items": [{"id": 2589, "name": "Linen Cloth", "quality": 1,
@@ -221,6 +221,8 @@ gzip JSON:
 ## Limits and recovery
 
 - Client scan throttle: roughly 15 minutes per account for `ReplicateItems`.
+  Auctionator's browse queries use `QueryAuctionItems` and a different throttle,
+  so Auctionator can scan while the TradePost full snapshot is still waiting.
 - Data addon: startup + 30 minutes; not per sync.
 - Live ring: 5-minute windows; `price_slots` per session; reload after a wrap.
 - Auth/ack slots: 16 each + 8 ring sync slots per session; reload resets.
