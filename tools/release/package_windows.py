@@ -22,9 +22,13 @@ README = """TradePost Companion {version} (Windows x64)
 3. Run tradepost.exe (or setup.cmd).
 
 The companion starts in the Windows notification area. Left-click the tray icon
-to open the dashboard; right-click for Sync now / Quit. It opens a local setup
-wizard at http://127.0.0.1:8787/setup. Select the WoW folder, server URL, market
-and ring slots there. No command-line setup is required.
+to open the dashboard; right-click for Open dashboard / Sync now / Quit. It
+opens a local setup wizard at http://127.0.0.1:8787/setup. Select the WoW
+folder, server URL, market and ring slots there. No command-line setup is
+required.
+
+Starting tradepost.exe again while it is running opens the dashboard instead of
+creating a second tray icon.
 
 If you prefer the command line:
 
@@ -43,6 +47,7 @@ Then start the game and run /reload. Hover items for prices; /tradepost browse o
 the in-game browser.
 
 Config:    %AppData%\\tradepost\\config.json
+Log:       %AppData%\\tradepost\\companion.log
 Dashboard: http://127.0.0.1:8787
 
 The tray icon keeps running in the background; no terminal window is shown.

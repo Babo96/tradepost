@@ -32,7 +32,9 @@ separate download.
 3. **Run `tradepost.exe`** (or `setup.cmd`). It starts in the Windows
    notification area without a terminal window. Left-click the tray icon to
    open the dashboard; the setup wizard is at `http://127.0.0.1:8787/setup`.
-   If the browser does not open, visit that URL manually.
+   If the browser does not open, visit that URL manually. `setup.cmd` is a
+   batch file, so Windows may briefly flash a console window for it;
+   `tradepost.exe` itself never opens one.
 4. **Game folder.** Select the folder that contains `_forever_`, for example
    `C:\World of Warcraft`. The wizard validates:
    - `_forever_/Interface/AddOns`,
@@ -52,9 +54,12 @@ separate download.
 ## Everyday use
 
 - Run `tradepost.exe` while playing. It stays in the notification area; no
-  terminal window is shown.
+  terminal window is shown. Running it with no arguments is the same as
+  `tradepost.exe run`.
 - **Left-click** the tray icon to open the dashboard. **Right-click** for
-  **Sync now** and **Quit**.
+  **Open dashboard**, **Sync now** and **Quit**.
+- **Quit** removes the tray icon and stops the companion; scans are uploaded
+  again the next time it starts.
 - Only one companion instance can run. Launching `tradepost.exe` again opens
   the existing dashboard and exits, so there is only one tray icon.
 - The dashboard is `http://127.0.0.1:8787`:
@@ -92,8 +97,22 @@ CurseForge/WoWUI managers can update the standalone addon.
 
 - Config: `%AppData%\tradepost\config.json`
 - Upload/metadata state: `%AppData%\tradepost\state.json`
+- Log: `%AppData%\tradepost\companion.log` (append-only; delete it while the
+  companion is stopped if it grows large). The GUI build has no console, so
+  this file is the first place to look when startup fails silently.
 - The companion writes only into the game's `_forever_` AddOns folder and its
   own config folder.
+
+## Uninstall
+
+1. Right-click the tray icon and choose **Quit**.
+2. Delete the folder where you extracted the companion (for example
+   `C:\TradePost`).
+3. Remove every `TradePost*` folder from `_forever_\Interface\AddOns`.
+4. Optionally delete `%AppData%\tradepost` (config, state and log).
+
+The companion installs no service, driver or registry entry, so there is
+nothing else to remove.
 
 ## Firewall and security
 
@@ -122,6 +141,13 @@ the companion tries `%ProgramFiles(x86)%\World of Warcraft`,
 `%ProgramFiles%\World of Warcraft`, `%LOCALAPPDATA%\World of Warcraft`,
 `C:\World of Warcraft`, and `C:\Games\World of Warcraft`.
 
+The Windows build is a GUI application. When a command is started from
+`cmd.exe` or PowerShell it reattaches to that console, so `status`, `version`,
+`update --check` and the other commands print normally. Double-clicking the
+`.exe` cannot show output; use the dashboard or run the command from a
+terminal. `tradepost.exe` with no arguments is the default `run` and only
+writes to the log file.
+
 ## Addon-only install
 
 If you install TradePost from CurseForge/WoWUI without the companion, it will
@@ -134,6 +160,12 @@ companion for the full experience.
 
 **The wizard does not open.** Open `http://127.0.0.1:8787/setup` manually. If
 the port is busy, close the other companion instance.
+
+**The tray icon does not appear.** Check `%AppData%\tradepost\companion.log`
+for a startup error. A second launch does not create a second icon; it opens
+the dashboard of the running instance. On Windows 11 the icon may be in the
+notification-area overflow menu (the `^` next to the clock); drag it onto the
+taskbar to pin it.
 
 **The game folder is rejected.** Pick the folder that contains `_forever_`;
 make sure the account folders and `_forever_/Interface/AddOns` exist and are

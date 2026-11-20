@@ -70,6 +70,7 @@ func usage() {
   tradepost enroll  --server URL [--wow DIR] [--market eu:pve:horde]
   tradepost install [--source DIR] [--wow DIR] [--count 64]
   tradepost sync    [--config PATH]
+  tradepost         same as run
   tradepost run     [--config PATH] [--no-browser]
   tradepost status  [--config PATH]
   tradepost update  [--check] [--force] [--yes] [--config PATH]

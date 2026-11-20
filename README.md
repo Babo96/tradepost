@@ -110,8 +110,9 @@ starts, when it stops, and once when the addon asks after a reload.
 
 Keep the companion running while you play. It stays in the notification area;
 left-click the tray icon for the dashboard at `http://127.0.0.1:8787`, or
-right-click for Sync now / Quit. The dashboard shows the last sync, the active
-market, the login code, and available updates.
+right-click for Open dashboard / Sync now / Quit. The dashboard shows the last
+sync, the active market, the login code, and available updates. Logs are
+written to `%AppData%\tradepost\companion.log`.
 
 > **Windows SmartScreen:** the binary is not code-signed. Choose
 > **More info → Run anyway**. The source and build workflow are in this
