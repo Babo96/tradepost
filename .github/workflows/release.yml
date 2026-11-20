@@ -13,8 +13,15 @@ jobs:
   release:
     name: Build release archives
     runs-on: ubuntu-latest
+    env:
+      CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+      CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-go@v5
         with:
@@ -72,3 +79,40 @@ jobs:
             dist/*linux-amd64.tar.gz
             dist/TradePost-*.zip
           generate_release_notes: true
+
+      - name: Read release notes
+        id: release_notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BODY="$(gh release view "$GITHUB_REF_NAME" --json body -q .body 2>/dev/null || true)"
+          if [ -z "$BODY" ]; then
+            BODY="Release $GITHUB_REF_NAME: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+          fi
+          {
+            echo 'body<<CURSEFORGE_CHANGELOG_EOF'
+            printf '%s\n' "$BODY"
+            echo 'CURSEFORGE_CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: CurseForge configuration
+        run: |
+          if [ -z "${CURSEFORGE_API_TOKEN}" ] || [ -z "${CURSEFORGE_PROJECT_ID}" ]; then
+            echo "::notice title=CurseForge upload skipped::Set the CURSEFORGE_API_TOKEN secret and CURSEFORGE_PROJECT_ID variable to enable automatic uploads."
+          else
+            echo "CurseForge upload enabled for project ${CURSEFORGE_PROJECT_ID}."
+          fi
+
+      - name: Upload addon to CurseForge
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && env.CURSEFORGE_API_TOKEN != '' && env.CURSEFORGE_PROJECT_ID != '' }}
+        uses: itsmeow/curseforge-upload@v3
+        with:
+          token: ${{ env.CURSEFORGE_API_TOKEN }}
+          project_id: ${{ env.CURSEFORGE_PROJECT_ID }}
+          game_endpoint: wow
+          file_path: dist/TradePost-${{ steps.version.outputs.value }}.zip
+          game_versions: ${{ vars.CURSEFORGE_GAME_VERSIONS || 'Forever:1.60.1' }}
+          release_type: release
+          display_name: TradePost ${{ steps.version.outputs.value }}
+          changelog: ${{ steps.release_notes.outputs.body }}
+          changelog_type: markdown

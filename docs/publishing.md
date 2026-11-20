@@ -40,12 +40,42 @@ A static data pack does not count as a running companion.
    - `companion/cmd/tradepost/main.go` (default version; release ldflags also
      set it)
 2. Tag and push (`vX.Y.Z`). The **Release** workflow builds:
-   - `TradePost-X.Y.Z.zip` (addon only; upload to CurseForge/WoWUI),
+   - `TradePost-X.Y.Z.zip` (addon only; uploaded to CurseForge when configured),
    - `tradepost-X.Y.Z-linux-amd64.tar.gz`,
    - `tradepost-companion-X.Y.Z-windows-amd64.zip`.
 3. The **Docker Build and Push** workflow builds
    `ghcr.io/babo96/tradepost-server:sha-<commit>` on `main`; update the Argo
    manifest tag if the server changed.
+
+## Automatic CurseForge uploads
+
+The **Release** workflow uploads `TradePost-<version>.zip` to CurseForge after
+the GitHub release is published. It is skipped until the repository values
+below exist, so a release never fails because the project is not set up yet.
+
+1. Create the CurseForge project page and copy its **numeric project ID** from
+   the project sidebar.
+2. Create an API token at
+   <https://www.curseforge.com/account/api-tokens>.
+3. In the GitHub repository go to **Settings → Secrets and variables →
+   Actions** and add:
+   - **Secret** `CURSEFORGE_API_TOKEN` — the token from step 2.
+   - **Variable** `CURSEFORGE_PROJECT_ID` — the numeric project ID.
+   - **Optional variable** `CURSEFORGE_GAME_VERSIONS` — defaults to
+     `Forever:1.60.1`.
+4. Push a `vX.Y.Z` tag. The upload uses:
+   - the addon zip `TradePost-X.Y.Z.zip`,
+   - game endpoint `wow`,
+   - game version `Forever:1.60.1` (the Forever flavor; the TOC interface is
+     `16001`),
+   - release type `release`,
+   - display name `TradePost X.Y.Z`,
+   - the generated GitHub release notes as the CurseForge changelog.
+
+If either the token or the project ID is missing, the workflow prints an
+Actions notice and skips the upload. The manual upload flow below still works.
+The token must belong to the project owner. For a brand-new project, the first
+file can also be uploaded from the CurseForge web UI.
 
 ## Project icon
 
