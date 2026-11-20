@@ -106,8 +106,9 @@ max stack, unique flag, set id, JSON `stats`, JSON `details`, and
   above.
 - `GET /v1/item/detail` returns metadata plus latest price/quantity/listings.
 - `GET /v1/items/missing-details?market=...&limit=500&force=0` returns item IDs
-  that still need details; `force=1` returns every known item ID in the market.
-  The metadata backfill uses this endpoint.
+  that still need details, including rows that only contain the client's
+  "Retrieving item information" placeholder; `force=1` returns every known item
+  ID in the market. The metadata backfill uses this endpoint.
 - The data addon endpoint builds the full `TradePost_Data` zip for one market;
   the companion also writes its own all-market baseline.
 

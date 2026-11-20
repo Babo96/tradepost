@@ -164,3 +164,14 @@ CREATE TABLE IF NOT EXISTS ingest_jobs (
 
 CREATE INDEX IF NOT EXISTS ingest_jobs_status_id
   ON ingest_jobs (status, id);
+
+-- Older addon builds stored the client's "Retrieving item information"
+-- placeholder as real tooltip data. Drop it so the backfill can retry and
+-- the website does not serve placeholder text.
+UPDATE items
+SET details = NULL
+WHERE details IS NOT NULL
+  AND (
+    details->'lines'->0->>'type' = '41'
+    OR details->'lines'->0->>'left' = 'Retrieving item information'
+  );

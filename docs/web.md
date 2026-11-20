@@ -81,6 +81,11 @@ Keys exposed in the UI:
 
 `has_stats=1` requires a non-empty stats object.
 
+Stats come from item metadata the game client has cached. Items whose stats
+were never cached are not returned by a stat filter; the companion's daily
+metadata backfill requests the missing item data and fills them in. Run
+`/tradepost meta force` in game for an immediate full refresh.
+
 ## Data flow
 
 1. The addon scans the auction house and the companion uploads the scan and

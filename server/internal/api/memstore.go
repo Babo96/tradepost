@@ -576,6 +576,23 @@ func formatItemID(id int64) string {
 	return strconv.FormatInt(id, 10)
 }
 
+func placeholderDetails(raw json.RawMessage) bool {
+	var details struct {
+		Lines []struct {
+			Type int    `json:"type"`
+			Left string `json:"left"`
+		} `json:"lines"`
+	}
+	if json.Unmarshal(raw, &details) != nil {
+		return false
+	}
+	if len(details.Lines) != 1 {
+		return false
+	}
+	line := details.Lines[0]
+	return line.Type == 41 || strings.Contains(line.Left, "Retrieving item information")
+}
+
 func (m *MemStore) MissingItemDetails(_ context.Context, market string, force bool, limit int) ([]int64, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -594,7 +611,7 @@ func (m *MemStore) MissingItemDetails(_ context.Context, market string, force bo
 		}
 		seen[id] = true
 		meta := m.items[id]
-		if !force && len(meta.Details) > 0 {
+		if !force && len(meta.Details) > 0 && !placeholderDetails(meta.Details) {
 			continue
 		}
 		result = append(result, id)

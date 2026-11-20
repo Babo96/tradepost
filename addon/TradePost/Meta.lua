@@ -128,6 +128,26 @@ local function readStats(link)
   return stats
 end
 
+local function requestLoad(id)
+  if C_Item and type(C_Item.RequestLoadItemDataByID) == "function" then
+    pcall(C_Item.RequestLoadItemDataByID, id)
+  end
+end
+
+-- Equipment should always expose at least armor or a primary stat. If the
+-- client has not cached it yet, GetItemStats returns an empty table; defer
+-- instead of storing a permanent "no stats" record.
+local function needsStats(classID, equipLoc)
+  if classID ~= 2 and classID ~= 4 then
+    return false
+  end
+  if equipLoc == "INVTYPE_NON_EQUIP_IGNORE" or equipLoc == "INVTYPE_BODY"
+    or equipLoc == "INVTYPE_TABARD" or equipLoc == "INVTYPE_BAG" then
+    return false
+  end
+  return true
+end
+
 -- C_TooltipInfo is the only reliable source for the full rendered tooltip.
 -- Keep plain text only: no textures, fonts, colors or raw tooltip objects.
 local function readDetailLines(id)
@@ -242,6 +262,10 @@ function TP:MetaCollect(id)
   local name, link, quality, itemLevel, requiredLevel, classID, subclassID
   local maxStack, equipLoc, icon, vendorPrice, bindType
 
+  -- The browser already asks the client to load auction items by ID. The
+  -- backfill must do the same; GetItemInfo alone only sees the current cache.
+  requestLoad(id)
+
   if C_Item and type(C_Item.GetItemInfo) == "function" then
     -- GetItemInfo: name, link, quality, itemLevel, itemMinLevel, itemType,
     -- itemSubType, stackCount, equipLoc, icon, sellPrice, classID,
@@ -311,10 +335,16 @@ function TP:MetaCollect(id)
     if C_Item and type(C_Item.GetItemInfo) == "function" then
       pcall(C_Item.GetItemInfo, id)
     end
+    requestLoad(id)
     self:MetaDefer(id)
     return nil
   end
   local stats = readStats(link)
+  if next(stats) == nil and needsStats(classID, equipLoc) then
+    requestLoad(id)
+    self:MetaDefer(id)
+    return nil
+  end
 
   local armor = numberOrNil(stats["ITEM_MOD_ARMOR"])
     or numberOrNil(stats["ITEM_MOD_ARMOR_SHORT"])
@@ -621,8 +651,9 @@ function TP:MetaDefer(id)
   queue.deferred[id] = true
 end
 
--- Items whose tooltip was still "Retrieving item information" get up to three
--- retry passes, one minute apart, so GetItemInfo can populate the client cache.
+-- Items whose tooltip was still "Retrieving item information", or equipment
+-- whose stats are not cached yet, get up to five retry passes one minute
+-- apart so RequestLoadItemDataByID can populate the client cache.
 function TP:MetaDeferredPass()
   local queue = TRADEPOST_META_QUEUE
   local deferred = queue.deferred or {}
@@ -636,7 +667,7 @@ function TP:MetaDeferredPass()
   table.sort(ids)
   queue.deferred = {}
   local pass = tonumber(queue.deferPass) or 0
-  if #ids == 0 or pass >= 3 then
+  if #ids == 0 or pass >= 5 then
     self:MetaFinish("complete")
     return
   end
@@ -762,6 +793,13 @@ function TP:MetaResume()
     return
   end
   local queue = TRADEPOST_META_QUEUE
+  local today = date("%Y-%m-%d")
+  if queue.lastRunDay ~= today then
+    -- Start the once-per-day pass. If yesterday's queue is incomplete,
+    -- MetaStart resumes it; otherwise it rebuilds the full id queue.
+    self:MetaStart(false)
+    return
+  end
   if queue and queue.ids and #queue.ids > 0 and not queue.completed
     and (queue.index or 1) <= (queue.total or #queue.ids) then
     self:MetaStart(false)

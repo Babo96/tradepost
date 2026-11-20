@@ -302,7 +302,9 @@ func (p *Postgres) MissingItemDetails(ctx context.Context, market string, force 
 	            ON i.item_id = NULLIF(split_part(p.item_key, ':', 2), '')::bigint
 	          WHERE p.market = $1 AND split_part(p.item_key, ':', 2) ~ '^[0-9]+$'`
 	if !force {
-		query += ` AND i.details IS NULL`
+		query += ` AND (i.details IS NULL
+		              OR i.details->'lines'->0->>'type' = '41'
+		              OR i.details->'lines'->0->>'left' = 'Retrieving item information')`
 	}
 	query += ` ORDER BY item_id LIMIT $2`
 
