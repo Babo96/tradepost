@@ -40,6 +40,7 @@ session cookie.
 | `GET` | `/v1/item/detail` | metadata + latest price for one item key |
 | `GET` | `/v1/item/history` | 12 h 1-minute, 7 d 15-minute, or hourly history |
 | `GET` | `/v1/item/markets` | latest price per market for a key |
+| `GET` | `/v1/stats` | market index, movers, stock and composition (`market`, optional `hours` 1-168) |
 | `GET` | `/v1/live` | live contributor count |
 | `POST` | `/v1/auth/code` | one-time website login code (bearer) |
 | `POST` | `/v1/auth/redeem` | exchange a code for a session cookie |
@@ -48,6 +49,7 @@ session cookie.
 | `GET/PUT` | `/v1/watch` | per-character watchlist |
 | `GET` | `/` | website |
 | `GET` | `/download/` | downloads page |
+| `GET` | `/stats/` | market statistics page |
 | `GET` | `/healthz` | liveness |
 
 Market keys are `region:ruleset:house`, e.g. `eu:pve:horde`.

@@ -261,6 +261,7 @@ the `_forever_` folder itself. The wizard validates
 | Build the companion | [Companion README](companion/README.md) |
 | Work on the addon | [Addon README](addon/TradePost/README.md) |
 | Browse prices | <https://tradepost.b4b0.de/> |
+| Read market stats | <https://tradepost.b4b0.de/stats/> |
 | Report a bug | <https://github.com/Babo96/tradepost/issues> |
 
 ## For developers
