@@ -86,6 +86,8 @@ jobs:
           if [ -z "$BODY" ]; then
             BODY="Release $GITHUB_REF_NAME: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
           fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          BODY="$(printf '%s\n\n## Companion downloads\nCurseForge hosts the addon only. Download the companion for your platform from GitHub:\n\n- Linux: https://github.com/%s/releases/download/%s/tradepost-%s-linux-amd64.tar.gz\n- Windows: https://github.com/%s/releases/download/%s/tradepost-companion-%s-windows-amd64.zip' "$BODY" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$VERSION" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$VERSION")"
           {
             echo 'body<<CURSEFORGE_CHANGELOG_EOF'
             printf '%s\n' "$BODY"

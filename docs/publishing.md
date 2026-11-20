@@ -39,8 +39,9 @@ A static data pack does not count as a running companion.
    - `data-addon/TradePost_LiveData/TradePost_LiveData.toc`
    - `companion/cmd/tradepost/main.go` (default version; release ldflags also
      set it)
-2. Tag and push (`vX.Y.Z`). The **Release** workflow builds:
-   - `TradePost-X.Y.Z.zip` (addon only; uploaded to CurseForge when configured),
+2. Tag and push (`vX.Y.Z`). The **Release** workflow builds and attaches all
+   three to the GitHub release:
+   - `TradePost-X.Y.Z.zip` (the addon; also uploaded to CurseForge when configured),
    - `tradepost-X.Y.Z-linux-amd64.tar.gz`,
    - `tradepost-companion-X.Y.Z-windows-amd64.zip`.
 3. The **Docker Build and Push** workflow builds
@@ -72,6 +73,11 @@ below exist, so a release never fails because the project is not set up yet.
    - display name `TradePost X.Y.Z`,
    - the generated GitHub release notes as the CurseForge changelog.
 
+Only the addon zip is uploaded to CurseForge. CurseForge rejects third-party
+installers and `.exe` files, and its app treats project files as addons; the
+Linux and Windows companions stay on GitHub Releases. The CurseForge changelog
+automatically appends direct links to both companion assets.
+
 If either the token or the project ID is missing, the workflow prints an
 Actions notice and skips the upload. The manual upload flow below still works.
 The token must belong to the project owner. For a brand-new project, the first
@@ -97,6 +103,9 @@ Use an original TradePost asset, not a Blizzard texture:
 - **Description:** use [`addon/TradePost/README.md`](../addon/TradePost/README.md).
   Keep the companion link and the standalone warning.
 - **Companion link:** <https://github.com/Babo96/tradepost>
+- **Companion files:** link to the `tradepost-<version>-linux-amd64.tar.gz` and
+  `tradepost-companion-<version>-windows-amd64.zip` assets from the matching
+  GitHub release. Do not upload `.exe` or `.tar.gz` files to CurseForge.
 - **Website:** <https://tradepost.b4b0.de/>
 
 The TOC carries `## X-Website`, `## X-License: MIT`, and a `## Notes` line
