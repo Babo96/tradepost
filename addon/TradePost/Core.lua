@@ -1,6 +1,6 @@
 local ADDON, TP = ...
 TP.name = ADDON
-TP.version = "0.2.17"
+TP.version = "0.2.18"
 TP.atAuctionHouse = false
 
 function TP:Print(...)

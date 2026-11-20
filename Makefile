@@ -20,6 +20,7 @@ ACCOUNT ?=
 ACCOUNT_ARG := $(if $(ACCOUNT),--account $(ACCOUNT),)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.1.0)
 COMPANION_LDFLAGS := -s -w -X main.version=$(VERSION)
+WINDOWS_LDFLAGS := $(COMPANION_LDFLAGS) -H=windowsgui
 
 PROBE_ADDONS := TradePostProbe TPProbeDataA TPProbeDataB TPProbeDataC TPProbeDataD
 
@@ -106,7 +107,7 @@ companion-build:
 
 companion-build-windows:
 	@mkdir -p dist
-	@cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(COMPANION_LDFLAGS)" -o ../dist/tradepost.exe ./cmd/tradepost
+	@cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$(WINDOWS_LDFLAGS)" -o ../dist/tradepost.exe ./cmd/tradepost
 
 icon:
 	@tools/assets/render_icon.sh

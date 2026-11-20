@@ -29,9 +29,10 @@ separate download.
    Avoid `Program Files` unless you want to run it as administrator.
 2. **Close World of Warcraft.** The installer copies files into the game
    folder; Windows can keep them open if the game is running.
-3. **Run `tradepost.exe`** (or `setup.cmd`). The setup wizard opens at
-   `http://127.0.0.1:8787/setup`. If the browser does not open, visit that URL
-   manually.
+3. **Run `tradepost.exe`** (or `setup.cmd`). It starts in the Windows
+   notification area without a terminal window. Left-click the tray icon to
+   open the dashboard; the setup wizard is at `http://127.0.0.1:8787/setup`.
+   If the browser does not open, visit that URL manually.
 4. **Game folder.** Select the folder that contains `_forever_`, for example
    `C:\World of Warcraft`. The wizard validates:
    - `_forever_/Interface/AddOns`,
@@ -50,7 +51,10 @@ separate download.
 
 ## Everyday use
 
-- Run `tradepost.exe` while playing. The console window can be minimized.
+- Run `tradepost.exe` while playing. It stays in the notification area; no
+  terminal window is shown.
+- **Left-click** the tray icon to open the dashboard. **Right-click** for
+  **Sync now** and **Quit**.
 - The dashboard is `http://127.0.0.1:8787`:
   - last sync, active market, item count, errors;
   - **Sync now**, **login code**, the update card;

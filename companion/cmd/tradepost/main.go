@@ -19,16 +19,22 @@ import (
 	"github.com/babo96/tradepost/companion/internal/config"
 	"github.com/babo96/tradepost/companion/internal/dashboard"
 	syncsvc "github.com/babo96/tradepost/companion/internal/sync"
+	"github.com/babo96/tradepost/companion/internal/tray"
 	"github.com/babo96/tradepost/companion/internal/update"
 	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
-var version = "0.2.17"
+var version = "0.2.18"
 
 func main() {
+	setupLogging()
 	if len(os.Args) < 2 {
-		usage()
-		os.Exit(2)
+		// Opening tradepost.exe starts the companion and tray icon.
+		os.Args = append(os.Args, "run")
+	} else {
+		// The Windows build is GUI-subsystem; reattach stdio when a CLI
+		// command is launched from an existing terminal.
+		attachConsole()
 	}
 
 	var err error
@@ -207,9 +213,21 @@ func cmdRun(args []string) error {
 		}
 	}
 
+	trayQuit := make(chan struct{}, 1)
+	tray.Start(application, "http://"+cfg.DashboardAddr, func() {
+		select {
+		case trayQuit <- struct{}{}:
+		default:
+		}
+	})
+	defer tray.Stop()
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	<-sig
+	select {
+	case <-sig:
+	case <-trayQuit:
+	}
 	log.Printf("shutting down")
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()

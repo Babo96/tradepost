@@ -30,7 +30,7 @@ jobs:
           mkdir -p dist
           VERSION="${GITHUB_REF_NAME#v}"
           (cd companion && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o ../dist/tradepost ./cmd/tradepost)
-          (cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o ../dist/tradepost.exe ./cmd/tradepost)
+          (cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w -H=windowsgui -X main.version=$VERSION" -o ../dist/tradepost.exe ./cmd/tradepost)
 
       - name: Package addon (CurseForge/WoWUI)
         run: |

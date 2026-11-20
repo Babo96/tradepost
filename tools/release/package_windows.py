@@ -21,9 +21,10 @@ README = """TradePost Companion {version} (Windows x64)
 2. Close World of Warcraft while the addon is installed.
 3. Run tradepost.exe (or setup.cmd).
 
-The companion opens a local setup wizard at http://127.0.0.1:8787/setup.
-Select the WoW folder, server URL, market and ring slots there. No command-line
-setup is required.
+The companion starts in the Windows notification area. Left-click the tray icon
+to open the dashboard; right-click for Sync now / Quit. It opens a local setup
+wizard at http://127.0.0.1:8787/setup. Select the WoW folder, server URL, market
+and ring slots there. No command-line setup is required.
 
 If you prefer the command line:
 
@@ -44,8 +45,8 @@ the in-game browser.
 Config:    %AppData%\\tradepost\\config.json
 Dashboard: http://127.0.0.1:8787
 
-`tradepost run` keeps running in the console. Close the window or press Ctrl+C to
-stop. Data uploads happen after an auction house scan and /tradepost export.
+The tray icon keeps running in the background; no terminal window is shown.
+Data uploads happen after an auction house scan and /tradepost export.
 """
 
 SETUP = """@echo off
@@ -54,11 +55,11 @@ cd /d "%~dp0"
 
 echo TradePost Companion
 echo.
-echo Starting the setup wizard in your browser.
-echo Close this window or press Ctrl+C to stop the companion.
+echo Starting TradePost in the notification area.
+echo Left-click the tray icon to open the dashboard.
 echo.
-tradepost.exe run
-exit /b %errorlevel%
+start "" "%~dp0tradepost.exe"
+exit /b 0
 """
 
 

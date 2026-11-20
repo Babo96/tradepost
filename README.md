@@ -87,9 +87,10 @@ starts, when it stops, and once when the addon asks after a reload.
    [latest release](https://github.com/Babo96/tradepost/releases/latest).
 2. Extract it somewhere permanent, for example `C:\TradePost`.
 3. Close World of Warcraft.
-4. Run `tradepost.exe` (or `setup.cmd`). The setup wizard opens at
-   `http://127.0.0.1:8787/setup`. If your browser does not open, visit that
-   address manually.
+4. Run `tradepost.exe` (or `setup.cmd`). It starts in the Windows notification
+   area with no terminal window. Left-click the tray icon to open the dashboard;
+   the setup wizard opens at `http://127.0.0.1:8787/setup`. If your browser does
+   not open, visit that address manually.
 5. In the wizard:
    - **Game folder:** choose the folder that contains `_forever_`, for example
      `C:\World of Warcraft`. The wizard checks `_forever_/Interface/AddOns` and
@@ -107,9 +108,10 @@ starts, when it stops, and once when the addon asks after a reload.
    to the minimap (left click: browser, right click: settings). Open the
    auction house to make your first scan.
 
-Keep the companion running while you play. Its dashboard is
-`http://127.0.0.1:8787`; it shows the last sync, the active market, the login
-code, and available updates.
+Keep the companion running while you play. It stays in the notification area;
+left-click the tray icon for the dashboard at `http://127.0.0.1:8787`, or
+right-click for Sync now / Quit. The dashboard shows the last sync, the active
+market, the login code, and available updates.
 
 > **Windows SmartScreen:** the binary is not code-signed. Choose
 > **More info → Run anyway**. The source and build workflow are in this

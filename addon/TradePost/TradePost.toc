@@ -3,7 +3,7 @@
 ## Category: TradePost
 ## Notes: Auction house prices for WoW Forever. The TradePost companion is required for live prices, web login, watch sync and full metadata; without it the addon warns and disables those options.
 ## Author: babo
-## Version: 0.2.17
+## Version: 0.2.18
 ## SavedVariables: TRADEPOST_DB, TRADEPOST_CONFIG, TRADEPOST_EXPORT, TRADEPOST_ITEMS, TRADEPOST_WATCH, TRADEPOST_ACTIVE, TRADEPOST_AUTH, TRADEPOST_ITEM_DETAILS, TRADEPOST_META_QUEUE, TRADEPOST_META_BATCH
 ## X-Category: Auction/Economy
 ## X-Website: https://tradepost.b4b0.de/
