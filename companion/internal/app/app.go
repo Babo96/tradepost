@@ -458,6 +458,7 @@ func (a *App) stopServiceLocked() {
 	if a.service == nil {
 		return
 	}
+	a.service.SetOnline(false)
 	// Only cancel the service context, not the app's base context.
 	if a.cancel != nil {
 		a.cancel()

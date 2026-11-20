@@ -18,9 +18,16 @@ The addon works without the companion at a reduced level:
 - local scans, the browser, tooltips from the central data addon, the
   watchlist, and the Auctionator bridge keep working.
 
-The companion detection uses `TRADEPOST_DATA.companion` and a 10-minute
-heartbeat written by the companion. A static data pack does not count as a
-running companion.
+The companion installs a tiny `TradePost_Companion` status addon containing
+`TRADEPOST_COMPANION = { online = true/false }`. The companion writes it once
+when it starts, once when it stops, and once when the addon asks for a refresh
+through `TRADEPOST_EXPORT.companionRequest` on login/reload. There is **no
+heartbeat**; the addon checks the flag once at login/reload. A static data pack
+does not count as a running companion.
+
+The price data addon is a login-time baseline and refreshes on companion
+startup, every 30 minutes, or on an explicit reload request; the live ring
+carries the 5-minute updates.
 
 ## Release flow
 

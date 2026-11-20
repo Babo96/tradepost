@@ -195,3 +195,37 @@ func TestAuthSlots(t *testing.T) {
 		t.Fatal("EnsureAuthSlots overwrote an existing reply")
 	}
 }
+
+func TestCompanionStatus(t *testing.T) {
+	wowDir := t.TempDir()
+	if err := os.MkdirAll(AddonsDir(wowDir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteCompanionStatus(wowDir, true); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(CompanionStatusPath(wowDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "online = true") {
+		t.Fatalf("status did not publish online=true:\n%s", data)
+	}
+	toc, err := os.ReadFile(filepath.Join(AddonsDir(wowDir), CompanionStatusAddon, CompanionStatusAddon+".toc"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(toc), "## Title: TradePost Companion") {
+		t.Fatalf("unexpected status TOC:\n%s", toc)
+	}
+	if err := WriteCompanionStatus(wowDir, false); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(CompanionStatusPath(wowDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "online = false") {
+		t.Fatalf("status did not publish online=false:\n%s", data)
+	}
+}

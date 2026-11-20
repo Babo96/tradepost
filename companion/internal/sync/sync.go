@@ -70,6 +70,8 @@ type Service struct {
 	ringSeq           int64
 	ringMarket        string
 	lastRingRequestAt int64
+	lastCompanionReq  int64
+	dataAddonAt       time.Time
 	watch             []string
 	watchAt           int64
 	status            Status
@@ -81,6 +83,12 @@ func New(cfg config.Config) (*Service, error) {
 	}
 	if err := wow.EnsureMetaAckSlots(cfg.WowDir); err != nil {
 		return nil, fmt.Errorf("meta ack slots: %w", err)
+	}
+	if err := wow.EnsureCompanionStatus(cfg.WowDir); err != nil {
+		return nil, fmt.Errorf("companion status: %w", err)
+	}
+	if err := wow.WriteCompanionStatus(cfg.WowDir, true); err != nil {
+		return nil, fmt.Errorf("companion status: %w", err)
 	}
 	accounts, err := wow.AccountDirs(cfg.WowDir)
 	if err != nil {
@@ -170,6 +178,12 @@ func (s *Service) sync(ctx context.Context) error {
 		s.mu.Lock()
 		s.activeMarket = data.ActiveMarket
 		s.mu.Unlock()
+	}
+	if data.CompanionRequest > s.lastCompanionReq {
+		s.lastCompanionReq = data.CompanionRequest
+		if err := wow.WriteCompanionStatus(s.cfg.WowDir, true); err != nil {
+			log.Printf("companion status: %v", err)
+		}
 	}
 	s.applyRingRequest(data.RingRequest)
 	s.syncAuth(ctx, data)
@@ -313,8 +327,14 @@ func (s *Service) sync(ctx context.Context) error {
 		}
 		snapshots = append(snapshots, snapshot)
 	}
-	if err := addon.WriteDataAddon(s.cfg.WowDir, snapshots); err != nil {
-		return fmt.Errorf("write data addon: %w", err)
+	// The data addon is a login-time baseline; the live ring carries updates.
+	// Refresh it on startup, every 30 minutes, or when a reload request asks
+	// for it, instead of rewriting ~700 KB every sync.
+	if s.dataAddonAt.IsZero() || time.Since(s.dataAddonAt) >= 30*time.Minute {
+		if err := addon.WriteDataAddon(s.cfg.WowDir, snapshots); err != nil {
+			return fmt.Errorf("write data addon: %w", err)
+		}
+		s.dataAddonAt = time.Now()
 	}
 
 	s.mu.Lock()
@@ -408,6 +428,16 @@ func (s *Service) buildRingPayload(snapshot *api.Snapshot, window int64) addon.R
 // applyRingRequest forces a full ring snapshot when the addon reports that it
 // missed a base (for example after a fresh login). The request travels through
 // SavedVariables, so it can take one flush to arrive.
+// SetOnline publishes the one-time companion presence flag.
+func (s *Service) SetOnline(online bool) {
+	if s.cfg.WowDir == "" {
+		return
+	}
+	if err := wow.WriteCompanionStatus(s.cfg.WowDir, online); err != nil {
+		log.Printf("companion status: %v", err)
+	}
+}
+
 func (s *Service) applyRingRequest(request *export.RingRequest) {
 	if request == nil || request.At <= s.lastRingRequestAt {
 		return

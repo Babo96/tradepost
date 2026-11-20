@@ -102,15 +102,16 @@ type RingRequest struct {
 }
 
 type Data struct {
-	Scans        []Scan
-	Items        []Meta
-	Details      []Meta
-	MetaBatch    *MetaBatch
-	Auth         *AuthRequest
-	RingRequest  *RingRequest
-	Watch        map[string]WatchSet
-	Active       string
-	ActiveMarket string
+	Scans            []Scan
+	Items            []Meta
+	Details          []Meta
+	MetaBatch        *MetaBatch
+	Auth             *AuthRequest
+	RingRequest      *RingRequest
+	Watch            map[string]WatchSet
+	Active           string
+	ActiveMarket     string
+	CompanionRequest int64
 }
 
 func Load(path string) ([]Scan, error) {
@@ -136,15 +137,16 @@ func LoadData(path string) (Data, error) {
 	}
 
 	data := Data{
-		Scans:        loadScans(L),
-		Items:        loadItems(L),
-		Details:      loadDetails(L),
-		MetaBatch:    loadMetaBatch(L),
-		Auth:         loadAuth(L),
-		RingRequest:  loadRingRequest(L),
-		Watch:        loadWatch(L),
-		Active:       loadActive(L),
-		ActiveMarket: loadActiveMarket(L),
+		Scans:            loadScans(L),
+		Items:            loadItems(L),
+		Details:          loadDetails(L),
+		MetaBatch:        loadMetaBatch(L),
+		Auth:             loadAuth(L),
+		RingRequest:      loadRingRequest(L),
+		Watch:            loadWatch(L),
+		Active:           loadActive(L),
+		ActiveMarket:     loadActiveMarket(L),
+		CompanionRequest: loadCompanionRequest(L),
 	}
 	sort.Slice(data.Items, func(i, j int) bool { return data.Items[i].ID < data.Items[j].ID })
 	sort.Slice(data.Details, func(i, j int) bool { return data.Details[i].ID < data.Details[j].ID })
@@ -458,6 +460,14 @@ func loadRingRequest(L *lua.LState) *RingRequest {
 		return nil
 	}
 	return request
+}
+
+func loadCompanionRequest(L *lua.LState) int64 {
+	exports, ok := L.GetGlobal("TRADEPOST_EXPORT").(*lua.LTable)
+	if !ok {
+		return 0
+	}
+	return int64(lua.LVAsNumber(exports.RawGetString("companionRequest")))
 }
 
 func loadActive(L *lua.LState) string {

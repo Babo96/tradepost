@@ -13,8 +13,10 @@ Download and run it from:
 
 https://github.com/Babo96/tradepost
 
-The companion installs the generated `TradePost_Data` addon and the ring/auth
-slots. If the companion is not detected at login/reload, the addon:
+The companion installs the generated `TradePost_Data` addon, the ring/auth
+slots, and a tiny `TradePost_Companion` status addon with an `online` flag
+(written once on start/stop and on a reload request; no heartbeat). If the
+companion is not detected at login/reload, the addon:
 
 - prints a chat warning that not all functionality is available,
 - disables the live ring, web login and metadata options in Settings,

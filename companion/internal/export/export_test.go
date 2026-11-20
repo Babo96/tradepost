@@ -255,3 +255,19 @@ func TestLoadActiveMarket(t *testing.T) {
 		t.Fatalf("unexpected active character/market: %q / %q", parsed.Active, parsed.ActiveMarket)
 	}
 }
+
+func TestLoadCompanionRequest(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TradePost.lua")
+	data := `TRADEPOST_EXPORT = { companionRequest = 1794947776 }`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := LoadData(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.CompanionRequest != 1794947776 {
+		t.Fatalf("unexpected companion request: %d", parsed.CompanionRequest)
+	}
+}

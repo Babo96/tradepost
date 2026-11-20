@@ -1,6 +1,6 @@
 local ADDON, TP = ...
 TP.name = ADDON
-TP.version = "0.2.5"
+TP.version = "0.2.6"
 TP.atAuctionHouse = false
 
 function TP:Print(...)
@@ -76,6 +76,10 @@ function TP:OnLogin()
     end)
   end
   if not self:CompanionReady() then
+    -- One small SavedVariables request per reload; the companion answers by
+    -- setting the status addon's online flag once. No heartbeat.
+    TRADEPOST_EXPORT = TRADEPOST_EXPORT or {}
+    TRADEPOST_EXPORT.companionRequest = time()
     self:WarnNoCompanion()
   end
   self:Print("v" .. self.version .. " ready. Market: " .. self:MarketKey() .. ". /tradepost help")
