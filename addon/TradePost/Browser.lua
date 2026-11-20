@@ -15,19 +15,26 @@ local queueIndex = 0
 local queueTicker
 local refreshTimer
 
-function TP:CacheItemMeta(itemID, name, quality, icon)
-  if not itemID or not name then
+function TP:CacheItemMeta(itemID, name, quality, icon, link)
+  if not itemID or not name or name == "" then
     return nil
   end
   local existing = self.DecodeItem(TRADEPOST_ITEMS[itemID])
-  if existing and existing.n then
+  if existing and existing.n and existing.n ~= "" then
     return existing
   end
-  local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(itemID)
+  local _, _, _, _, _, classID, subClassID = C_Item.GetItemInfoInstant(link or itemID)
+  local q = tonumber(quality)
+  if not q or q < 0 then
+    q = 1
+  end
+  if not icon or icon == 0 then
+    icon = DEFAULT_ICON
+  end
   local meta = {
     n = name,
-    i = icon or DEFAULT_ICON,
-    q = quality or 1,
+    i = icon,
+    q = q,
     c = classID,
     s = subClassID,
   }
@@ -37,11 +44,11 @@ end
 
 local function cacheItem(itemID)
   local existing = TP.DecodeItem(TRADEPOST_ITEMS[itemID])
-  if existing and existing.n then
+  if existing and existing.n and existing.n ~= "" then
     return existing
   end
   local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
-  if not name then
+  if not name or name == "" then
     return nil
   end
   return TP:CacheItemMeta(itemID, name, quality, icon)
@@ -81,7 +88,8 @@ local function processQueue()
 end
 
 function TP:QueueItemMeta(itemID)
-  if TRADEPOST_ITEMS[itemID] or queued[itemID] then
+  local existing = TP.DecodeItem(TRADEPOST_ITEMS[itemID])
+  if (existing and existing.n and existing.n ~= "") or queued[itemID] then
     return
   end
   queued[itemID] = true

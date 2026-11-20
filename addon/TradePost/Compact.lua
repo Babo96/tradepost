@@ -85,8 +85,13 @@ function TP:CompactMigrate()
     end
   end
   for id, meta in pairs(TRADEPOST_ITEMS or {}) do
-    if type(meta) == "table" then
-      TRADEPOST_ITEMS[id] = self.EncodeItem(meta)
+    local decoded = self.DecodeItem(meta)
+    if not decoded or not decoded.n or decoded.n == "" then
+      -- Empty names came from old scans where the client had no item data.
+      -- Drop them so the browser requests a real item cache entry.
+      TRADEPOST_ITEMS[id] = nil
+    elseif type(meta) == "table" then
+      TRADEPOST_ITEMS[id] = self.EncodeItem(decoded)
     end
   end
 end

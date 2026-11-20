@@ -192,14 +192,14 @@ function TP:StartProcessing(total)
             self.scan.links[itemID] = link
             TP.itemLinks[itemID] = link
           end
-          local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
-          if not name then
+          local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(link or itemID)
+          if not name or name == "" then
             name = type(info[1]) == "string" and info[1] or nil
             quality = quality or (type(info[4]) == "number" and info[4] or nil)
             icon = icon or info[2]
           end
-          if name then
-            self:CacheItemMeta(itemID, name, quality, icon)
+          if name and name ~= "" then
+            self:CacheItemMeta(itemID, name, quality, icon, link)
           end
         end
 

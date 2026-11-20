@@ -201,7 +201,7 @@ func TestCompanionStatus(t *testing.T) {
 	if err := os.MkdirAll(AddonsDir(wowDir), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteCompanionStatus(wowDir, true, "0.2.15", "https://github.com/Babo96/tradepost/releases/tag/v0.2.15"); err != nil {
+	if err := WriteCompanionStatus(wowDir, true, "0.2.16", "https://github.com/Babo96/tradepost/releases/tag/v0.2.16"); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(CompanionStatusPath(wowDir))
@@ -209,7 +209,7 @@ func TestCompanionStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(data), "online = true") ||
-		!strings.Contains(string(data), `addon_latest = "0.2.15"`) {
+		!strings.Contains(string(data), `addon_latest = "0.2.16"`) {
 		t.Fatalf("status did not publish online/latest:\n%s", data)
 	}
 	toc, err := os.ReadFile(filepath.Join(AddonsDir(wowDir), CompanionStatusAddon, CompanionStatusAddon+".toc"))
