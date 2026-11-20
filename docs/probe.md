@@ -1,5 +1,7 @@
 # Phase 0 probe guide
 
+> **Historical document.** The phase 0 client probes. The current architecture and protocol are in [architecture.md](architecture.md) and [protocol.md](protocol.md).
+
 The probe answers the questions that decide the addon's data path. Run it once
 on Linux now; the same steps apply on Windows later.
 

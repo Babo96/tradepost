@@ -20,7 +20,7 @@ The companion installs a tiny `TradePost_Companion` status addon. It writes
 writes it once more when the addon asks for a refresh via
 `TRADEPOST_EXPORT.companionRequest` on login/reload. There is no heartbeat. The
 addon checks the flag once at login/reload. The price data addon refreshes on
-startup, every 30 minutes, or on an explicit request; the live ring carries the
+startup and every 30 minutes; the live ring carries the
 5-minute updates.
 
 ## Multiple characters and markets

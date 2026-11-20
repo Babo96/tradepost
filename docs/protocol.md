@@ -1,135 +1,232 @@
-# Live ring protocol (v1)
+# Companion ↔ game protocol
 
-Status: **validated** in phase 0. A LoadOnDemand addon written on disk while the
-game is running loads its **current** file content when first loaded. That is
-the live channel.
+Current as of TradePost **v0.2.6**. This document describes how the addon and
+the local companion exchange data. It is the technical counterpart to the
+player-facing [README](../README.md) and [architecture](architecture.md).
 
-The bindings mailbox was rejected: `LoadBindings` does not re-read
-`bindings-cache.wtf` mid-session. TOC metadata is cached at load/startup, and
-new addon folders created at runtime are not discovered. The ring must
-therefore be **pre-created, fixed-size, and time-indexed**.
+## Constraints
 
-## Slots
+The addon runs in the standard WoW Lua sandbox:
 
+- no file, socket, HTTP or clipboard **read** API;
+- SavedVariables are read at login and written by the client at logout/reload
+  and on a throttled `SaveAddOns()`;
+- a LoadOnDemand addon can be loaded **once per UI session**; there is no
+  unload API;
+- new addon folders are discovered at client startup/reload, not at runtime.
+
+The companion therefore uses four channels:
+
+1. SavedVariables for the game → companion direction;
+2. a tiny status addon for the companion → game presence flag;
+3. a data addon for the full baseline;
+4. LoadOnDemand ring/auth/ack slots for small live updates.
+
+## Game → companion (SavedVariables)
+
+The companion watches `WTF/Account/<account>/SavedVariables/TradePost.lua`
+every few seconds and parses it with a Lua interpreter. Writing the file is
+throttled by the client; the addon calls `SaveExport()` and retries the flush
+so scans, batches and requests eventually reach the companion without
+`/reload`.
+
+| Global | Meaning |
+| --- | --- |
+| `TRADEPOST_EXPORT.scans` | compact scan records: `market|unix|key,price,qty,listings;...` |
+| `TRADEPOST_EXPORT.companionRequest` | one-time reload request: "refresh the status flag" |
+| `TRADEPOST_EXPORT.ringRequest` | `{ market, at }`: force a full ring snapshot |
+| `TRADEPOST_ITEMS` | basic item cache: name, quality, class, subclass, icon |
+| `TRADEPOST_ITEM_DETAILS` | full tooltip lines + stats for the metadata backfill |
+| `TRADEPOST_META_BATCH` | current 500-item metadata batch |
+| `TRADEPOST_AUTH` | login-code request (`seq`, `character`, `market`) |
+| `TRADEPOST_WATCH` | local watchlist per character |
+| `TRADEPOST_ACTIVE` | active character and market (`character`, `market`, `seen`) |
+
+The companion hashes scans and metadata (`state.json`) and only uploads new or
+changed records.
+
+## Companion → game
+
+### Status addon (`TradePost_Companion`)
+
+A tiny regular addon written by the companion:
+
+```lua
+TRADEPOST_COMPANION = {
+  online = true,
+  updated = 1795163048,
+}
 ```
-Interface/AddOns/TradePost_Data_00/
-  TradePost_Data_00.toc   ## LoadOnDemand: 1
-  Data.lua
-...
-TradePost_Data_63/
+
+- `online = true` is written when the companion starts.
+- `online = false` is written when it stops.
+- It is written once more when the addon's `companionRequest` is seen after a
+  login/reload.
+
+There is **no heartbeat** and no timestamp check. The addon loads the flag once
+at login/reload:
+
+```lua
+if not self:CompanionReady() then
+  TRADEPOST_EXPORT.companionRequest = time()
+  -- warn and disable live-only options; one request per reload
+end
 ```
 
-64 slots = 64 windows of 5 minutes = **5 h 20 min** per session. After a full
-wrap the addon asks for `/reload`; all LoadOnDemand slots unload and can be
-reused.
+If the companion is offline, nothing answers the request and the next load
+still warns. A missing addon (standalone CurseForge/WoWUI install) is treated
+the same way.
 
-## Time windows
+### Data addon (`TradePost_Data`)
+
+The full baseline for every known market:
+
+```lua
+TRADEPOST_DATA = {
+  schema = 1,
+  markets = {
+    ["eu:pve:horde"] = {
+      version = 17,
+      generated = 1795162407,
+      items = {
+        { k = "i:2589", p = 125, q = 20, n = 3, t = 1795162000 },
+      },
+    },
+  },
+}
+```
+
+- Loaded by the game at login/reload.
+- Written by the companion on startup and every **30 minutes**.
+- It is a baseline, not a live feed; the live ring carries the 5-minute data.
+- The addon merges it into its central lookup and uses it before the first ring
+  window.
+
+### Live ring (`TradePost_Data_XX`)
+
+The ring is a pool of LoadOnDemand addons. A slot is written by the companion
+and read by the addon when the window advances:
 
 ```
 window = floor(unix_time / 300)
-slot   = window mod 64
+slot   = window mod price_slots         -- price_slots = ring_slots - 8
 ```
 
-- In game, `time()` is the host clock; the companion uses the same clock.
-- The **companion** writes slot `slot` during the window. It may rewrite it
-  several times as new data arrives; the latest write wins.
-- The **addon** loads the slot for the **previous completed window** at each
-  boundary:
-  `load_window = floor((now - 1) / 300)`.
-- If the slot is already loaded, skip. This happens after a wrap; the addon
-  then prompts for `/reload`.
-- If the companion was not running, the slot is empty/stale; the addon loads
-  it once, ignores it, and tries the next window. One window is lost; the next
-  cumulative delta covers the change.
+With the default 64 slots there are 56 price slots, i.e. 56 windows
+(4 h 40 min) of live updates per UI session. The slider allows up to 128
+slots (120 price slots, about 10 h). The 8 remaining slots are reserved for
+login-code ring payloads.
 
-At login/reload, load the previous window's slot immediately, then align to
-the next 5-minute boundary.
-
-## Slot payload
-
-`Data.lua` defines one global and overwrites the previous one:
+Each price slot contains either a full snapshot or a cumulative delta:
 
 ```lua
 TRADEPOST_RING = {
   schema = 1,
   market = "eu:pve:horde",
-  window = 12345,             -- floor(unix_time / 300)
-  generated = 1794944447,     -- unix time of the snapshot
-  base = 41,                  -- base snapshot version loaded at login
-  seq = 42,                   -- monotonic delta sequence
-  items = {                   -- cumulative delta since base
-    { k = "i:2589", p = 125, q = 20, t = 1794944400 },
-    { k = "g:12345:70", p = 4200, q = 1, t = 1794944380 },
+  window = 5983775,
+  generated = 1795162407,
+  full = false,              -- full snapshot when true
+  base = 1795132453284,      -- seq of the full snapshot this delta builds on
+  seq  = 1795132539956,      -- monotonically increasing write id (ms)
+  items = {                  -- cumulative changes since base
+    { k = "i:2589", p = 125, q = 20, n = 3, t = 1795162000 },
   },
-  removed = { "i:6789" },
-  pins = { 2589, 12345 },     -- v2 watchlist
+  removed = { "i:6789" },    -- keys removed since base
+  pins = { "i:1251" },       -- watchlist pins
+  pins_updated = 1795162400,
 }
 ```
 
-- `items` is **cumulative since the base**, not a per-window delta. A missed
-  window therefore loses nothing; the next slot contains all changes.
-- The companion keeps the per-item aggregate for the market and diffs it
-  against the base loaded at login.
-- Slot size grows with session changes; typical 5–50 KB, worst case ~200 KB.
-  The addon replaces the global, so old tables are garbage-collected.
+Rules:
 
-## Producer (companion)
+- **Full snapshot** (`full = true`): the addon replaces its lookup for that
+  market. The companion writes a full on startup, on a market change, every 6
+  windows (30 minutes), or when the delta exceeds 4,000 changed items.
+- **Delta** (`full = false`): requires `base` to match the addon's current
+  full. The addon applies `items` and `removed` and updates `seq`. A missed
+  window is harmless because each delta is cumulative since the base.
+- If `base` does not match, the addon keeps its old data and writes
+  `TRADEPOST_EXPORT.ringRequest`; the companion forces a full on the next sync.
+- The companion writes the current and next window slots on each sync. The
+  addon loads the target window's slot at the 5-minute boundary.
+- The companion selects the market from `TRADEPOST_ACTIVE.market`; its
+  configured `market` is only the fallback until a character is detected.
+- After the ring wraps, the addon asks for `/reload`; all LoadOnDemand addons
+  unload and can be reused.
 
-1. On session start (data addon written), capture the base snapshot version.
-2. Every 60 s, fetch the latest market snapshot, diff against the base.
-3. Write the current window's slot atomically (temp + rename + backup).
-4. If nothing changed, write a heartbeat with the same `items` (or skip; the
-   addon will load the last written slot).
-5. Stop after `64` windows; print “reload WoW to continue live data”.
-6. Detect a new session by the SavedVariables mtime (written on `/reload` or
-   logout) and reset.
+### Login codes
 
-## Consumer (addon)
+The companion publishes a fresh code every 8 minutes, or answers an explicit
+`/tradepost login` request:
 
-1. At login, load `TradePost_Data` (full base).
-2. `C_Timer.After(seconds_to_next_boundary, tick)`, then every 300 s.
-3. `tick`: compute the previous window, slot name; if not loaded, `LoadAddOn`.
-4. If the global matches the current market and `seq > last_seq`, apply:
-   - upsert `items`
-   - remove `removed`
-   - update `pins`
-5. If `seq <= last_seq`, ignore (stale slot).
-6. If the slot is already loaded and the window is new (wrap), show
-   “live data exhausted; /reload to continue”.
+- all 16 `TradePost_Auth_XX` slots receive `TRADEPOST_AUTH_REPLY = { seq, code,
+  character, expires }`;
+- the 8 reserved ring sync slots receive the same code as `auth = { ... }`;
+- the addon first tries a cached, unexpired code for the current character
+  (instant), then writes a request and polls if none is available.
+
+The 16 auth slots and 8 sync slots are one-shot per UI session. After many
+logins without a restart, `/reload` resets them. The companion also keeps the
+code in its dashboard state.
+
+### Metadata acknowledgements
+
+Each `TRADEPOST_META_BATCH` (`seq`, `count`, `items`) is uploaded by the
+companion. After a successful ingest the companion writes:
+
+```lua
+TRADEPOST_META_ACK = { batch = 17, ok = true }
+```
+
+into the 16 `TradePost_Ack_XX` LoadOnDemand slots. The addon consumes an unused
+slot to advance. The slots are one-shot; after 16 batches the addon finishes or
+waits for `/reload`. Acks are progress reporting only — collection is not
+blocked by the ack budget.
+
+## Server ingest
+
+`POST /v1/ingest` is authenticated with the companion bearer token and accepts
+gzip JSON:
+
+```json
+{
+  "v": 1,
+  "scans": [{
+    "market": "eu:pve:horde",
+    "scanned_at": 1795162000,
+    "client_version": "0.2.6",
+    "items": [{"k": "i:2589", "p": 125, "q": 20, "n": 3}]
+  }],
+  "items": [{"id": 2589, "name": "Linen Cloth", "quality": 1,
+             "class_id": 7, "subclass_id": 5, "icon": 132889,
+             "stats": {"ITEM_MOD_STAMINA_SHORT": 4}}]
+}
+```
+
+- `202 Accepted` with `{queued,rejected,meta}`; scans enter the durable
+  `ingest_jobs` queue.
+- The worker claims jobs with `FOR UPDATE SKIP LOCKED`, writes the audit scan,
+  and aggregates into `prices_1m`, `prices_15m`, `prices_hourly` and
+  `prices_latest`.
+- Duplicate `(client, checksum)` scans are rejected.
+- Optional metadata is upserted synchronously; `details` increments
+  `details_version`.
+
+## Limits and recovery
+
+- Client scan throttle: roughly 15 minutes per account for `ReplicateItems`.
+- Data addon: startup + 30 minutes; not per sync.
+- Live ring: 5-minute windows; `price_slots` per session; reload after a wrap.
+- Auth/ack slots: 16 each + 8 ring sync slots per session; reload resets.
+- The SavedVariables write throttle is survived by `ScheduleExportRetry`;
+  pending data is kept across reloads.
+- If the companion is not running, the addon warns and keeps local/central
+  data; the live ring, login and metadata are disabled.
 
 ## Why not the alternatives
 
-- **Bindings mailbox:** `LoadBindings` did not re-read the file mid-session;
-  a valid `Y` binding change only appeared after `/reload`. The client also
-  dropped unknown `TPD1` actions on save/load.
-- **TOC metadata:** `GetAddOnMetadata` returned the old value after the TOC was
-  rewritten, so it cannot be used as a “slot ready” flag.
-- **New folders at runtime:** `LoadAddOn("TPProbeDataC")` returned `MISSING`
-  for a folder created after startup. The ring is fixed-size.
-- **Addon messages:** 255 bytes, server-relayed, spam-policy risk.
-
-## Open items
-
-- Scan benchmark done: 254,976 auctions in 4,817 ms, 6,593 unique item IDs,
-  -568 KB memory after GC. The real pass adds equipment-link/item-level work;
-  measure that in the addon prototype.
-- Choose 48 vs 64 vs 96 slots after measuring typical session length and slot
-  size.
-- Delta vs full snapshot per window; cumulative deltas are the current default.
-
-## Live upload (outbound)
-
-The inbound ring has an outbound counterpart: the addon calls
-`C_AddOns.SaveAddOns()` after a scan. That writes `TRADEPOST_EXPORT` to
-`SavedVariables/TradePost.lua` immediately, without `/reload`.
-
-The companion watches the SavedVariables mtime every 5 seconds, parses
-`TRADEPOST_EXPORT`, uploads new scan hashes, and records them in
-`~/.config/tradepost/state.json`.
-
-Fallbacks if `SaveAddOns` is unavailable or restricted:
-
-- `/tradepost export save` to force a flush (for testing)
-- normal `/reload` or logout
-
-`/tradepost export` shows the last flush time and the export size.
+The client probes ruled out `LoadBindings` as a reliable mid-session channel,
+runtime addon creation (only discovered at reload), TOC metadata changes
+(cached) and addon messages (server relay, 255 bytes, spam policy). The ring is
+fixed, pre-created, time-indexed and one-shot. The full rationale and probe
+results are in [findings.md](findings.md) and [probe.md](probe.md).

@@ -1,10 +1,14 @@
-# In-game price browser
+# In-game price browser design notes
+
+> The browser is implemented in `addon/TradePost/Browser.lua`; this page keeps
+the original design notes and virtual-list rationale. Current features are in
+[`addon/TradePost/README.md`](../addon/TradePost/README.md).
 
 A minimal icon, similar in spirit to the Dungeon Journal button, opens a
 searchable auction-data window fed by the same local/live/central sources as
 the tooltips.
 
-## Implemented (0.1.0)
+## Original implementation (0.1.0)
 
 - Minimap coin button; left click toggles the window, `/tradepost browse` also works.
 - Search by item name or item ID, live filtering while typing.

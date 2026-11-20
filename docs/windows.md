@@ -1,18 +1,14 @@
-# Windows companion
+# Windows companion guide
 
-The companion is the same Go program on Linux and Windows. The Windows build is
-`tradepost.exe`, cross-compiled with `CGO_ENABLED=0`, and ships with the addon sources
-in one zip.
+The Windows companion is a single `tradepost.exe` plus the addon sources and a
+setup wizard. It installs the addon, the data addon, the status addon and the
+ring/auth slots into your World of Warcraft: Forever installation, then keeps
+syncing while you play.
 
-## Release zip
+Download the latest **`tradepost-companion-<version>-windows-amd64.zip`** from
+<https://github.com/Babo96/tradepost/releases/latest>.
 
-```sh
-make release-windows
-```
-
-Output: `dist/tradepost-companion-<version>-windows-amd64.zip`
-
-Contents:
+## What is in the zip
 
 ```
 tradepost.exe
@@ -23,65 +19,129 @@ data-addon/TradePost_Data/...
 data-addon/TradePost_LiveData/...
 ```
 
-## Install
+The addon sources are included so the companion can install them without a
+separate download.
 
-1. Extract to a permanent folder. Avoid `Program Files` unless you want to run
-   the companion as administrator; `C:\TradePost` is a good default.
-2. Close World of Warcraft.
-3. Run `setup.cmd`.
+## First install
 
-`setup.cmd` runs:
-
-```bat
-tradepost.exe enroll --server https://tradepost.b4b0.de --market eu:pve:horde --count 64
-tradepost.exe install --source "%~dp0" --count 64
-tradepost.exe run
-```
-
-`enroll` stores the API token in `%AppData%\tradepost\config.json` and saves
-the detected game root. `install` writes the addon and 64 live ring slots.
-`run` keeps syncing; the dashboard is at `http://127.0.0.1:8787`.
-
-## WoW path detection
-
-Order:
-
-1. `--wow DIR` (also accepts the `_forever_` directory)
-2. `WOW_DIR`
-3. `%ProgramFiles(x86)%\World of Warcraft`
-4. `%ProgramFiles%\World of Warcraft`
-5. `%LOCALAPPDATA%\World of Warcraft`
-6. `C:\World of Warcraft`, `C:\Games\World of Warcraft`
-
-If the client is somewhere else, pass it explicitly:
-
-```bat
-tradepost.exe enroll --wow "D:\Games\WoW Forever" ...
-tradepost.exe install --wow "D:\Games\WoW Forever" --count 64
-```
+1. **Extract** the zip somewhere permanent, for example `C:\TradePost`.
+   Avoid `Program Files` unless you want to run it as administrator.
+2. **Close World of Warcraft.** The installer copies files into the game
+   folder; Windows can keep them open if the game is running.
+3. **Run `tradepost.exe`** (or `setup.cmd`). The setup wizard opens at
+   `http://127.0.0.1:8787/setup`. If the browser does not open, visit that URL
+   manually.
+4. **Game folder.** Select the folder that contains `_forever_`, for example
+   `C:\World of Warcraft`. The wizard validates:
+   - `_forever_/Interface/AddOns`,
+   - the account folders under `_forever_/WTF/Account`,
+   - write access to the AddOns folder.
+5. **Server and market.** Keep `https://tradepost.b4b0.de`. The default market
+   `eu:pve:horde` is only a fallback until a character is detected; the active
+   character's region, ruleset and faction choose the live market
+   automatically. Ring slots default to 64 (up to 128 for a longer session).
+6. **Install.** The companion enrolls this machine, writes the addon, the data
+   addon, the status addon and the ring/auth slots, saves the config, and starts
+   syncing.
+7. **Start WoW.** Restart the client once after the first install so the new
+   addon folders are discovered. Open `/tradepost` or the minimap coin button,
+   then open the auction house for the first scan.
 
 ## Everyday use
 
-- Run `tradepost.exe run` while playing (console window can be minimized).
-- The addon writes scans when the auction house opens and when `/tradepost export` is
-  used; the companion uploads them on the next 5-second SavedVariables check and
-  the next sync tick.
-- Snapshot and ring updates are written into the addon folders; `/reload` picks
-  them up in game.
-- Config and upload state are in `%AppData%\tradepost\`.
+- Run `tradepost.exe` while playing. The console window can be minimized.
+- The dashboard is `http://127.0.0.1:8787`:
+  - last sync, active market, item count, errors;
+  - **Sync now**, **login code**, the update card;
+  - the raw status JSON.
+- Scans are uploaded when the addon writes them and the companion sees the
+  SavedVariables change (the client throttles writes; the addon retries).
+- The data addon is refreshed on companion startup and every 30 minutes. Live
+  prices arrive in the 5-minute ring windows.
+- The tiny `TradePost_Companion` status addon carries the `online` flag. There
+  is no heartbeat. If the companion is not running, the addon warns once and
+  disables live-only options.
+- The companion does not install a Windows service. Start it when you want to
+  play, or place a shortcut in your startup folder.
+
+## Updates
+
+The companion checks GitHub once a day and shows an **update available** card
+on the dashboard. Use **Install update** or run:
+
+```bat
+tradepost.exe update
+```
+
+The binary is replaced; the running process keeps using the old code until you
+restart it. The addon files are refreshed too, so `/reload` in game (or a
+client restart if new addon folders were created). `tradepost.exe update
+--check` prints the current and latest versions without changing anything.
+
+## Config and state
+
+- Config: `%AppData%\tradepost\config.json`
+- Upload/metadata state: `%AppData%\tradepost\state.json`
+- The companion writes only into the game's `_forever_` AddOns folder and its
+  own config folder.
 
 ## Firewall and security
 
-- The dashboard binds to `127.0.0.1:8787` only.
-- Outbound access is HTTPS to `tradepost.b4b0.de`.
-- The executable is not code-signed; Windows SmartScreen may ask for
-  confirmation the first time. Use “More info → Run anyway” for your own build.
+- The dashboard binds to `127.0.0.1:8787` only. It is not reachable from the
+  LAN.
+- Outbound traffic is HTTPS to `tradepost.b4b0.de` (and GitHub for the update
+  check).
+- The executable is not code-signed. Windows SmartScreen may ask for
+  confirmation the first time: choose **More info → Run anyway** if you trust
+  the source. The source and CI build are in this repository.
+- The companion never writes Auctionator's database or SavedVariables. The
+  Auctionator integration is a read-only display bridge.
 
-## Notes
+## Advanced command line
 
-- The companion never writes Auctionator data.
-- `tradepost install` replaces `TradePost`, `TradePost_Data`,
-  `TradePost_LiveData`, and the generated ring slots. Other addons are
-  untouched.
-- If the game is running during install, close it first: Windows may keep files
-  open and make the copy incomplete.
+The wizard is the normal path. For scripts:
+
+```bat
+tradepost.exe enroll --server https://tradepost.b4b0.de --wow "D:\Games\World of Warcraft" --market eu:pve:horde --count 64
+tradepost.exe install --source "%~dp0" --wow "D:\Games\World of Warcraft" --count 64
+tradepost.exe run
+```
+
+`--wow` accepts either the game root or its `_forever_` directory. Without it,
+the companion tries `%ProgramFiles(x86)%\World of Warcraft`,
+`%ProgramFiles%\World of Warcraft`, `%LOCALAPPDATA%\World of Warcraft`,
+`C:\World of Warcraft`, and `C:\Games\World of Warcraft`.
+
+## Addon-only install
+
+If you install TradePost from CurseForge/WoWUI without the companion, it will
+warn that not all functionality is available and disable the live ring, web
+login and metadata options. Local scans, the browser, central-data tooltips,
+the watchlist and the Auctionator bridge keep working. Install and run the
+companion for the full experience.
+
+## Troubleshooting
+
+**The wizard does not open.** Open `http://127.0.0.1:8787/setup` manually. If
+the port is busy, close the other companion instance.
+
+**The game folder is rejected.** Pick the folder that contains `_forever_`;
+make sure the account folders and `_forever_/Interface/AddOns` exist and are
+writable.
+
+**The addon or slots are missing in game.** Restart the client after the first
+install. LoadOnDemand addons created while the client was running are only
+discovered at startup.
+
+**"Companion not detected" in game.** Start the companion, then `/reload`.
+Check the dashboard status and that `TradePost_Companion` is enabled.
+
+**No prices.** Open the auction house once so the addon scans. The upload and
+the next ring/data refresh take a few minutes.
+
+**Login code does not appear.** The companion must be running. It publishes a
+code every 8 minutes; if the 16 auth slots are exhausted, restart the client or
+wait for the next refresh.
+
+**Windows Defender/SmartScreen.** The binary is unsigned. Use **More info →
+Run anyway** if you trust the source, or build it yourself.

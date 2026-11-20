@@ -1,5 +1,7 @@
 # Phase 0 findings
 
+> **Historical document.** Phase 0 findings that shaped the current design. See [architecture.md](architecture.md) and [protocol.md](protocol.md).
+
 Fill this in from the in-game probe and the host scripts. Keep it factual; the
 next design decision depends on it.
 

@@ -1,5 +1,7 @@
 # Phase 3 local test checklist
 
+> **Historical document.** The phase 3 local test checklist from the original ring implementation. See [protocol.md](protocol.md) for the current transport.
+
 Local services started on this machine:
 
 | Service | Address |

@@ -20,8 +20,8 @@ companion is not detected at login/reload, the addon:
 
 - prints a chat warning that not all functionality is available,
 - disables the live ring, web login and metadata options in Settings,
-- keeps local scans, the browser, tooltips from the central data, and the
-  Auctionator bridge working.
+- keeps local scans, the browser, the watchlist, the Auctionator bridge and
+  tooltips from any installed central data pack working.
 
 The configured market is only a fallback: the active character's region,
 ruleset (PvE/PvP/RP/etc.) and faction choose the live market automatically.
