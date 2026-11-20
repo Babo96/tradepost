@@ -48,12 +48,12 @@
         <span class="market-badge" id="market-badge" hidden></span>
       </div>
       <div class="refresh-box">
-        <span class="refresh-state" id="refresh-state" role="status" aria-live="polite">Loading…</span>
+        <span class="refresh-state" id="refresh-state" role="status" aria-live="off">Loading…</span>
         <button type="button" id="refresh" class="ghost">Refresh now</button>
       </div>
     </section>
 
-    <div class="notice" id="notice" hidden>
+    <div class="notice" id="notice" role="status" aria-live="polite" hidden>
       <span class="notice-mark" aria-hidden="true">!</span>
       <p class="notice-text" id="notice-text"></p>
       <button type="button" id="notice-retry" class="ghost notice-retry">Retry</button>
@@ -149,7 +149,7 @@
             <p class="eyebrow"><span class="eyebrow-num">04</span>Movers</p>
             <h2 id="gainers-title">Top gainers</h2>
           </div>
-          <p class="panel-note">Lowest listing, then vs now</p>
+          <p class="panel-note">Lowest listing vs earlier scan</p>
         </header>
         <div class="table-wrap">
           <table class="movers-table">
@@ -176,7 +176,7 @@
             <p class="eyebrow"><span class="eyebrow-num">04</span>Movers</p>
             <h2 id="losers-title">Top losers</h2>
           </div>
-          <p class="panel-note">Lowest listing, then vs now</p>
+          <p class="panel-note">Lowest listing vs earlier scan</p>
         </header>
         <div class="table-wrap">
           <table class="movers-table">
@@ -244,6 +244,7 @@
           <ul class="class-list" id="class-list">
             <li class="empty-row">Loading…</li>
           </ul>
+          <p class="mini-foot">Bars show share of listed value.</p>
         </section>
 
         <section class="panel mini-panel" aria-labelledby="quality-title">
@@ -266,6 +267,7 @@
               </tbody>
             </table>
           </div>
+          <p class="mini-foot">Counts are distinct items in this window.</p>
         </section>
 
         <section class="panel mini-panel" aria-labelledby="bands-title">
@@ -288,6 +290,7 @@
               </tbody>
             </table>
           </div>
+          <p class="mini-foot">Bands use each item's lowest listing.</p>
         </section>
       </div>
     </section>
@@ -298,7 +301,7 @@
           <p class="eyebrow"><span class="eyebrow-num">07</span>Heavyweights</p>
           <h2 id="heavy-title">Biggest items by listed value</h2>
         </div>
-        <p class="panel-note">Share of the whole market</p>
+        <p class="panel-note">Share of total · bars scaled to the top item</p>
       </header>
       <ol class="heavy-list" id="heavy-list">
         <li class="empty-row">Loading…</li>

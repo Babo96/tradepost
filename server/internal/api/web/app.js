@@ -1877,6 +1877,13 @@ updateFilterCount();
 loadLive();
 setInterval(loadLive, 60_000);
 
+// Deep links from the stats page: /?q=<item id or name>&market=<market>.
+const bootParams = new URLSearchParams(window.location.search);
+const bootQuery = (bootParams.get("q") || "").trim();
+if (bootQuery) $("#query").value = bootQuery;
+const bootMarket = (bootParams.get("market") || "").trim();
+if (bootMarket) state.market = bootMarket;
+
 loadMeta()
   .then(initAuth)
   .then(search)
