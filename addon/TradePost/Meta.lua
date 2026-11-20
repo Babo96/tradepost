@@ -516,7 +516,20 @@ function TP:MetaAckReceived(seq, count)
     queue.lastAckSeq = seq
     queue.synced = (queue.synced or 0) + count
   end
-  if TRADEPOST_META_BATCH and tonumber(TRADEPOST_META_BATCH.seq) == seq then
+  local batch = TRADEPOST_META_BATCH
+  if batch and tonumber(batch.seq) == seq then
+    -- The companion has ingested this batch. Drop its detail payload so the
+    -- outbound SavedVariables file does not keep growing with already-sent
+    -- tooltips. Unsent details and other batches stay in the table.
+    local details = TRADEPOST_ITEM_DETAILS
+    if details and type(batch.items) == "table" then
+      for _, item in ipairs(batch.items) do
+        local id = tonumber(item and item.id)
+        if id then
+          details[id] = nil
+        end
+      end
+    end
     TRADEPOST_META_BATCH = nil
   end
   self:SaveExport()
