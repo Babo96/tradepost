@@ -42,6 +42,9 @@ func TestWriteDataAddon(t *testing.T) {
 	if !strings.Contains(string(data), `["eu:pve:horde"]`) || !strings.Contains(string(data), `k = "i:2589"`) {
 		t.Fatalf("unexpected data addon:\n%s", data)
 	}
+	if !strings.Contains(string(data), `companion = 1`) || !strings.Contains(string(data), `generated = `) {
+		t.Fatalf("data addon missing companion heartbeat:\n%s", data)
+	}
 }
 
 func TestWriteRingSlot(t *testing.T) {

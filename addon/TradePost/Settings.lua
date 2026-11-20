@@ -120,6 +120,7 @@ local function createPanel()
     panel = panel,
     controls = {},
     houseButtons = {},
+    crowdButtons = {},
     refreshing = false,
   }
 
@@ -139,7 +140,7 @@ local function createPanel()
 
   y = y - 28
   settings.controls.ring = createCheckbox(panel, 20, y, "Live data ring", "ring",
-    "Load crowd-sourced live price snapshots from the TradePost_Data slots.",
+    "Load crowd-sourced live price snapshots from the TradePost_Data slots. Requires the companion.",
     function(value)
       if value then
         TP:InitRing()
@@ -266,7 +267,8 @@ local function createPanel()
     function()
       TP:SyncBlizzardFavorites(true)
     end, "/tradepost favorites sync")
-  createButton(panel, 220, y, 186, "Login code", "Request a short login code for the TradePost companion site.",
+  settings.crowdButtons.login = createButton(panel, 220, y, 186, "Login code",
+    "Request a short login code for the TradePost companion site. Requires the companion.",
     function()
       TP:RequestLogin()
     end, "/tradepost login")
@@ -310,7 +312,7 @@ local function createPanel()
   y = y - 50
   settings.controls.adminFullSync = createAdminCheckbox(panel, 20, y,
     "|cffff5555Enable full metadata sync|r", "Advanced/admin: backfill complete item " ..
-    "tooltip details for every known item. Off by default because the payload is large.",
+    "tooltip details for every known item. Off by default because the payload is large. Requires the companion.",
     function()
       TP:MetaStart(false)
     end, "/tradepost meta enable|disable")
@@ -323,17 +325,18 @@ local function createPanel()
   settings.adminStatus:SetText("Admin full sync: off")
 
   y = y - 24
-  createButton(panel, 20, y, 130, "Meta start", "Start the metadata backfill now, even if it already ran today.",
+  settings.crowdButtons.metaStart = createButton(panel, 20, y, 130, "Meta start",
+    "Start the metadata backfill now, even if it already ran today. Requires the companion.",
     function()
       TP:MetaStart(false, true)
     end, "/tradepost meta start")
-  createButton(panel, 158, y, 130, "Meta stop", "Stop the metadata backfill. The pending " ..
-    "batch and queue are kept.",
+  settings.crowdButtons.metaStop = createButton(panel, 158, y, 130, "Meta stop",
+    "Stop the metadata backfill. The pending batch and queue are kept. Requires the companion.",
     function()
       TP:MetaStop()
     end, "/tradepost meta stop")
-  createButton(panel, 296, y, 160, "Force refresh all", "Discard the pending batch and " ..
-    "requeue every known item for a full refresh.",
+  settings.crowdButtons.metaForce = createButton(panel, 296, y, 160, "Force refresh all",
+    "Discard the pending batch and requeue every known item for a full refresh. Requires the companion.",
     function()
       if not (TP.config and TP.config.adminFullSync) then
         TP:Print("enable full metadata sync first")
@@ -354,8 +357,36 @@ local function createPanel()
     TP:UpdateMarket()
 
     local config = TP.config or {}
+    local ready = TP:CompanionReady()
     for key, checkbox in pairs(settings.controls) do
-      checkbox:SetChecked(config[key] and true or false)
+      local value = config[key] and true or false
+      if not ready and (key == "ring" or key == "adminFullSync") then
+        value = false
+      end
+      checkbox:SetChecked(value)
+      if key == "ring" or key == "adminFullSync" then
+        if ready then
+          checkbox:Enable()
+        else
+          checkbox:Disable()
+        end
+      end
+    end
+    if ready then
+      settings.slider:EnableMouse(true)
+      settings.slider:SetAlpha(1)
+    else
+      settings.slider:EnableMouse(false)
+      settings.slider:SetAlpha(0.5)
+    end
+    for _, button in pairs(settings.crowdButtons or {}) do
+      if ready then
+        button:Enable()
+        button:SetAlpha(1)
+      else
+        button:Disable()
+        button:SetAlpha(0.5)
+      end
     end
 
     local slots = tonumber(config.ringSlots) or 64
@@ -383,6 +414,7 @@ local function createPanel()
     end
 
     settings.status:SetText(table.concat({
+      ready and "Companion: |cff33ff99running|r" or "Companion: |cffff5555not detected|r (local data only)",
       "Version: v" .. tostring(TP.version),
       "Market: " .. TP:MarketLabel() .. "  [" .. TP:MarketKey() .. "]",
       "Local: " .. TP:CountLocal() .. " items, last scan " .. ageText(db.lastScan),
@@ -391,9 +423,13 @@ local function createPanel()
     }, "\n"))
 
     if settings.adminStatus then
-      local adminText = "Admin full sync: off"
-      if TP.MetaStatusText then
+      local adminText
+      if not ready then
+        adminText = "|cffff5555Admin full sync: companion not detected|r"
+      elseif TP.MetaStatusText then
         adminText = TP:MetaStatusText()
+      else
+        adminText = "Admin full sync: off"
       end
       settings.adminStatus:SetText(adminText)
     end

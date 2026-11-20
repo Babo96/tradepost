@@ -3,7 +3,7 @@
 ## Category: TradePost
 ## Notes: Section for the generated TradePost live price ring slots.
 ## Author: babo
-## Version: 0.2.0
+## Version: 0.2.5
 ## X-Category: Auction/Economy
 
 LiveData.lua

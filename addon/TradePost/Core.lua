@@ -1,6 +1,6 @@
 local ADDON, TP = ...
 TP.name = ADDON
-TP.version = "0.2.0"
+TP.version = "0.2.5"
 TP.atAuctionHouse = false
 
 function TP:Print(...)
@@ -39,14 +39,19 @@ function TP:OnLoad()
 
   self:UpdateMarket()
   self:PruneLocal()
+  self.companion = self.companion or { present = false, running = false, generated = 0 }
   self:LoadCentral()
 end
 
 function TP:OnLogin()
   self:UpdateMarket()
+  self:LoadCentral()
+  self:CheckCompanion()
   self:MarkActive()
   self:PruneLocal()
-  self:InitRing()
+  if self:CompanionReady() then
+    self:InitRing()
+  end
   self:InitBridge()
   self:InitBlizzardFavorites()
   C_Timer.After(3, function()
@@ -70,7 +75,19 @@ function TP:OnLogin()
       end)
     end)
   end
+  if not self:CompanionReady() then
+    self:WarnNoCompanion()
+  end
   self:Print("v" .. self.version .. " ready. Market: " .. self:MarketKey() .. ". /tradepost help")
+end
+
+function TP:WarnNoCompanion()
+  if self.companionWarned then
+    return
+  end
+  self.companionWarned = true
+  self:Print("|cffff5555companion not detected.|r Live prices, web login, watch sync and full metadata are disabled; local data still works.")
+  self:Print("Install/run the companion for full functionality: https://github.com/Babo96/tradepost")
 end
 
 function TP:OnAuctionHouseShow()

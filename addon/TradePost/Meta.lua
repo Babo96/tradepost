@@ -663,6 +663,10 @@ end
 
 -- Start/resume the backfill. Force starts a fresh pass over every known item.
 function TP:MetaStart(force, manual)
+  if not self:CompanionReady() then
+    self:Print("metadata sync needs the TradePost companion (not detected).")
+    return
+  end
   if not (self.config and self.config.adminFullSync) then
     self:Print("admin full metadata sync is disabled. Enable it in " ..
       "/tradepost settings under Advanced / Admin first.")
@@ -746,6 +750,9 @@ end
 
 -- Called on login. Resumes automatically when admin mode was left enabled.
 function TP:MetaResume()
+  if not self:CompanionReady() then
+    return
+  end
   if not (self.config and self.config.adminFullSync) then
     return
   end

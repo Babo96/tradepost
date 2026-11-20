@@ -4,8 +4,15 @@ TP.central = TP.central or {}
 
 function TP:LoadCentral()
   self.central = {}
+  self.companion = { present = false, running = false, generated = 0 }
   if type(TRADEPOST_DATA) ~= "table" or TRADEPOST_DATA.schema ~= 1 then
     return
+  end
+  if TRADEPOST_DATA.companion == 1 then
+    local generated = tonumber(TRADEPOST_DATA.generated) or 0
+    self.companion.present = true
+    self.companion.generated = generated
+    self.companion.running = generated > 0 and (time() - generated) <= 600
   end
 
   for marketKey, market in pairs(TRADEPOST_DATA.markets or {}) do
@@ -26,6 +33,19 @@ function TP:LoadCentral()
       lookup = lookup,
     }
   end
+end
+
+function TP:CheckCompanion()
+  local companion = self.companion or {}
+  local generated = tonumber(companion.generated) or 0
+  companion.running = companion.present == true and
+    generated > 0 and (time() - generated) <= 600
+  self.companion = companion
+  return companion.running
+end
+
+function TP:CompanionReady()
+  return self.companion ~= nil and self.companion.running == true
 end
 
 function TP:GetCentralPrice(keys)

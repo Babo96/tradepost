@@ -513,6 +513,11 @@ function TP:PollAuth(seq, tries)
 end
 
 function TP:RequestLogin()
+  if not self:CompanionReady() then
+    self:Print("login codes need the TradePost companion (not detected).")
+    self:Print("Install/run it from https://github.com/Babo96/tradepost")
+    return
+  end
   -- The companion publishes a fresh code every 8 minutes, so most logins can
   -- use the cached one immediately instead of waiting for a throttled
   -- SavedVariables flush round-trip.

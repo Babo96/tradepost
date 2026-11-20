@@ -147,7 +147,7 @@ function TP:RequestRingResync()
 end
 
 function TP:LoadRingWindow(window, force)
-  if not self.config.ring then
+  if not self.config.ring or not self:CompanionReady() then
     return false
   end
 
@@ -252,7 +252,7 @@ function TP:RingWarnWrap()
 end
 
 function TP:RingTick()
-  if not self.config.ring then
+  if not self.config.ring or not self:CompanionReady() then
     return
   end
 
@@ -274,6 +274,13 @@ function TP:InitRing()
     wrapWarned = false,
   }
   if not self.config.ring then
+    return
+  end
+  if not self:CompanionReady() then
+    if not self.ringCompanionWarned then
+      self.ringCompanionWarned = true
+      self:Print("live data ring needs the TradePost companion (not detected).")
+    end
     return
   end
   if self.ring.timer then

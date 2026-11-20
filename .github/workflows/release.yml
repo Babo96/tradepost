@@ -28,6 +28,16 @@ jobs:
           (cd companion && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o ../dist/tradepost ./cmd/tradepost)
           (cd companion && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w -X main.version=$VERSION" -o ../dist/tradepost.exe ./cmd/tradepost)
 
+      - name: Package addon (CurseForge/WoWUI)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          STAGE=dist/addon-stage
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/TradePost"
+          cp -R addon/TradePost/. "$STAGE/TradePost/"
+          (cd "$STAGE" && zip -qr "../TradePost-${VERSION}.zip" TradePost)
+          ls -lh "dist/TradePost-${VERSION}.zip"
+
       - name: Package Windows
         run: python3 tools/release/package_windows.py --version "${GITHUB_REF_NAME#v}" --binary dist/tradepost.exe
 
@@ -60,4 +70,5 @@ jobs:
           files: |
             dist/*windows-amd64.zip
             dist/*linux-amd64.tar.gz
+            dist/TradePost-*.zip
           generate_release_notes: true

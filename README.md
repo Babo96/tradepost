@@ -1,5 +1,10 @@
 # tradepost
 
+The addon can also be published standalone on CurseForge/WoWUI; it detects
+whether the companion is running and disables live-only options with a chat
+warning if not. See [`docs/publishing.md`](docs/publishing.md).
+
+
 Crowd-sourced auction house prices for **World of Warcraft: Forever**, with
 in-game tooltips, an Auctionator display bridge, and a self-hosted backend.
 
