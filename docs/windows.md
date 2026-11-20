@@ -6,6 +6,7 @@ ring/auth slots into your World of Warcraft: Forever installation, then keeps
 syncing while you play.
 
 Download the latest **`tradepost-companion-<version>-windows-amd64.zip`** from
+the [downloads page](https://tradepost.b4b0.de/download/) or
 <https://github.com/Babo96/tradepost/releases/latest>.
 
 ## What is in the zip

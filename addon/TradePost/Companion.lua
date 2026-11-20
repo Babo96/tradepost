@@ -2,7 +2,7 @@ local ADDON, TP = ...
 
 -- The companion installs a tiny TradePost_Companion status addon containing:
 --   TRADEPOST_COMPANION = { online = true/false, updated = <unix time>,
---                           addon_latest = "0.2.8", addon_url = "..." }
+--                           addon_latest = "0.2.9", addon_url = "..." }
 -- It is written when the companion comes online, on shutdown, on a reload
 -- request, and when its update check finds a new addon release. No heartbeat.
 

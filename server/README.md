@@ -47,6 +47,7 @@ session cookie.
 | `POST` | `/v1/auth/logout` | clear the session |
 | `GET/PUT` | `/v1/watch` | per-character watchlist |
 | `GET` | `/` | website |
+| `GET` | `/download/` | downloads page |
 | `GET` | `/healthz` | liveness |
 
 Market keys are `region:ruleset:house`, e.g. `eu:pve:horde`.

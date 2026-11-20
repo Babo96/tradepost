@@ -44,7 +44,10 @@ A static data pack does not count as a running companion.
    - `TradePost-X.Y.Z.zip` (the addon; also uploaded to CurseForge when configured),
    - `tradepost-X.Y.Z-linux-amd64.tar.gz`,
    - `tradepost-companion-X.Y.Z-windows-amd64.zip`.
-3. The **Docker Build and Push** workflow builds
+3. The workflow also attaches stable asset names
+   (`TradePost-addon.zip`, `tradepost-linux-amd64.tar.gz`,
+   `tradepost-companion-windows-amd64.zip`) for the website downloads page.
+4. The **Docker Build and Push** workflow builds
    `ghcr.io/babo96/tradepost-server:sha-<commit>` on `main`; update the Argo
    manifest tag if the server changed.
 
@@ -61,7 +64,7 @@ below exist, so a release never fails because the project is not set up yet.
 3. In the GitHub repository go to **Settings → Secrets and variables →
    Actions** and add:
    - **Secret** `CURSEFORGE_API_TOKEN` — the token from step 2.
-   - **Variable** `CURSEFORGE_PROJECT_ID` — the numeric project ID.
+   - **Variable or secret** `CURSEFORGE_PROJECT_ID` — the numeric project ID.
    - **Optional variable** `CURSEFORGE_GAME_VERSIONS` — defaults to
      `Forever:1.60.1`.
 4. Push a `vX.Y.Z` tag. The upload uses:
@@ -103,9 +106,9 @@ Use an original TradePost asset, not a Blizzard texture:
 - **Description:** use [`addon/TradePost/README.md`](../addon/TradePost/README.md).
   Keep the companion link and the standalone warning.
 - **Companion link:** <https://github.com/Babo96/tradepost>
-- **Companion files:** link to the `tradepost-<version>-linux-amd64.tar.gz` and
-  `tradepost-companion-<version>-windows-amd64.zip` assets from the matching
-  GitHub release. Do not upload `.exe` or `.tar.gz` files to CurseForge.
+- **Companion files:** point users to
+  <https://tradepost.b4b0.de/download/> (or the matching GitHub release assets).
+  Do not upload `.exe` or `.tar.gz` files to CurseForge.
 - **Website:** <https://tradepost.b4b0.de/>
 
 The TOC carries `## X-Website`, `## X-License: MIT`, and a `## Notes` line

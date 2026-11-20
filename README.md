@@ -15,7 +15,8 @@ already makes.
 > of once per player.
 
 [Website](https://tradepost.b4b0.de/) ·
-[Download the latest release](https://github.com/Babo96/tradepost/releases/latest) ·
+[Downloads](https://tradepost.b4b0.de/download/) ·
+[Latest release notes](https://github.com/Babo96/tradepost/releases/latest) ·
 [Windows](#windows) · [Linux](#linux) · [How the crowd works](#how-the-crowd-works) ·
 [Documentation](docs/README.md)
 
@@ -82,6 +83,7 @@ starts, when it stops, and once when the addon asks after a reload.
 ## Windows
 
 1. Download **`tradepost-companion-<version>-windows-amd64.zip`** from the
+   [downloads page](https://tradepost.b4b0.de/download/) or the
    [latest release](https://github.com/Babo96/tradepost/releases/latest).
 2. Extract it somewhere permanent, for example `C:\TradePost`.
 3. Close World of Warcraft.
@@ -123,6 +125,7 @@ For screenshots, advanced CLI flags and troubleshooting, see the
 ## Linux
 
 1. Download **`tradepost-<version>-linux-amd64.tar.gz`** from the
+   [downloads page](https://tradepost.b4b0.de/download/) or the
    [latest release](https://github.com/Babo96/tradepost/releases/latest).
 2. Extract it somewhere permanent, for example `~/TradePost`:
    ```sh
@@ -241,6 +244,7 @@ the `_forever_` folder itself. The wizard validates
 
 | I want to… | Read |
 | --- | --- |
+| Download the addon or a companion | <https://tradepost.b4b0.de/download/> |
 | See every document | [Documentation index](docs/README.md) |
 | Install on Windows in detail | [Windows guide](docs/windows.md) |
 | Install on Linux in detail | [Linux guide](docs/linux.md) |

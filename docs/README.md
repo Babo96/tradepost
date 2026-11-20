@@ -5,6 +5,7 @@ TradePost is, how the crowd data works, and the Windows/Linux install steps.
 
 ## For players
 
+- [Downloads](https://tradepost.b4b0.de/download/) — addon, Windows companion, Linux companion
 - [Windows companion guide](windows.md) — wizard, game folder, dashboard, updates
 - [Linux companion guide](linux.md) — tar install, Proton, systemd, updates
 - [Website and API](web.md) — search, filters, stats, history, hover cards

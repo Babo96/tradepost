@@ -5,7 +5,8 @@ writes the addon files into the game folder, and serves a local dashboard at
 `http://127.0.0.1:8787`. It does not need Wine or Proton for itself — it writes
 the files directly, and the game (native or Proton) reads them.
 
-Download the latest **`tradepost-<version>-linux-amd64.tar.gz`** from
+Download the latest **`tradepost-<version>-linux-amd64.tar.gz`** from the
+[downloads page](https://tradepost.b4b0.de/download/) or
 <https://github.com/Babo96/tradepost/releases/latest>.
 
 ## Extract and first run

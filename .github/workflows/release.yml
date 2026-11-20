@@ -68,6 +68,13 @@ jobs:
           TXT
           tar -czf "dist/tradepost-${VERSION}-linux-amd64.tar.gz" -C "$STAGE" .
 
+      - name: Add stable download names
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cp "dist/TradePost-${VERSION}.zip" dist/TradePost-addon.zip
+          cp "dist/tradepost-${VERSION}-linux-amd64.tar.gz" dist/tradepost-linux-amd64.tar.gz
+          cp "dist/tradepost-companion-${VERSION}-windows-amd64.zip" dist/tradepost-companion-windows-amd64.zip
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -98,7 +105,7 @@ jobs:
         id: curseforge
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID || secrets.CURSEFORGE_PROJECT_ID }}
         run: |
           if [ -z "${CURSEFORGE_API_TOKEN}" ] || [ -z "${CURSEFORGE_PROJECT_ID}" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
@@ -113,7 +120,7 @@ jobs:
         uses: itsmeow/curseforge-upload@v3
         with:
           token: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          project_id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          project_id: ${{ vars.CURSEFORGE_PROJECT_ID || secrets.CURSEFORGE_PROJECT_ID }}
           game_endpoint: wow
           file_path: dist/TradePost-${{ steps.version.outputs.value }}.zip
           game_versions: ${{ vars.CURSEFORGE_GAME_VERSIONS || 'Forever:1.60.1' }}

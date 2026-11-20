@@ -13,6 +13,18 @@ The website reads the same crowd-sourced data as the in-game addon. A player's
 companion uploads scans; the server aggregates them; the site shows the shared
 prices, history and metadata. The website does not need the companion itself.
 
+## Downloads
+
+<https://tradepost.b4b0.de/download/> links to the latest GitHub release assets:
+
+- Windows companion (`tradepost-companion-windows-amd64.zip`),
+- Linux companion (`tradepost-linux-amd64.tar.gz`),
+- addon only (`TradePost-addon.zip`).
+
+The links use stable release aliases, so they always point at the newest release.
+The companion installs the addon and data pack; the addon-only zip is for
+CurseForge/WoWUI or manual installs.
+
 ## What you can do
 
 - Pick a market (for example `eu:pve:horde`, `eu:pvp:alliance`).
@@ -28,6 +40,7 @@ prices, history and metadata. The website does not need the companion itself.
 - Compare the latest price across markets.
 - Keep a per-character watchlist, optionally logged in with a one-time code.
 - See the live contributor count in the header.
+- Download the addon or a companion from the [downloads page](https://tradepost.b4b0.de/download/).
 
 The filter panel collapses on narrow screens; the pager and hover card work on
 mobile.
