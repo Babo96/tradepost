@@ -390,6 +390,10 @@ function TP:MetaQueueBuild(force)
   local queue = TRADEPOST_META_QUEUE
   local ids = collectIDs()
   queue.ids = ids
+  queue.idsSet = {}
+  for _, id in ipairs(ids) do
+    queue.idsSet[id] = true
+  end
   queue.index = 1
   queue.total = #ids
   queue.completed = false
@@ -638,6 +642,34 @@ function TP:MetaAckTick()
     end
   end
 end
+-- ITEM_DATA_LOAD_RESULT only enqueues here; the ticker does the tooltip work
+-- so the client event handler never blocks a frame.
+function TP:MetaItemLoaded(itemID)
+  local meta = self.meta
+  if not meta or not meta.running or meta.paused then
+    return
+  end
+  local queue = TRADEPOST_META_QUEUE
+  local deferred = queue.deferred
+  local inQueue = queue.idsSet and queue.idsSet[itemID]
+  if not inQueue and not (deferred and deferred[itemID]) then
+    return
+  end
+  if deferred then
+    deferred[itemID] = nil
+  end
+  meta.ready = meta.ready or {}
+  meta.readySet = meta.readySet or {}
+  if meta.readySet[itemID] then
+    return
+  end
+  meta.readySet[itemID] = true
+  meta.ready[#meta.ready + 1] = itemID
+  -- A deferred pass stops the ticker while it waits 60 seconds. Resume it so
+  -- the loaded item is handled now instead of after that wait.
+  self:MetaEnsureProcessTicker()
+end
+
 function TP:MetaProcessTick()
   local meta = self.meta
   if not meta.running or meta.paused then
@@ -648,11 +680,41 @@ function TP:MetaProcessTick()
   local pending = meta.pending or {}
   local processed = 0
 
+  -- Drain items whose load result arrived since the last tick. This is the
+  -- fast path that replaces waiting for the next 60-second retry pass.
+  local ready = meta.ready or {}
+  local readyIndex = meta.readyIndex or 1
+  while readyIndex <= #ready and processed < PER_TICK do
+    local id = ready[readyIndex]
+    readyIndex = readyIndex + 1
+    processed = processed + 1
+    if id then
+      meta.readySet[id] = nil
+      if validID(id) and not TRADEPOST_ITEM_DETAILS[id] then
+        local detail = self:MetaCollect(id)
+        if detail then
+          TRADEPOST_ITEM_DETAILS[id] = detail
+          pending[#pending + 1] = detail
+        end
+      end
+    end
+  end
+  if readyIndex > #ready then
+    meta.ready = {}
+    meta.readyIndex = 1
+  else
+    meta.readyIndex = readyIndex
+  end
+
   while (queue.index or 1) <= #ids and processed < PER_TICK do
     local id = ids[queue.index]
     queue.index = (queue.index or 1) + 1
+    if queue.idsSet then
+      queue.idsSet[id] = nil
+    end
     processed = processed + 1
-    if validID(id) then
+    if validID(id) and not (meta.readySet and meta.readySet[id])
+      and not TRADEPOST_ITEM_DETAILS[id] then
       local detail = self:MetaCollect(id)
       if detail then
         TRADEPOST_ITEM_DETAILS[id] = detail
@@ -667,6 +729,9 @@ function TP:MetaProcessTick()
   elseif (queue.index or 1) > #ids then
     if #pending > 0 then
       self:MetaFinalizeBatch()
+    end
+    if #(meta.ready or {}) >= (meta.readyIndex or 1) then
+      return -- drain the loaded queue on the next tick
     end
     self:MetaDeferredPass()
   end
@@ -700,6 +765,10 @@ function TP:MetaDeferredPass()
   end
   queue.deferPass = pass + 1
   queue.ids = ids
+  queue.idsSet = {}
+  for _, id in ipairs(ids) do
+    queue.idsSet[id] = true
+  end
   queue.index = 1
   queue.total = #ids
   queue.completed = false
@@ -734,6 +803,14 @@ function TP:MetaStart(force, manual)
   local meta = self.meta
   local queue = TRADEPOST_META_QUEUE
   local today = date("%Y-%m-%d")
+  if queue.ids and not queue.idsSet then
+    queue.idsSet = {}
+    for _, id in ipairs(queue.ids) do
+      if validID(id) then
+        queue.idsSet[id] = true
+      end
+    end
+  end
   local inProgress = queue.ids and #queue.ids > 0
     and (queue.index or 1) <= (queue.total or #queue.ids)
   -- Enabled admin sync runs at most once per day. Manual start/force always
@@ -776,6 +853,9 @@ function TP:MetaStart(force, manual)
   meta.ackStarted = nil
   meta.lastAckPoll = nil
   meta.pending = meta.pending or {}
+  meta.ready = {}
+  meta.readyIndex = 1
+  meta.readySet = {}
   queue.completed = false
   queue.nextSeq = queue.nextSeq or 1
   queue.lastRunDay = today
@@ -799,6 +879,9 @@ function TP:MetaStop()
   meta.running = false
   meta.waitingAck = false
   meta.paused = true
+  meta.ready = {}
+  meta.readyIndex = 1
+  meta.readySet = {}
   self:SaveExport()
   self:Print("metadata sync stopped. Pending batch/queue data is kept.")
   if self.settings and self.settings.refresh then
@@ -902,3 +985,14 @@ function TP:MetaInit()
 end
 
 TP:MetaInit()
+
+-- Non-blocking item-load signal. The browser has its own listener for names;
+-- this one only feeds the metadata ready queue.
+local metaLoader = CreateFrame("Frame")
+metaLoader:RegisterEvent("ITEM_DATA_LOAD_RESULT")
+metaLoader:SetScript("OnEvent", function(_, _, itemID, success)
+  if not itemID or success == false then
+    return
+  end
+  TP:MetaItemLoaded(itemID)
+end)

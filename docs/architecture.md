@@ -147,7 +147,10 @@ carry item details. When enabled, it collects full tooltip text and
 once per day when enabled (manual start/force overrides), skips the client's
 "Retrieving item information" placeholder, uses item links captured by
 TradePost's own auction-house scan (`GetReplicateItemLink`), requests uncached
-item data by ID, and retries equipment whose stats are not cached yet. The
+item data by ID, and retries equipment whose stats are not cached yet.
+`ITEM_DATA_LOAD_RESULT` is queued and drained by the metadata ticker, so a
+loaded item is collected immediately without blocking the event handler or
+waiting for the next retry pass. The
 Auctionator bridge is display-only and is not part of metadata collection. The
 companion uploads changed details and acknowledges batches through the 16
 `TradePost_Ack_XX` slots. The website renders the text lines and stats in the
