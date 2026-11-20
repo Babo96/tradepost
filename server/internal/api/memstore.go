@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -655,6 +656,229 @@ func (m *MemStore) MissingItemDetails(_ context.Context, market string, force bo
 		result = result[:limit]
 	}
 	return result, nil
+}
+
+func (m *MemStore) Stats(_ context.Context, market string, hours int) (store.Stats, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if hours < 1 {
+		hours = 1
+	}
+	if hours > 168 {
+		hours = 168
+	}
+	now := time.Now()
+	hist := m.history[market]
+
+	freshness := memFreshness(m.markets[market], hist, now)
+
+	bucketSet := map[int64]bool{}
+	for _, points := range hist {
+		for bucket := range points {
+			bucketSet[bucket] = true
+		}
+	}
+	buckets := make([]int64, 0, len(bucketSet))
+	for bucket := range bucketSet {
+		buckets = append(buckets, bucket)
+	}
+	sort.Slice(buckets, func(i, j int) bool { return buckets[i] < buckets[j] })
+
+	if len(buckets) == 0 {
+		return store.BuildStats(store.StatsBuildInput{
+			Market:    market,
+			Now:       now,
+			Hours:     hours,
+			Freshness: freshness,
+		}), nil
+	}
+
+	firstBucket := buckets[0]
+	currentBucket := buckets[len(buckets)-1]
+	cutoff := now.Add(-time.Duration(hours) * time.Hour).Unix()
+	refBucket := int64(0)
+	for _, bucket := range buckets {
+		if bucket <= cutoff {
+			refBucket = bucket
+		}
+	}
+	if refBucket == 0 {
+		refBucket = firstBucket
+	}
+
+	current := memBucketItems(hist, currentBucket)
+	reference := memBucketItems(hist, refBucket)
+
+	meta := make(map[int64]store.StatsItemMetaInfo, len(m.items))
+	for id, item := range m.items {
+		meta[id] = store.StatsItemMetaInfo{Name: item.Name, Quality: item.Quality, ClassID: item.ClassID}
+	}
+
+	points := []store.StatsPoint{}
+	matched := 0
+	for _, bucket := range buckets {
+		if bucket < refBucket {
+			continue
+		}
+		items := memBucketItems(hist, bucket)
+		ratios := make([]float64, 0, len(items))
+		for id, item := range items {
+			base, ok := reference[id]
+			if !ok || base.Price < 10000 || item.Price <= 0 {
+				continue
+			}
+			ratios = append(ratios, float64(item.Price)/float64(base.Price))
+		}
+		if len(ratios) == 0 {
+			continue
+		}
+		sort.Float64s(ratios)
+		var median float64
+		mid := len(ratios) / 2
+		if len(ratios)%2 == 1 {
+			median = ratios[mid]
+		} else {
+			median = (ratios[mid-1] + ratios[mid]) / 2
+		}
+		points = append(points, store.StatsPoint{T: bucket, Value: memRound1(median * 100)})
+		if bucket == currentBucket {
+			matched = len(ratios)
+		}
+	}
+
+	since := now.Add(-time.Duration(hours) * time.Hour).Unix()
+	newCount := 0
+	newItems := []store.StatsItem{}
+	for key, pointsByBucket := range hist {
+		if len(pointsByBucket) == 0 {
+			continue
+		}
+		min := int64(0)
+		for bucket := range pointsByBucket {
+			if min == 0 || bucket < min {
+				min = bucket
+			}
+		}
+		if min < since {
+			continue
+		}
+		newCount++
+		id := store.ItemID(key)
+		item := store.StatsItem{
+			ItemID:  id,
+			Key:     key,
+			Name:    m.items[id].Name,
+			Quality: m.items[id].Quality,
+		}
+		if latest, ok := m.markets[market][key]; ok {
+			item.Price = latest.Price
+			item.Quantity = latest.Quantity
+		} else if point, ok := pointsByBucket[min]; ok {
+			item.Price = point.Min
+			item.Quantity = point.Quantity
+		}
+		newItems = append(newItems, item)
+	}
+	sort.Slice(newItems, func(i, j int) bool {
+		vi := newItems[i].Price * newItems[i].Quantity
+		vj := newItems[j].Price * newItems[j].Quantity
+		if vi == vj {
+			return newItems[i].ItemID < newItems[j].ItemID
+		}
+		return vi > vj
+	})
+	if len(newItems) > 8 {
+		newItems = newItems[:8]
+	}
+
+	refKeys := memKeysAt(hist, refBucket)
+	curKeys := memKeysAt(hist, currentBucket)
+	delisted := int64(0)
+	for key := range refKeys {
+		if !curKeys[key] {
+			delisted++
+		}
+	}
+
+	return store.BuildStats(store.StatsBuildInput{
+		Market:          market,
+		Now:             now,
+		Hours:           hours,
+		CurrentBucket:   currentBucket,
+		ReferenceBucket: refBucket,
+		FirstBucket:     firstBucket,
+		Current:         current,
+		Reference:       reference,
+		Meta:            meta,
+		IndexPoints:     points,
+		IndexMatched:    matched,
+		NewItems:        newItems,
+		NewItemsCount:   newCount,
+		Delisted:        delisted,
+		Freshness:       freshness,
+	}), nil
+}
+
+func memBucketItems(hist map[string]map[int64]store.HistoryPoint, bucket int64) map[int64]store.StatsItemAtBucket {
+	result := map[int64]store.StatsItemAtBucket{}
+	for key, points := range hist {
+		point, ok := points[bucket]
+		if !ok {
+			continue
+		}
+		id := store.ItemID(key)
+		if id == 0 {
+			continue
+		}
+		item, exists := result[id]
+		if !exists {
+			item = store.StatsItemAtBucket{Price: point.Min}
+		} else if point.Min < item.Price {
+			item.Price = point.Min
+		}
+		item.Quantity += point.Quantity
+		item.Offers++
+		result[id] = item
+	}
+	return result
+}
+
+func memKeysAt(hist map[string]map[int64]store.HistoryPoint, bucket int64) map[string]bool {
+	keys := map[string]bool{}
+	for key, points := range hist {
+		if _, ok := points[bucket]; ok {
+			keys[key] = true
+		}
+	}
+	return keys
+}
+
+func memFreshness(latest map[string]store.SnapshotItem, hist map[string]map[int64]store.HistoryPoint, now time.Time) store.StatsFreshness {
+	var fresh store.StatsFreshness
+	for _, item := range latest {
+		if item.Scanned > fresh.LastScan {
+			fresh.LastScan = item.Scanned
+		}
+	}
+	if fresh.LastScan > 0 {
+		fresh.LastScanAgeMin = memRound1(now.Sub(time.Unix(fresh.LastScan, 0)).Minutes())
+	}
+	seen := map[int64]bool{}
+	cutoff := now.Add(-24 * time.Hour).Unix()
+	for _, points := range hist {
+		for bucket := range points {
+			if bucket >= cutoff {
+				seen[bucket] = true
+			}
+		}
+	}
+	fresh.Scans24h = len(seen)
+	return fresh
+}
+
+func memRound1(value float64) float64 {
+	return math.Round(value*10) / 10
 }
 
 func (m *MemStore) ItemDetail(_ context.Context, market, key string) (store.ItemDetail, error) {

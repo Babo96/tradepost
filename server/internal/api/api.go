@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/babo96/tradepost/server/internal/store"
@@ -41,12 +42,21 @@ const (
 type Server struct {
 	store store.Store
 	mux   *http.ServeMux
+
+	statsMu    sync.Mutex
+	statsCache map[string]statsCacheEntry
+}
+
+type statsCacheEntry struct {
+	stats   store.Stats
+	expires time.Time
 }
 
 func New(st store.Store) *Server {
 	s := &Server{
-		store: st,
-		mux:   http.NewServeMux(),
+		store:      st,
+		mux:        http.NewServeMux(),
+		statsCache: map[string]statsCacheEntry{},
 	}
 	s.mux.HandleFunc("GET /healthz", s.handleHealth)
 	s.mux.HandleFunc("POST /v1/enroll", s.handleEnroll)
@@ -66,6 +76,7 @@ func New(st store.Store) *Server {
 	s.mux.HandleFunc("POST /v1/auth/logout", s.handleAuthLogout)
 	s.mux.HandleFunc("GET /v1/watch", s.handleWatchGet)
 	s.mux.HandleFunc("PUT /v1/watch", s.handleWatchPut)
+	s.mux.HandleFunc("GET /v1/stats", s.handleStats)
 	s.mux.Handle("GET /", s.webHandler())
 	return s
 }
@@ -509,6 +520,56 @@ func (s *Server) handleItems(w http.ResponseWriter, r *http.Request) {
 		"page":   filters.Page,
 		"limit":  filters.Limit,
 	})
+}
+
+func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	market := query.Get("market")
+	if !marketRE.MatchString(market) {
+		writeError(w, http.StatusBadRequest, "invalid market")
+		return
+	}
+	hours := 24
+	if raw := query.Get("hours"); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid hours")
+			return
+		}
+		hours = value
+	}
+	if hours < 1 {
+		hours = 1
+	} else if hours > 168 {
+		hours = 168
+	}
+
+	key := market + "|" + strconv.Itoa(hours)
+	now := time.Now()
+	s.statsMu.Lock()
+	if entry, ok := s.statsCache[key]; ok && now.Before(entry.expires) {
+		s.statsMu.Unlock()
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		writeJSON(w, http.StatusOK, entry.stats)
+		return
+	}
+	s.statsMu.Unlock()
+
+	stats, err := s.store.Stats(r.Context(), market, hours)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "stats failed")
+		return
+	}
+
+	s.statsMu.Lock()
+	if s.statsCache == nil {
+		s.statsCache = map[string]statsCacheEntry{}
+	}
+	s.statsCache[key] = statsCacheEntry{stats: stats, expires: now.Add(time.Minute)}
+	s.statsMu.Unlock()
+
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	writeJSON(w, http.StatusOK, stats)
 }
 
 func (s *Server) handleMissingDetails(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Market stats — TradePost</title>
+  <meta name="description" content="Market index, price movers, stock changes and composition for World of Warcraft: Forever auction houses, built from TradePost companion scans.">
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="icon" href="../icon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="../icon-192.png">
+  <meta name="theme-color" content="#0d1117">
+  <meta property="og:title" content="Market stats — TradePost">
+  <meta property="og:description" content="A stock-market style view of the TradePost auction house: index, movers, stock and composition.">
+  <meta property="og:image" content="https://tradepost.b4b0.de/icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="stats.css">
+</head>
+<body class="stats-page">
+  <a class="skip-link" href="#stats-main">Skip to market stats</a>
+
+  <header class="stats-header">
+    <a class="brand" href="/" aria-label="TradePost prices">
+      <img class="brand-icon" src="../icon.svg" alt="" width="28" height="28">
+      TradePost <span>Auction Data</span>
+    </a>
+    <label class="market">
+      <span class="market-label">Market</span>
+      <select id="market" aria-label="Auction house market"></select>
+    </label>
+    <span class="sync-pill" id="sync-pill">
+      <i class="sync-dot" aria-hidden="true"></i>
+      <span id="sync-text">Connecting</span>
+    </span>
+    <nav class="page-nav" aria-label="Primary">
+      <a href="/">Prices</a>
+      <a href="/download/">Download</a>
+      <a href="/stats/" aria-current="page">Stats</a>
+    </nav>
+  </header>
+
+  <main id="stats-main" class="stats-main">
+    <section class="stats-intro" aria-labelledby="stats-title">
+      <div class="intro-copy">
+        <p class="kicker">Auction house overview</p>
+        <h1 id="stats-title">Market <span>stats</span></h1>
+        <p class="window-line" id="window-line">Loading the latest scan window…</p>
+        <span class="market-badge" id="market-badge" hidden></span>
+      </div>
+      <div class="refresh-box">
+        <span class="refresh-state" id="refresh-state" role="status" aria-live="polite">Loading…</span>
+        <button type="button" id="refresh" class="ghost">Refresh now</button>
+      </div>
+    </section>
+
+    <div class="notice" id="notice" hidden>
+      <span class="notice-mark" aria-hidden="true">!</span>
+      <p class="notice-text" id="notice-text"></p>
+      <button type="button" id="notice-retry" class="ghost notice-retry">Retry</button>
+    </div>
+
+    <section class="kpi-panel" id="kpis" aria-label="Key market figures">
+      <div class="kpi kpi-index">
+        <span class="kpi-label"><i class="kpi-mark" aria-hidden="true"></i>Market index</span>
+        <div class="kpi-main">
+          <span class="kpi-value" id="kpi-index"><span class="skel skel-value"></span></span>
+          <svg class="kpi-spark" id="kpi-spark" viewBox="0 0 72 26" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+        <span class="kpi-chip-slot" id="kpi-index-chip"></span>
+      </div>
+
+      <div class="kpi">
+        <span class="kpi-label">Items listed</span>
+        <span class="kpi-value" id="kpi-items"><span class="skel skel-value"></span></span>
+        <span class="kpi-chip-slot" id="kpi-items-chip"></span>
+      </div>
+
+      <div class="kpi">
+        <span class="kpi-label">Offers</span>
+        <span class="kpi-value" id="kpi-offers"><span class="skel skel-value"></span></span>
+        <span class="kpi-chip-slot" id="kpi-offers-chip"></span>
+      </div>
+
+      <div class="kpi">
+        <span class="kpi-label">Total stock</span>
+        <span class="kpi-value" id="kpi-qty"><span class="skel skel-value"></span></span>
+        <span class="kpi-chip-slot" id="kpi-qty-chip"></span>
+      </div>
+
+      <div class="kpi">
+        <span class="kpi-label">Market value</span>
+        <span class="kpi-value" id="kpi-value"><span class="skel skel-value"></span></span>
+        <span class="kpi-chip-slot" id="kpi-value-chip"></span>
+      </div>
+
+      <div class="kpi">
+        <span class="kpi-label">New items</span>
+        <span class="kpi-value" id="kpi-new"><span class="skel skel-value"></span></span>
+        <span class="kpi-chip-slot" id="kpi-new-chip"></span>
+      </div>
+
+      <div class="kpi">
+        <span class="kpi-label">Delisted</span>
+        <span class="kpi-value" id="kpi-delisted"><span class="skel skel-value"></span></span>
+        <span class="kpi-chip-slot" id="kpi-delisted-chip"></span>
+      </div>
+    </section>
+
+    <section class="panel chart-panel" aria-labelledby="chart-title">
+      <header class="panel-head">
+        <div class="panel-title">
+          <p class="eyebrow"><span class="eyebrow-num">02</span>Index</p>
+          <h2 id="chart-title">Market index</h2>
+        </div>
+        <p class="panel-note" id="chart-note">Base 100 at the first scan</p>
+      </header>
+      <div class="chart-body">
+        <div class="chart-plot" id="chart-plot">
+          <p class="chart-placeholder">Loading market history…</p>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item"><i class="swatch swatch-line" aria-hidden="true"></i>Market index</span>
+          <span class="legend-item"><i class="swatch swatch-base" aria-hidden="true"></i>Base 100</span>
+          <span class="chart-caption" id="chart-caption"></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel breadth-panel" aria-labelledby="breadth-title">
+      <header class="panel-head">
+        <div class="panel-title">
+          <p class="eyebrow"><span class="eyebrow-num">03</span>Breadth</p>
+          <h2 id="breadth-title">How many items moved</h2>
+        </div>
+        <p class="panel-note" id="breadth-matched">Loading…</p>
+      </header>
+      <div class="breadth-body">
+        <div class="breadth-bar" id="breadth-bar" role="img" aria-label="Share of items with rising, falling and flat prices">
+          <span class="skel skel-bar"></span>
+        </div>
+        <div class="breadth-legend" id="breadth-legend"></div>
+      </div>
+    </section>
+
+    <div class="split" aria-label="Price movers">
+      <section class="panel movers-panel" aria-labelledby="gainers-title">
+        <header class="panel-head">
+          <div class="panel-title">
+            <p class="eyebrow"><span class="eyebrow-num">04</span>Movers</p>
+            <h2 id="gainers-title">Top gainers</h2>
+          </div>
+          <p class="panel-note">Lowest listing, then vs now</p>
+        </header>
+        <div class="table-wrap">
+          <table class="movers-table">
+            <caption class="sr-only">Items with the largest price increase compared with the reference scan</caption>
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col" class="num">Price</th>
+                <th scope="col" class="num">Was</th>
+                <th scope="col" class="num">Change</th>
+                <th scope="col" class="num">Stock</th>
+              </tr>
+            </thead>
+            <tbody id="gainers-body">
+              <tr><td colspan="5" class="empty-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel movers-panel" aria-labelledby="losers-title">
+        <header class="panel-head">
+          <div class="panel-title">
+            <p class="eyebrow"><span class="eyebrow-num">04</span>Movers</p>
+            <h2 id="losers-title">Top losers</h2>
+          </div>
+          <p class="panel-note">Lowest listing, then vs now</p>
+        </header>
+        <div class="table-wrap">
+          <table class="movers-table">
+            <caption class="sr-only">Items with the largest price decrease compared with the reference scan</caption>
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col" class="num">Price</th>
+                <th scope="col" class="num">Was</th>
+                <th scope="col" class="num">Change</th>
+                <th scope="col" class="num">Stock</th>
+              </tr>
+            </thead>
+            <tbody id="losers-body">
+              <tr><td colspan="5" class="empty-row">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="split" aria-label="Stock changes">
+      <section class="panel stock-panel" aria-labelledby="stock-added-title">
+        <header class="panel-head">
+          <div class="panel-title">
+            <p class="eyebrow"><span class="eyebrow-num">05</span>Stock</p>
+            <h2 id="stock-added-title">Most stock added</h2>
+          </div>
+          <p class="panel-note">Listed quantity change</p>
+        </header>
+        <ul class="stock-list" id="stock-added">
+          <li class="empty-row">Loading…</li>
+        </ul>
+      </section>
+
+      <section class="panel stock-panel" aria-labelledby="stock-removed-title">
+        <header class="panel-head">
+          <div class="panel-title">
+            <p class="eyebrow"><span class="eyebrow-num">05</span>Stock</p>
+            <h2 id="stock-removed-title">Most stock removed</h2>
+          </div>
+          <p class="panel-note">Listed quantity change</p>
+        </header>
+        <ul class="stock-list" id="stock-removed">
+          <li class="empty-row">Loading…</li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="composition" aria-labelledby="composition-title">
+      <header class="composition-head">
+        <div class="panel-title">
+          <p class="eyebrow"><span class="eyebrow-num">06</span>Composition</p>
+          <h2 id="composition-title">What the market is made of</h2>
+        </div>
+        <p class="panel-note">Listed value and item counts</p>
+      </header>
+
+      <div class="composition-grid">
+        <section class="panel mini-panel" aria-labelledby="class-title">
+          <header class="mini-head">
+            <h3 id="class-title">By item class</h3>
+            <span class="mini-note">Top share of value</span>
+          </header>
+          <ul class="class-list" id="class-list">
+            <li class="empty-row">Loading…</li>
+          </ul>
+        </section>
+
+        <section class="panel mini-panel" aria-labelledby="quality-title">
+          <header class="mini-head">
+            <h3 id="quality-title">By quality</h3>
+            <span class="mini-note">Distinct items</span>
+          </header>
+          <div class="table-wrap">
+            <table class="mini-table">
+              <caption class="sr-only">Distinct item counts and listed value by quality</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Quality</th>
+                  <th scope="col" class="num">Items</th>
+                  <th scope="col" class="num">Value</th>
+                </tr>
+              </thead>
+              <tbody id="quality-body">
+                <tr><td colspan="3" class="empty-row">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel mini-panel" aria-labelledby="bands-title">
+          <header class="mini-head">
+            <h3 id="bands-title">By price band</h3>
+            <span class="mini-note">Lowest listing</span>
+          </header>
+          <div class="table-wrap">
+            <table class="mini-table">
+              <caption class="sr-only">Item counts and listed value by price band</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Band</th>
+                  <th scope="col" class="num">Items</th>
+                  <th scope="col" class="num">Value</th>
+                </tr>
+              </thead>
+              <tbody id="bands-body">
+                <tr><td colspan="3" class="empty-row">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="panel heavy-panel" aria-labelledby="heavy-title">
+      <header class="panel-head">
+        <div class="panel-title">
+          <p class="eyebrow"><span class="eyebrow-num">07</span>Heavyweights</p>
+          <h2 id="heavy-title">Biggest items by listed value</h2>
+        </div>
+        <p class="panel-note">Share of the whole market</p>
+      </header>
+      <ol class="heavy-list" id="heavy-list">
+        <li class="empty-row">Loading…</li>
+      </ol>
+    </section>
+
+    <footer class="stats-footer" aria-labelledby="fresh-title">
+      <div class="fresh-head">
+        <h2 id="fresh-title">Data freshness</h2>
+        <span class="fresh-time" id="fresh-time"></span>
+      </div>
+      <dl class="fresh-grid">
+        <div>
+          <dt>Last scan</dt>
+          <dd id="fresh-scan">—</dd>
+        </div>
+        <div>
+          <dt>Scans in 24h</dt>
+          <dd id="fresh-scans">—</dd>
+        </div>
+        <div>
+          <dt>Contributors</dt>
+          <dd id="fresh-clients">—</dd>
+        </div>
+        <div>
+          <dt>Generated</dt>
+          <dd id="fresh-generated">—</dd>
+        </div>
+      </dl>
+      <p class="fresh-note">
+        Prices are the lowest listing per item from companion scans. Scans are sporadic, so each
+        comparison uses the most recent earlier scan and labels its real age. This page refreshes
+        every 60 seconds while it stays open.
+      </p>
+    </footer>
+
+    <noscript>
+      <p class="empty">Market stats need JavaScript to load the latest scan.</p>
+    </noscript>
+  </main>
+
+  <script src="stats.js"></script>
+</body>
+</html>

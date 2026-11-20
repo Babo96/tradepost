@@ -204,6 +204,139 @@ type History struct {
 	Points     []HistoryPoint `json:"points"`
 }
 
+type Stats struct {
+	Market       string           `json:"market"`
+	GeneratedAt  int64            `json:"generated_at"`
+	Window       StatsWindow      `json:"window"`
+	Index        StatsIndex       `json:"index"`
+	Totals       StatsTotals      `json:"totals"`
+	Breadth      StatsBreadth     `json:"breadth"`
+	NewItems     StatsNewItems    `json:"new_items"`
+	Delisted     int64            `json:"delisted"`
+	Movers       StatsMovers      `json:"movers"`
+	Stock        StatsStock       `json:"stock"`
+	Classes      []StatsClass     `json:"classes"`
+	Quality      []StatsQuality   `json:"quality"`
+	Bands        []StatsBand      `json:"bands"`
+	Heavyweights []StatsItemValue `json:"heavyweights"`
+	Freshness    StatsFreshness   `json:"freshness"`
+}
+
+type StatsWindow struct {
+	TargetHours     int     `json:"target_hours"`
+	CurrentBucket   int64   `json:"current_bucket"`
+	ReferenceBucket int64   `json:"reference_bucket"`
+	ReferenceHours  float64 `json:"reference_hours"`
+	FirstBucket     int64   `json:"first_bucket"`
+}
+
+type StatsPoint struct {
+	T     int64   `json:"t"`
+	Value float64 `json:"value"`
+}
+
+type StatsIndex struct {
+	ChangePct float64      `json:"change_pct"`
+	Matched   int          `json:"matched"`
+	Points    []StatsPoint `json:"points"`
+}
+
+type StatsTotals struct {
+	Items        int   `json:"items"`
+	ItemsPrev    int   `json:"items_prev"`
+	Offers       int   `json:"offers"`
+	OffersPrev   int   `json:"offers_prev"`
+	Quantity     int64 `json:"quantity"`
+	QuantityPrev int64 `json:"quantity_prev"`
+	Value        int64 `json:"value"`
+	ValuePrev    int64 `json:"value_prev"`
+}
+
+type StatsBreadth struct {
+	Up, Down, Flat, Matched int
+}
+
+type StatsNewItems struct {
+	Count int         `json:"count"`
+	Items []StatsItem `json:"items"`
+}
+
+type StatsItem struct {
+	ItemID   int64  `json:"item_id"`
+	Key      string `json:"key,omitempty"`
+	Name     string `json:"name"`
+	Quality  int    `json:"quality"`
+	Price    int64  `json:"price"`
+	Quantity int64  `json:"quantity"`
+}
+
+type StatsMovers struct {
+	Gainers []StatsMove `json:"gainers"`
+	Losers  []StatsMove `json:"losers"`
+}
+
+type StatsMove struct {
+	ItemID       int64   `json:"item_id"`
+	Name         string  `json:"name"`
+	Quality      int     `json:"quality"`
+	Price        int64   `json:"price"`
+	PricePrev    int64   `json:"price_prev"`
+	ChangePct    float64 `json:"change_pct"`
+	Quantity     int64   `json:"quantity"`
+	QuantityPrev int64   `json:"quantity_prev"`
+}
+
+type StatsStock struct {
+	Added   []StatsStockMove `json:"added"`
+	Removed []StatsStockMove `json:"removed"`
+}
+
+type StatsStockMove struct {
+	ItemID       int64  `json:"item_id"`
+	Name         string `json:"name"`
+	Quality      int    `json:"quality"`
+	Price        int64  `json:"price"`
+	Quantity     int64  `json:"quantity"`
+	QuantityPrev int64  `json:"quantity_prev"`
+	Delta        int64  `json:"delta"`
+}
+
+type StatsClass struct {
+	ClassID   int     `json:"class_id"`
+	Items     int     `json:"items"`
+	Quantity  int64   `json:"quantity"`
+	Value     int64   `json:"value"`
+	ChangePct float64 `json:"change_pct"`
+}
+
+type StatsQuality struct {
+	Quality  int   `json:"quality"`
+	Items    int   `json:"items"`
+	Offers   int   `json:"offers"`
+	Quantity int64 `json:"quantity"`
+	Value    int64 `json:"value"`
+}
+
+type StatsBand struct {
+	Label string `json:"label"`
+	Items int    `json:"items"`
+	Value int64  `json:"value"`
+}
+
+type StatsItemValue struct {
+	ItemID   int64   `json:"item_id"`
+	Name     string  `json:"name"`
+	Value    int64   `json:"value"`
+	SharePct float64 `json:"share_pct"`
+}
+
+type StatsFreshness struct {
+	LastScan       int64   `json:"last_scan"`
+	LastScanAgeMin float64 `json:"last_scan_age_min"`
+	Scans24h       int     `json:"scans_24h"`
+	Clients24h     int     `json:"clients_24h"`
+}
+
 // MarketPrice compares one key across markets.
 type MarketPrice struct {
 	Market   string `json:"market"`
@@ -262,6 +395,7 @@ type Store interface {
 	ItemDetail(ctx context.Context, market, key string) (ItemDetail, error)
 	ItemHistory(ctx context.Context, market, key string, limit int) (History, error)
 	HistoryPoints(ctx context.Context, market, key, resolution string, since time.Time, limit int) (History, error)
+	Stats(ctx context.Context, market string, hours int) (Stats, error)
 	CleanupHistory(ctx context.Context) error
 	ItemMarkets(ctx context.Context, key string) ([]MarketPrice, error)
 
