@@ -239,3 +239,19 @@ func TestLoadRingRequest(t *testing.T) {
 		t.Fatalf("unexpected ring request: %+v", parsed.RingRequest)
 	}
 }
+
+func TestLoadActiveMarket(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TradePost.lua")
+	data := `TRADEPOST_ACTIVE = { character = "Schmoo-Boo", market = "eu:pvp:alliance", seen = 1794947776 }`
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := LoadData(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Active != "Schmoo-Boo" || parsed.ActiveMarket != "eu:pvp:alliance" {
+		t.Fatalf("unexpected active character/market: %q / %q", parsed.Active, parsed.ActiveMarket)
+	}
+}

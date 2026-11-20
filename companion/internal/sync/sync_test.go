@@ -61,3 +61,19 @@ func TestApplyRingRequestForcesFull(t *testing.T) {
 		t.Fatal("request for another market should not force a full")
 	}
 }
+
+func TestPickSnapshotUsesActiveMarket(t *testing.T) {
+	snapshots := []api.Snapshot{
+		{Market: "eu:pve:horde", Items: []api.SnapshotItem{{Key: "i:1"}}},
+		{Market: "eu:pvp:alliance", Items: []api.SnapshotItem{{Key: "i:2"}}},
+	}
+	if got := pickSnapshot(snapshots, "eu:pvp:alliance"); got == nil || got.Market != "eu:pvp:alliance" {
+		t.Fatalf("active market not selected: %+v", got)
+	}
+	if got := pickSnapshot(snapshots, "missing"); got != nil {
+		t.Fatalf("missing market should return nil: %+v", got)
+	}
+	if got := pickSnapshot(snapshots, ""); got != nil {
+		t.Fatalf("empty market should return nil: %+v", got)
+	}
+}

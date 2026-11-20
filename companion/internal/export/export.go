@@ -102,14 +102,15 @@ type RingRequest struct {
 }
 
 type Data struct {
-	Scans       []Scan
-	Items       []Meta
-	Details     []Meta
-	MetaBatch   *MetaBatch
-	Auth        *AuthRequest
-	RingRequest *RingRequest
-	Watch       map[string]WatchSet
-	Active      string
+	Scans        []Scan
+	Items        []Meta
+	Details      []Meta
+	MetaBatch    *MetaBatch
+	Auth         *AuthRequest
+	RingRequest  *RingRequest
+	Watch        map[string]WatchSet
+	Active       string
+	ActiveMarket string
 }
 
 func Load(path string) ([]Scan, error) {
@@ -135,14 +136,15 @@ func LoadData(path string) (Data, error) {
 	}
 
 	data := Data{
-		Scans:       loadScans(L),
-		Items:       loadItems(L),
-		Details:     loadDetails(L),
-		MetaBatch:   loadMetaBatch(L),
-		Auth:        loadAuth(L),
-		RingRequest: loadRingRequest(L),
-		Watch:       loadWatch(L),
-		Active:      loadActive(L),
+		Scans:        loadScans(L),
+		Items:        loadItems(L),
+		Details:      loadDetails(L),
+		MetaBatch:    loadMetaBatch(L),
+		Auth:         loadAuth(L),
+		RingRequest:  loadRingRequest(L),
+		Watch:        loadWatch(L),
+		Active:       loadActive(L),
+		ActiveMarket: loadActiveMarket(L),
 	}
 	sort.Slice(data.Items, func(i, j int) bool { return data.Items[i].ID < data.Items[j].ID })
 	sort.Slice(data.Details, func(i, j int) bool { return data.Details[i].ID < data.Details[j].ID })
@@ -464,6 +466,14 @@ func loadActive(L *lua.LState) string {
 		return ""
 	}
 	return lua.LVAsString(table.RawGetString("character"))
+}
+
+func loadActiveMarket(L *lua.LState) string {
+	table, ok := L.GetGlobal("TRADEPOST_ACTIVE").(*lua.LTable)
+	if !ok {
+		return ""
+	}
+	return lua.LVAsString(table.RawGetString("market"))
 }
 
 func parseRecord(record string) (Scan, error) {

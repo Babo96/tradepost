@@ -62,6 +62,7 @@ type Service struct {
 	meta              map[string]string
 	authSeq           int64
 	activeCharacter   string
+	activeMarket      string
 	lastLoginCodeAt   time.Time
 	ringBase          map[string]api.SnapshotItem
 	ringBaseSeq       int64
@@ -163,6 +164,11 @@ func (s *Service) sync(ctx context.Context) error {
 	if data.Active != "" {
 		s.mu.Lock()
 		s.activeCharacter = data.Active
+		s.mu.Unlock()
+	}
+	if data.ActiveMarket != "" {
+		s.mu.Lock()
+		s.activeMarket = data.ActiveMarket
 		s.mu.Unlock()
 	}
 	s.applyRingRequest(data.RingRequest)
@@ -311,12 +317,12 @@ func (s *Service) sync(ctx context.Context) error {
 		return fmt.Errorf("write data addon: %w", err)
 	}
 
-	var selected *api.Snapshot
-	for i := range snapshots {
-		if snapshots[i].Market == s.cfg.Market {
-			selected = &snapshots[i]
-			break
-		}
+	s.mu.Lock()
+	activeMarket := s.activeMarket
+	s.mu.Unlock()
+	selected := pickSnapshot(snapshots, activeMarket)
+	if selected == nil {
+		selected = pickSnapshot(snapshots, s.cfg.Market)
 	}
 	if selected == nil && len(snapshots) > 0 {
 		selected = &snapshots[0]
@@ -407,10 +413,28 @@ func (s *Service) applyRingRequest(request *export.RingRequest) {
 		return
 	}
 	s.lastRingRequestAt = request.At
-	if request.Market == "" || request.Market == s.cfg.Market {
+	s.mu.Lock()
+	activeMarket := s.activeMarket
+	s.mu.Unlock()
+	if request.Market == "" ||
+		request.Market == s.cfg.Market ||
+		request.Market == activeMarket ||
+		request.Market == s.ringMarket {
 		s.ringBase = nil
 		s.ringMarket = ""
 	}
+}
+
+func pickSnapshot(snapshots []api.Snapshot, market string) *api.Snapshot {
+	if market == "" {
+		return nil
+	}
+	for i := range snapshots {
+		if snapshots[i].Market == market {
+			return &snapshots[i]
+		}
+	}
+	return nil
 }
 
 func (s *Service) syncAuth(ctx context.Context, data export.Data) {
@@ -435,6 +459,11 @@ func (s *Service) syncAuth(ctx context.Context, data export.Data) {
 		return
 	}
 	market := request.Market
+	if market == "" {
+		s.mu.Lock()
+		market = s.activeMarket
+		s.mu.Unlock()
+	}
 	if market == "" {
 		market = s.cfg.Market
 	}
@@ -582,7 +611,12 @@ func (s *Service) maybeRefreshLoginCode(ctx context.Context) {
 		log.Printf("login code slot: %v", err)
 		return
 	}
-	market := s.cfg.Market
+	s.mu.Lock()
+	market := s.activeMarket
+	s.mu.Unlock()
+	if market == "" {
+		market = s.cfg.Market
+	}
 	if market == "" {
 		market = "eu:pve:horde"
 	}

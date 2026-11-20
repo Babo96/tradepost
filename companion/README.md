@@ -5,13 +5,23 @@ Go companion for Linux and Windows. No CGO, no runtime dependencies.
 ## Build
 
 ```sh
-make companion-build           # dist/tradepostc (host platform)
-make companion-build-windows   # dist/tradepostc.exe (windows/amd64)
+make companion-build           # dist/tradepost (host platform)
+make companion-build-windows   # dist/tradepost.exe (windows/amd64)
 make release-windows           # dist/tradepost-companion-<version>-windows-amd64.zip
 ```
 
 The Windows zip contains `tradepost.exe`, `setup.cmd`, and the addon sources in the
 `addon/` and `data-addon/` layout expected by `tradepost install`.
+
+## Multiple characters and markets
+
+The addon publishes the active character's market (`region:ruleset:faction`) in
+`TRADEPOST_ACTIVE.market`. The companion follows that market for the live price
+ring; the configured `market` is only the fallback until a character is
+detected. Scans, local prices, watchlists and login codes are per character and
+market. The website, server, and central data addon keep every market snapshot,
+so Horde/Alliance and PvP/PvE alts all have data; switching characters switches
+the live ring after the next SavedVariables flush (up to a few minutes).
 
 ## Commands
 
@@ -35,8 +45,8 @@ the sync service without a restart.
 The dashboard has:
 
 - `/` — status, “Sync now”, login code, raw JSON
-- `/setup` — three-step setup wizard (game folder, server/market, install)
-- `/settings` — change the game folder, server, market, ring slots, interval,
+- `/setup` — three-step setup wizard (game folder, server/default market, install)
+- `/settings` — change the game folder, server, default market, ring slots, interval,
   and re-run the addon install
 
 The dashboard always binds `127.0.0.1`. POST endpoints require a per-process

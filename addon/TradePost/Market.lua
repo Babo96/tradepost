@@ -76,6 +76,7 @@ function TP:UpdateMarket()
     house = self.config.houseOverride
   end
 
+  local previous = self.market and self.market.key
   self.market = {
     realm = realm,
     ruleset = ruleset,
@@ -85,6 +86,11 @@ function TP:UpdateMarket()
     house = house,
     key = region .. ":" .. ruleset .. ":" .. house,
   }
+  -- Character/faction/ruleset changes move the live ring to another market.
+  -- Tell the companion immediately so it selects the new snapshot.
+  if previous and previous ~= self.market.key and self.MarkActive then
+    self:MarkActive()
+  end
   return self.market
 end
 

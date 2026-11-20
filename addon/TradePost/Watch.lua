@@ -18,8 +18,12 @@ end
 function TP:MarkActive()
   TRADEPOST_ACTIVE = {
     character = self:CharacterKey(),
+    market = self:MarketKey(),
     seen = time(),
   }
+  if self.SaveExport then
+    self:SaveExport()
+  end
   return TRADEPOST_ACTIVE.character
 end
 

@@ -38,6 +38,7 @@ const baseCSS = `
   code { font-family: ui-monospace, monospace; }
   footer { color: #6b7280; margin-top: 28px; font-size: 12px; }
   .muted { color: #9ca3af; font-size: 12px; }
+  .hint { color: #6b7280; font-size: 12px; margin: 6px 0 0; }
   ul.summary { margin: 0; padding-left: 20px; }
   ul.summary li { margin: 4px 0; }
 `
@@ -59,7 +60,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 
   <div class="grid">
     <div class="card"><div class="label">Server</div><div class="value" id="server">–</div></div>
-    <div class="card"><div class="label">Market</div><div class="value" id="market">–</div></div>
+    <div class="card"><div class="label">Active market</div><div class="value" id="market">–</div></div>
     <div class="card"><div class="label">Last sync</div><div class="value" id="lastSync">–</div></div>
     <div class="card"><div class="label">Snapshot</div><div class="value" id="snapshot">–</div></div>
     <div class="card"><div class="label">Last upload</div><div class="value" id="lastUpload">–</div></div>
@@ -308,11 +309,12 @@ var setupTemplate = template.Must(template.New("setup").Parse(`<!doctype html>
   </section>
 
   <section id="step2" class="panel" hidden>
-    <h2>Server &amp; market</h2>
+    <h2>Server &amp; default market</h2>
     <label for="server">Server URL</label>
     <input id="server" value="{{.Config.Server}}" placeholder="https://tradepost.b4b0.de" autocomplete="off">
-    <label for="market">Market key</label>
+    <label for="market">Default market</label>
     <input id="market" value="{{.Config.Market}}" placeholder="eu:pve:horde" autocomplete="off">
+    <p class="hint">Fallback only; the active character's region, ruleset and faction select the live market automatically.</p>
     <div class="row">
       <div>
         <label for="ringSlots">Ring slots</label>
@@ -383,8 +385,9 @@ var settingsTemplate = template.Must(template.New("settings").Parse(`<!doctype h
     <h2>Sync settings</h2>
     <label for="server">Server URL</label>
     <input id="server" value="{{.Config.Server}}" autocomplete="off">
-    <label for="market">Market key</label>
+    <label for="market">Default market</label>
     <input id="market" value="{{.Config.Market}}" autocomplete="off">
+    <p class="hint">Fallback only; the active character's market follows automatically.</p>
     <div class="row">
       <div>
         <label for="ringSlots">Ring slots</label>
