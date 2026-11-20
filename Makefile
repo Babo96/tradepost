@@ -23,7 +23,7 @@ COMPANION_LDFLAGS := -s -w -X main.version=$(VERSION)
 
 PROBE_ADDONS := TradePostProbe TPProbeDataA TPProbeDataB TPProbeDataC TPProbeDataD
 
-.PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-build-windows icon release-windows companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
+.PHONY: help addon-install addon-update addon-uninstall ring-install ring-uninstall ring-write db-up db-down server-build server-run server-test companion-build companion-build-windows icon windows-icon release-windows companion-install companion-enroll companion-run companion-test go-lint probe-install probe-uninstall probe-show probe-bind probe-ring probe-meta probe-set probe-clear probe-reset probe-restore lint test check
 
 help:
 	@echo "TradePost"
@@ -42,6 +42,7 @@ help:
 	@echo "  make companion-build        build dist/tradepost (host platform)"
 	@echo "  make companion-build-windows build dist/tradepost.exe"
 	@echo "  make icon                   regenerate brand icons from the SVG source"
+	@echo "  make windows-icon           embed the icon in the Windows executable"
 	@echo "  make release-windows        package the Windows companion zip"
 	@echo "  make companion-install      install addon + COUNT slots via tradepost"
 	@echo "  make companion-enroll       enroll this machine with SERVER"
@@ -109,6 +110,10 @@ companion-build-windows:
 
 icon:
 	@tools/assets/render_icon.sh
+	@$(MAKE) windows-icon
+
+windows-icon:
+	@go run github.com/akavel/rsrc@latest -arch amd64 -ico assets/tradepost-icon.ico -o companion/cmd/tradepost/rsrc_windows_amd64.syso
 
 release-windows: companion-build-windows
 	@$(PYTHON) tools/release/package_windows.py --version "$(VERSION)" --binary dist/tradepost.exe
