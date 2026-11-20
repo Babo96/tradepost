@@ -154,6 +154,8 @@ function TP:StartProcessing(total)
   self.scan.total = total
   self.scan.acc = {}
   self.scan.metaSeen = {}
+  self.scan.links = {}
+  TP.itemLinks = TP.itemLinks or {}
   self.scan.auctions = 0
   self.scan.missing = 0
   self.scan.started = debugprofilestop()
@@ -181,6 +183,15 @@ function TP:StartProcessing(total)
 
         if itemID and not self.scan.metaSeen[itemID] then
           self.scan.metaSeen[itemID] = true
+          -- The AH link is available while the replicate list is loaded and
+          -- lets the metadata pass read stats even when the item is not in the
+          -- general item cache. This is TradePost's own scan; Auctionator is
+          -- not involved.
+          local link = C_AuctionHouse.GetReplicateItemLink(i)
+          if link then
+            self.scan.links[itemID] = link
+            TP.itemLinks[itemID] = link
+          end
           local name, _, quality, _, _, _, _, _, _, icon = C_Item.GetItemInfo(itemID)
           if not name then
             name = type(info[1]) == "string" and info[1] or nil

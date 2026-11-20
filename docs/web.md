@@ -81,10 +81,10 @@ Keys exposed in the UI:
 
 `has_stats=1` requires a non-empty stats object.
 
-Stats come from item metadata the game client has cached. Items whose stats
-were never cached are not returned by a stat filter; the companion's daily
-metadata backfill requests the missing item data and fills them in. Run
-`/tradepost meta force` in game for an immediate full refresh.
+Stats come from item metadata collected from TradePost's own auction-house
+scan; Auctionator is not required. Items whose stats were never captured are
+not returned by a stat filter. Run `/tradepost meta force` in game for an
+immediate full refresh after a scan.
 
 ## Data flow
 

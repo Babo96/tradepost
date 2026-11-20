@@ -139,8 +139,10 @@ See [protocol.md](protocol.md) for the payloads and slot rules.
 The optional Advanced/Admin backfill collects full tooltip text and
 `C_Item.GetItemStats` for every known item in 500-item batches. It runs at most
 once per day when enabled (manual start/force overrides), skips the client's
-"Retrieving item information" placeholder, requests uncached item data by ID,
-and retries equipment whose stats are not cached yet. The
+"Retrieving item information" placeholder, uses item links captured by
+TradePost's own auction-house scan (`GetReplicateItemLink`), requests uncached
+item data by ID, and retries equipment whose stats are not cached yet. The
+Auctionator bridge is display-only and is not part of metadata collection. The
 companion uploads changed details and acknowledges batches through the 16
 `TradePost_Ack_XX` slots. The website renders the text lines and stats in the
 hover card; `GET /v1/items/missing-details` drives the next pass.

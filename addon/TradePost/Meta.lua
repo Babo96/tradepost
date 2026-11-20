@@ -18,6 +18,7 @@ local ACK_TIMEOUT_SECONDS = 300
 local ACK_SLOTS = 16
 local DEFAULT_ICON = 134400 -- inv_misc_questionmark
 
+TP.itemLinks = TP.itemLinks or {}
 TRADEPOST_ITEM_DETAILS = TRADEPOST_ITEM_DETAILS or {}
 TRADEPOST_META_QUEUE = TRADEPOST_META_QUEUE or {
   ids = {},
@@ -150,15 +151,24 @@ end
 
 -- C_TooltipInfo is the only reliable source for the full rendered tooltip.
 -- Keep plain text only: no textures, fonts, colors or raw tooltip objects.
-local function readDetailLines(id)
+local function readDetailLines(id, link)
   local lines = {}
-  local fn = C_TooltipInfo and C_TooltipInfo.GetItemByID
-  if type(fn) ~= "function" then
+  if not C_TooltipInfo then
     return { lines = lines }
   end
-  local ok, data = pcall(fn, id)
+  local ok, data
+  if link and type(C_TooltipInfo.GetHyperlink) == "function" then
+    ok, data = pcall(C_TooltipInfo.GetHyperlink, link)
+  end
   if not ok or type(data) ~= "table" then
-    ok, data = pcall(fn, { itemID = id })
+    local fn = C_TooltipInfo.GetItemByID
+    if type(fn) ~= "function" then
+      return { lines = lines }
+    end
+    ok, data = pcall(fn, id)
+    if not ok or type(data) ~= "table" then
+      ok, data = pcall(fn, { itemID = id })
+    end
   end
   if not ok or type(data) ~= "table" then
     return { lines = lines }
@@ -261,6 +271,7 @@ function TP:MetaCollect(id)
   local cached = TRADEPOST_ITEMS and TRADEPOST_ITEMS[id]
   local name, link, quality, itemLevel, requiredLevel, classID, subclassID
   local maxStack, equipLoc, icon, vendorPrice, bindType
+  local ahLink = TP.itemLinks and TP.itemLinks[id]
 
   -- The browser already asks the client to load auction items by ID. The
   -- backfill must do the same; GetItemInfo alone only sees the current cache.
@@ -278,6 +289,9 @@ function TP:MetaCollect(id)
     if not ok then
       name = nil
     end
+  end
+  if not link then
+    link = ahLink
   end
   if not link and C_Item and type(C_Item.GetItemLink) == "function" then
     local ok, value = pcall(C_Item.GetItemLink, id)
@@ -328,7 +342,7 @@ function TP:MetaCollect(id)
     subclassID = cached.s
   end
 
-  local detailLines = readDetailLines(id)
+  local detailLines = readDetailLines(id, link)
   if isPlaceholderLines(detailLines.lines) then
     -- Ask the client to load the item and retry it in a later pass. Keep any
     -- real details already stored from a previous run.
