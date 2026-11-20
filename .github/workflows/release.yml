@@ -13,9 +13,6 @@ jobs:
   release:
     name: Build release archives
     runs-on: ubuntu-latest
-    env:
-      CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-      CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -95,20 +92,26 @@ jobs:
             echo 'CURSEFORGE_CHANGELOG_EOF'
           } >> "$GITHUB_OUTPUT"
 
-      - name: CurseForge configuration
+      - name: Check CurseForge configuration
+        id: curseforge
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
         run: |
           if [ -z "${CURSEFORGE_API_TOKEN}" ] || [ -z "${CURSEFORGE_PROJECT_ID}" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
             echo "::notice title=CurseForge upload skipped::Set the CURSEFORGE_API_TOKEN secret and CURSEFORGE_PROJECT_ID variable to enable automatic uploads."
           else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
             echo "CurseForge upload enabled for project ${CURSEFORGE_PROJECT_ID}."
           fi
 
       - name: Upload addon to CurseForge
-        if: ${{ startsWith(github.ref, 'refs/tags/v') && env.CURSEFORGE_API_TOKEN != '' && env.CURSEFORGE_PROJECT_ID != '' }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') && steps.curseforge.outputs.enabled == 'true' }}
         uses: itsmeow/curseforge-upload@v3
         with:
-          token: ${{ env.CURSEFORGE_API_TOKEN }}
-          project_id: ${{ env.CURSEFORGE_PROJECT_ID }}
+          token: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          project_id: ${{ vars.CURSEFORGE_PROJECT_ID }}
           game_endpoint: wow
           file_path: dist/TradePost-${{ steps.version.outputs.value }}.zip
           game_versions: ${{ vars.CURSEFORGE_GAME_VERSIONS || 'Forever:1.60.1' }}
