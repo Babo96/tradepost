@@ -123,7 +123,7 @@ jobs:
           project_id: ${{ vars.CURSEFORGE_PROJECT_ID || secrets.CURSEFORGE_PROJECT_ID }}
           game_endpoint: wow
           file_path: dist/TradePost-${{ steps.version.outputs.value }}.zip
-          game_versions: ${{ vars.CURSEFORGE_GAME_VERSIONS || 'Forever:1.60.1' }}
+          game_versions: ${{ vars.CURSEFORGE_GAME_VERSIONS || '88568:1.60.1' }}
           release_type: release
           display_name: TradePost ${{ steps.version.outputs.value }}
           changelog: ${{ steps.release_notes.outputs.body }}

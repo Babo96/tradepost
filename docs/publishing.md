@@ -66,11 +66,13 @@ below exist, so a release never fails because the project is not set up yet.
    - **Secret** `CURSEFORGE_API_TOKEN` — the token from step 2.
    - **Variable or secret** `CURSEFORGE_PROJECT_ID` — the numeric project ID.
    - **Optional variable** `CURSEFORGE_GAME_VERSIONS` — defaults to
-     `Forever:1.60.1`.
+     `88568:1.60.1` (game version type `88568` = Forever, version `1.60.1`).
+     Use the numeric type ID; the API does not resolve the display name
+     `Forever`.
 4. Push a `vX.Y.Z` tag. The upload uses:
    - the addon zip `TradePost-X.Y.Z.zip`,
    - game endpoint `wow`,
-   - game version `Forever:1.60.1` (the Forever flavor; the TOC interface is
+   - game version `88568:1.60.1` (the Forever type ID; the TOC interface is
      `16001`),
    - release type `release`,
    - display name `TradePost X.Y.Z`,
