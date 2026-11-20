@@ -23,7 +23,7 @@ import (
 	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
-var version = "0.2.14"
+var version = "0.2.15"
 
 func main() {
 	if len(os.Args) < 2 {

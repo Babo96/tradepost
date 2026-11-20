@@ -20,15 +20,12 @@ end
 
 function TP:SetLocalPriceFor(marketKey, key, price, quantity, listings, timestamp)
   local db = self:LocalDBFor(marketKey)
-  local entry = db.prices[key]
-  if not entry then
-    entry = {}
-    db.prices[key] = entry
-  end
-  entry.p = price
-  entry.q = quantity
-  entry.n = listings
-  entry.t = timestamp
+  db.prices[key] = self.EncodePrice({
+    p = price,
+    q = quantity,
+    n = listings,
+    t = timestamp,
+  })
 end
 
 function TP:SetLocalPrice(key, price, quantity, listings, timestamp)
@@ -38,7 +35,7 @@ end
 function TP:GetLocalPrice(keys)
   local db = self:LocalDB()
   for _, key in ipairs(keys) do
-    local entry = db.prices[key]
+    local entry = self.DecodePrice(db.prices[key])
     if entry then
       return entry, key
     end
@@ -59,8 +56,9 @@ function TP:PruneLocal()
   end
   local now = time()
   for _, db in pairs(TRADEPOST_DB.markets) do
-    for key, entry in pairs(db.prices or {}) do
-      if not entry.t or (now - entry.t) > MAX_AGE then
+    for key, raw in pairs(db.prices or {}) do
+      local entry = self.DecodePrice(raw)
+      if not entry or not entry.t or (now - entry.t) > MAX_AGE then
         db.prices[key] = nil
       end
     end

@@ -1,6 +1,6 @@
 local ADDON, TP = ...
 TP.name = ADDON
-TP.version = "0.2.14"
+TP.version = "0.2.15"
 TP.atAuctionHouse = false
 
 function TP:Print(...)
@@ -39,6 +39,9 @@ function TP:OnLoad()
     pcall(self.ExportDB, self)
   end
   TRADEPOST_DB.markets = TRADEPOST_DB.markets or {}
+  if self.CompactMigrate then
+    pcall(self.CompactMigrate, self)
+  end
 
   self:UpdateMarket()
   self:PruneLocal()

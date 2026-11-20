@@ -97,6 +97,11 @@ delay, vendor price, max stack, unique flag, set id, JSON `stats`, and JSON
 `details` (the rendered tooltip lines). `details_version` and `details_updated`
 track the metadata backfill.
 
+The client-side price DB and item cache are stored as compact per-entry strings
+(`prices[key] = "p,q,n,t"`, `items[id] = "name\ticon\tclass\tsubclass\tquality"`).
+Legacy table entries are migrated on load; the tables keep their keys, so
+lookups and iteration remain the same.
+
 ## Companion ↔ game transport
 
 The game sandbox offers no file, socket or HTTP API to Lua. The game does write

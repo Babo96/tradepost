@@ -268,7 +268,7 @@ end
 -- client cannot resolve (they are excluded from the batch rather than uploaded
 -- with an empty name, which the server rejects).
 function TP:MetaCollect(id)
-  local cached = TRADEPOST_ITEMS and TRADEPOST_ITEMS[id]
+  local cached = self.DecodeItem(TRADEPOST_ITEMS and TRADEPOST_ITEMS[id])
   local name, link, quality, itemLevel, requiredLevel, classID, subclassID
   local maxStack, equipLoc, icon, vendorPrice, bindType
   local ahLink = TP.itemLinks and TP.itemLinks[id]

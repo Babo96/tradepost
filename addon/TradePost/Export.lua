@@ -35,8 +35,9 @@ end
 -- The companion parses this without needing a Lua interpreter.
 function TP:RecordExport(marketKey, timestamp, accumulator)
   local parts = {}
-  for key, entry in pairs(accumulator) do
-    if entry.p and entry.q and entry.n then
+  for key, raw in pairs(accumulator) do
+    local entry = self.DecodePrice(raw)
+    if entry and entry.p and entry.q and entry.n then
       parts[#parts + 1] = string.format(
         "%s,%d,%d,%d",
         key,

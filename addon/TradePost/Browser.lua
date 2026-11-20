@@ -19,7 +19,7 @@ function TP:CacheItemMeta(itemID, name, quality, icon)
   if not itemID or not name then
     return nil
   end
-  local existing = TRADEPOST_ITEMS[itemID]
+  local existing = self.DecodeItem(TRADEPOST_ITEMS[itemID])
   if existing and existing.n then
     return existing
   end
@@ -31,12 +31,12 @@ function TP:CacheItemMeta(itemID, name, quality, icon)
     c = classID,
     s = subClassID,
   }
-  TRADEPOST_ITEMS[itemID] = meta
+  TRADEPOST_ITEMS[itemID] = self.EncodeItem(meta)
   return meta
 end
 
 local function cacheItem(itemID)
-  local existing = TRADEPOST_ITEMS[itemID]
+  local existing = TP.DecodeItem(TRADEPOST_ITEMS[itemID])
   if existing and existing.n then
     return existing
   end
@@ -150,7 +150,8 @@ function TP:BuildBrowserData()
   local merged = {}
 
   local function add(entries, source)
-    for key, entry in pairs(entries or {}) do
+    for key, raw in pairs(entries or {}) do
+      local entry = TP.DecodePrice(raw) or raw
       if entry and entry.p then
         local current = merged[key]
         if not current
