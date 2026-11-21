@@ -576,6 +576,94 @@ function TP:ToggleBrowser()
   self:RefreshBrowser()
 end
 
+local MINIMAP_DEFAULT_ANGLE = 225
+
+-- Cursor angle around the minimap centre. Only the angle is used, so the
+-- result is safe across minimap/UI scale differences.
+local function minimapAngleFromCursor()
+  if not Minimap or not Minimap.GetCenter then
+    return nil
+  end
+  local mx, my = Minimap:GetCenter()
+  local scale = Minimap:GetEffectiveScale()
+  if not mx or not my or not scale or scale == 0 then
+    return nil
+  end
+  local x, y = GetCursorPosition()
+  if not x or not y then
+    return nil
+  end
+  x, y = x / scale, y / scale
+  local atan2 = math.atan2
+  if not atan2 then
+    atan2 = function(py, px)
+      if px > 0 then
+        return math.atan(py / px)
+      elseif px < 0 and py >= 0 then
+        return math.atan(py / px) + math.pi
+      elseif px < 0 then
+        return math.atan(py / px) - math.pi
+      elseif py > 0 then
+        return math.pi / 2
+      elseif py < 0 then
+        return -math.pi / 2
+      end
+      return 0
+    end
+  end
+  return math.deg(atan2(y - my, x - mx))
+end
+
+function TP:MinimapRadius()
+  local width = Minimap and Minimap.GetWidth and Minimap:GetWidth() or 140
+  return width / 2 + 10
+end
+
+function TP:PlaceMinimapButton(angle)
+  local button = self.minimapButton
+  if not button or not Minimap then
+    return
+  end
+  if angle == nil then
+    angle = tonumber(self.config and self.config.minimapAngle) or MINIMAP_DEFAULT_ANGLE
+  end
+  local radians = math.rad(angle)
+  local radius = self:MinimapRadius()
+  button:ClearAllPoints()
+  button:SetPoint("CENTER", Minimap, "CENTER",
+    math.cos(radians) * radius, math.sin(radians) * radius)
+end
+
+function TP:SetMinimapVisible(show)
+  show = show and true or false
+  self:SetConfig("minimap", show)
+  local button = self.minimapButton
+  if button then
+    if show then
+      self:PlaceMinimapButton()
+      button:Show()
+    else
+      button:Hide()
+      if GameTooltip then
+        GameTooltip:Hide()
+      end
+    end
+  end
+  if self.settings and self.settings.refresh then
+    self.settings.refresh()
+  end
+end
+
+function TP:ToggleMinimap()
+  local show = not (self.config and self.config.minimap)
+  self:SetMinimapVisible(show)
+  if show then
+    self:Print("minimap button shown")
+  else
+    self:Print("minimap button hidden; /tradepost minimap shows it again")
+  end
+end
+
 function TP:CreateMinimapButton()
   if self.minimapButton or not Minimap then
     return
@@ -584,32 +672,92 @@ function TP:CreateMinimapButton()
   button:SetSize(28, 28)
   button:SetFrameStrata("MEDIUM")
   button:SetFrameLevel(Minimap:GetFrameLevel() + 5)
-  button:SetPoint("CENTER", Minimap, "CENTER", -58, -58)
   button:SetNormalTexture("Interface\\AddOns\\TradePost\\Media\\icon")
   button:SetHighlightTexture("Interface\\AddOns\\TradePost\\Media\\highlight", "ADD")
   local icon = button:GetNormalTexture()
   if icon then
     icon:SetTexCoord(0, 1, 0, 1)
   end
+
+  self.minimapButton = button
+  self:PlaceMinimapButton()
+
+  local dragging = false
+  local suppressUntil = 0
+
+  local function updateDrag()
+    local angle = minimapAngleFromCursor()
+    if angle ~= nil then
+      TP:PlaceMinimapButton(angle)
+    end
+  end
+
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  button:RegisterForDrag("LeftButton")
+
+  button:SetScript("OnDragStart", function()
+    if not IsShiftKeyDown() then
+      return
+    end
+    dragging = true
+    -- A drag ends with a button release; swallow the click that follows it.
+    suppressUntil = GetTime() + 0.25
+    if GameTooltip then
+      GameTooltip:Hide()
+    end
+    button:SetScript("OnUpdate", updateDrag)
+    updateDrag()
+  end)
+
+  button:SetScript("OnDragStop", function()
+    if not dragging then
+      return
+    end
+    dragging = false
+    button:SetScript("OnUpdate", nil)
+    local angle = minimapAngleFromCursor()
+    if angle ~= nil then
+      angle = angle % 360
+      TP:SetConfig("minimapAngle", math.floor(angle * 10 + 0.5) / 10)
+    end
+    TP:PlaceMinimapButton()
+  end)
+
   button:SetScript("OnClick", function(_, mouseButton)
+    if GetTime() < suppressUntil then
+      suppressUntil = 0
+      return
+    end
+    if IsShiftKeyDown() then
+      if mouseButton == "RightButton" then
+        TP:SetMinimapVisible(false)
+        TP:Print("minimap button hidden; /tradepost minimap or the addon settings bring it back")
+      end
+      return
+    end
     if mouseButton == "RightButton" then
       TP:OpenSettings()
     else
       TP:ToggleBrowser()
     end
   end)
+
   button:SetScript("OnEnter", function(btn)
     GameTooltip:SetOwner(btn, "ANCHOR_LEFT")
     GameTooltip:AddLine("TradePost")
     GameTooltip:AddLine("Left click: browse auction prices", 0.8, 0.8, 0.8)
     GameTooltip:AddLine("Right click: open settings", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("Shift + drag: move around the minimap", 0.8, 0.8, 0.8)
+    GameTooltip:AddLine("Shift + right click: hide the button", 0.8, 0.8, 0.8)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()
     GameTooltip:Hide()
   end)
-  self.minimapButton = button
+
+  if TP.config and TP.config.minimap == false then
+    button:Hide()
+  end
 end
 
 local init = CreateFrame("Frame")

@@ -165,6 +165,11 @@ local function createPanel()
         TP:SyncAuctionatorFavourites(true)
       end
     end, "/tradepost favourites on|off")
+  settings.controls.minimap = createCheckbox(panel, 320, y, "Minimap button", "minimap",
+    "Show the TradePost button on the minimap. Shift-drag moves it; shift-right-click hides it.",
+    function(value)
+      TP:SetMinimapVisible(value)
+    end, "/tradepost minimap on|off")
 
   y = y - 34
   local sliderLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")

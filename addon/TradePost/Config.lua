@@ -11,6 +11,10 @@ local DEFAULTS = {
   ringWindow = 300,
   auctionatorBridge = true,
   auctionatorFavourites = true,
+  -- Minimap button: shown by default, position stored as degrees around the
+  -- minimap (0 = right, 90 = up). Shift-drag moves it, shift-right-click hides.
+  minimap = true,
+  minimapAngle = 225,
   -- Advanced/admin only. Collects full item tooltip metadata. Off by default
   -- because the SavedVariables payload can be large.
   adminFullSync = false,

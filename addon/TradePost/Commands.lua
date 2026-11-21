@@ -60,6 +60,7 @@ function TP:PrintHelp()
   self:Print("  /tradepost supply on/off    show total supply")
   self:Print("  /tradepost ring [now/on/off/count N]  live data ring")
   self:Print("  /tradepost browse           open the auction data browser")
+  self:Print("  /tradepost minimap [on/off] show or hide the minimap button")
   self:Print("  /tradepost watch [id/key]   toggle a watched item / list the watchlist")
   self:Print("  /tradepost watch sync       rebuild the Auctionator watchlist")
   self:Print("  /tradepost favourites on/off mirror Auctionator favourites into the watchlist")
@@ -141,6 +142,16 @@ SlashCmdList["TRADEPOST"] = function(msg)
     TP:OpenSettings()
   elseif command == "browse" or command == "browser" then
     TP:ToggleBrowser()
+  elseif command == "minimap" then
+    if rest == "on" then
+      TP:SetMinimapVisible(true)
+      TP:Print("minimap button shown")
+    elseif rest == "off" then
+      TP:SetMinimapVisible(false)
+      TP:Print("minimap button hidden")
+    else
+      TP:ToggleMinimap()
+    end
   elseif command == "watch" then
     if rest == "sync" or rest == "auctionator" then
       TP:SyncAuctionatorWatchList(true)

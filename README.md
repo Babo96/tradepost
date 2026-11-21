@@ -105,8 +105,10 @@ starts, when it stops, and once when the addon asks after a reload.
 7. Start WoW. **Restart the client once** after the first install so the new
    addon folders are discovered. Later addon code updates only need `/reload`.
 8. In game, open `/tradepost` for settings, or use the TradePost button next
-   to the minimap (left click: browser, right click: settings). Open the
-   auction house to make your first scan.
+   to the minimap: left click opens the browser, right click opens settings,
+   shift-drag moves the button around the minimap, and shift-right-click hides
+   it (`/tradepost minimap` brings it back). Open the auction house to make
+   your first scan.
 
 Keep the companion running while you play. It stays in the notification area;
 left-click the tray icon for the dashboard at `http://127.0.0.1:8787`, or

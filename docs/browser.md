@@ -39,8 +39,12 @@ Two options, in order of preference:
 1. **Addon compartment icon** (`AddonCompartmentFunc`): the official small icon
    next to the minimap. No custom minimap math; the icon can use
    `Interface\AddOns\TradePost\Media\icon` (a custom 32×32 TGA).
-2. **Minimap button** fallback with saved position, for clients/addon managers
-   where the compartment is not available.
+2. **Minimap button** with a saved position, for clients/addon managers where
+   the compartment is not available. Left click toggles the browser, right
+   click opens settings. **Shift-drag** moves it around the minimap and stores
+   the angle in `minimapAngle`; **shift-right-click** hides it and sets
+   `minimap = false`. Restore it with `/tradepost minimap` or the "Minimap
+   button" checkbox in Options → AddOns → TradePost.
 
 The icon opens `TradePostBrowser`; a second click or Escape closes it.
 
