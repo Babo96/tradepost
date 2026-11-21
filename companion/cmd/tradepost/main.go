@@ -24,7 +24,7 @@ import (
 	"github.com/babo96/tradepost/companion/internal/wow"
 )
 
-var version = "0.2.19"
+var version = "0.2.20"
 
 func main() {
 	setupLogging()
