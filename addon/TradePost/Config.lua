@@ -15,6 +15,9 @@ local DEFAULTS = {
   -- minimap (0 = right, 90 = up). Shift-drag moves it, shift-right-click hides.
   minimap = true,
   minimapAngle = 225,
+  -- Market ruleset detection. "auto" reads the realm name (with fallbacks);
+  -- set pve/pvp/rp/rp-pvp/hc if a custom client hides its realm name.
+  rulesetOverride = "auto",
   -- Advanced/admin only. Collects full item tooltip metadata. Off by default
   -- because the SavedVariables payload can be large.
   adminFullSync = false,

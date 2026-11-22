@@ -37,9 +37,15 @@ end
 function TP:PrintMarket()
   self:UpdateMarket()
   local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player") or nil
-  self:Print("realm: " .. tostring(self.market.realm))
+  self:Print("realm: '" .. tostring(self.market.realm) .. "'")
   self:Print("region: " .. tostring(self.market.region) .. " (" .. tostring(self.market.regionNumber) .. ")")
-  self:Print("ruleset: " .. tostring(self.market.ruleset))
+  self:Print("ruleset: " .. tostring(self.market.ruleset) ..
+    (self.market.rulesetSource and (" (" .. self.market.rulesetSource .. ")") or ""))
+  if self.market.ruleset == "unknown" then
+    local names = self.market.realmCandidates or {}
+    self:Print("realm sources: " .. (#names > 0 and table.concat(names, " | ") or "none"))
+    self:Print("set it manually: /tradepost ruleset pve")
+  end
   self:Print("faction: " .. tostring(self.market.faction))
   self:Print("house: " .. tostring(self.market.house))
   self:Print("key: " .. tostring(self.market.key))
@@ -55,6 +61,7 @@ function TP:PrintHelp()
   self:Print("  /tradepost status           local data and throttle state")
   self:Print("  /tradepost market           market detection details")
   self:Print("  /tradepost house auto/alliance/horde/neutral")
+  self:Print("  /tradepost ruleset auto/pve/pvp/rp/rp-pvp/hc")
   self:Print("  /tradepost tooltips on/off  price tooltips")
   self:Print("  /tradepost age on/off       show price age")
   self:Print("  /tradepost supply on/off    show total supply")
@@ -99,6 +106,13 @@ SlashCmdList["TRADEPOST"] = function(msg)
     TP:UpdateMarket()
     TP:Print("house override: " .. tostring(TP.config.houseOverride or "auto") ..
       " -> " .. TP:MarketKey())
+  elseif command == "ruleset" then
+    local value = rest ~= "" and rest or "auto"
+    if not TP:SetRulesetOverride(value) then
+      TP:Print("usage: /tradepost ruleset auto/pve/pvp/rp/rp-pvp/hc")
+      return
+    end
+    TP:Print("ruleset: " .. TP:MarketKey() .. " (" .. tostring(TP.config.rulesetOverride) .. ")")
   elseif command == "tooltips" then
     TP:SetConfig("tooltips", rest ~= "off")
     TP:Print("tooltips: " .. tostring(TP.config.tooltips))

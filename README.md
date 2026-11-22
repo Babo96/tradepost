@@ -214,6 +214,13 @@ the server aggregates it, and the next ring window (5 minutes) or data addon
 refresh (30 minutes) delivers it. The website should show your market
 immediately after the upload.
 
+**The market shows `unknown` (for example `eu:unknown:horde`).**
+Some client builds return an empty realm name. TradePost reads the raw realm
+name, the normalized name and the realm list, then falls back to markets this
+install already has data for. If it still cannot detect the ruleset, set it
+once with `/tradepost ruleset pve` (also `pvp`, `rp`, `rp-pvp`, `hc`, or `auto`
+to return to detection). `/tradepost market` prints which realm names it saw.
+
 **`/tradepost login` does not show a code.**
 The companion must be running. It publishes a fresh code every 8 minutes. If a
 code still does not appear after a few `/reload`s, the 16 load-on-demand auth
